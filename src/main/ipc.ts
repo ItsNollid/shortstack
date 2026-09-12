@@ -2,6 +2,7 @@ import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { IPC_CHANNELS } from '../shared/types';
 import { getMainWindow } from './index';
 import { 
+  getDb,
   getAllVideos, 
   getAllQueueItems, 
   approveQueueItem, 
@@ -24,7 +25,7 @@ import { generateMetadata } from './ai/ollama';
 export const registerIpcHandlers = () => {
   ipcMain.handle(IPC_CHANNELS.GET_VIDEOS, () => getAllVideos());
   
-  ipcMain.handle(IPC_CHANNELS.SCAN_FOLDER, () => scanFolder());
+  ipcMain.handle(IPC_CHANNELS.SCAN_FOLDER, () => scanFolder(getDb()));
   
   ipcMain.handle(IPC_CHANNELS.GET_QUEUE, () => getAllQueueItems());
   
