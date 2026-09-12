@@ -1,0 +1,49 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-4);
+  height: 32px;
+  font-size: var(--text-md);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  transition: background var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease);
+}
+
+.button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+/* The one strongly-weighted action on a screen: a white pill, like Studio's primary. */
+.primary {
+  background: var(--text);
+  color: var(--on-light);
+}
+.primary:hover:not(:disabled) { background: #ffffff; }
+
+.secondary {
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+.secondary:hover:not(:disabled) { background: var(--hover); }
+
+.ghost { color: var(--text-muted); }
+.ghost:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+
+.danger { color: var(--danger); border-color: rgba(255, 107, 97, 0.4); }
+.danger:hover:not(:disabled) { background: rgba(255, 107, 97, 0.12); }
+
+.small { height: 26px; padding: 0 var(--space-3); font-size: var(--text-sm); }
+.large { height: 38px; padding: 0 var(--space-5); }
+
+.iconOnly { width: 32px; padding: 0; border-radius: var(--radius-pill); }
+.iconOnly.small { width: 26px; }
+.iconOnly.large { width: 38px; }
+
+.icon { display: inline-flex; flex: none; }

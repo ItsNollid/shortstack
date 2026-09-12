@@ -1,0 +1,39 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-2) 2px 6px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+.neutral { color: var(--text-muted); background: var(--hover); }
+.waiting { color: var(--pending); background: rgba(245, 185, 74, 0.14); }
+.ready { color: var(--text); background: var(--hover); }
+.scheduled { color: var(--scheduled); background: rgba(62, 166, 255, 0.14); }
+.active { color: var(--brand); background: rgba(255, 78, 69, 0.14); }
+.live { color: var(--live); background: rgba(63, 207, 142, 0.14); }
+.attention { color: var(--danger); background: rgba(255, 107, 97, 0.14); }
+
+/* Something is happening right now: a slow pulse, stilled for reduced motion. */
+.pulsing .dot { animation: pulse 1.6s ease-in-out infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulsing .dot { animation: none; }
+}

@@ -1,0 +1,23 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-3);
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--raised);
+  padding: var(--space-3) var(--space-4);
+}
+
+.panelTitle { font-size: var(--text-md); margin-bottom: var(--space-2); }
+
+.dump {
+  margin: 0;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}

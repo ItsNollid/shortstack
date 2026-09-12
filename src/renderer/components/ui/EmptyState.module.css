@@ -1,0 +1,22 @@
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.glyph {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--text-faint);
+}
+
+.title { font-size: var(--text-lg); color: var(--text); }
+.text { max-width: 40ch; }
