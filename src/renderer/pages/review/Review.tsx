@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, FolderOpen, Pencil, Repeat, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, CircleSlash, FolderOpen, Pencil, Repeat, RotateCw, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { QueueItemDTO } from '../../../shared/dto';
 import type { Result } from '../../../shared/ipc';
 import { formatDuration, formatFileSize, presentState, shortsWarning } from '../../../shared/presentation';
 import { needsReview, positionAfterChange, progress, step } from '../../../shared/review';
+import { nextFreeSlot } from '../../../shared/slots';
+import { useAppStatus } from '../../app/status';
 import { PageHeader } from '../../components/PageHeader';
 import { Banner, Button, EmptyState, StatusPill } from '../../components/ui';
 import { useRequestApproval } from '../../app/approval';
@@ -26,6 +28,7 @@ export function Review(): React.JSX.Element {
   const navigate = useNavigate();
   const toast = useToast();
   const requestApproval = useRequestApproval();
+  const { settings } = useAppStatus();
   const queue = useApiQuery(readQueue, { key: 'queue', invalidateOn: ['queue:changed'] });
   const [index, setIndex] = useState(0);
   const startedWith = useRef<number | null>(null);
@@ -44,7 +47,7 @@ export function Review(): React.JSX.Element {
 
   const reject = useApiMutation((ids: number[]) => window.api.queueReject(ids));
   const markReupload = useApiMutation((ids: number[]) => window.api.rotationMarkPublishedBefore(ids, true));
-  const pauseRotation = useApiMutation((ids: number[]) => window.api.rotationSetPaused(ids, true));
+  const setRotation = useApiMutation((ids: number[], paused: boolean) => window.api.rotationSetPaused(ids, paused));
 
   const move = (delta: number): void => setIndex((current) => step(current, delta, pending.length));
 
@@ -76,6 +79,19 @@ export function Review(): React.JSX.Element {
           if (done !== null) toast({ text: `${current.title} marked as a re-upload — it will not notify subscribers` });
         });
         move(1);
+      }
+    },
+    {
+      key: 'o',
+      label: item?.rotation_paused === true ? 'Back in rotation' : 'Out of rotation',
+      icon: item?.rotation_paused === true ? <RotateCw size={15} /> : <CircleSlash size={15} />,
+      run: (current) => {
+        const paused = !current.rotation_paused;
+        void setRotation.run([current.id], paused).then((done) => {
+          if (done !== null) {
+            toast({ text: `${current.title} ${paused ? 'taken out of' : 'put back into'} rotation` });
+          }
+        });
       }
     },
     {
@@ -123,7 +139,7 @@ export function Review(): React.JSX.Element {
 
   const total = startedWith.current ?? 0;
   const counted = progress(index, pending.length, total);
-  const problem = queue.error ?? reject.error ?? markReupload.error ?? pauseRotation.error;
+  const problem = queue.error ?? reject.error ?? markReupload.error ?? setRotation.error;
 
   if (item === null) {
     return (
@@ -138,6 +154,20 @@ export function Review(): React.JSX.Element {
 
   const warning = shortsWarning(item.duration_s, item.width, item.height);
   const state = presentState(item.state, item.attention_code);
+
+  // What approving would do with it, shown before the decision rather than after.
+  const lane = item.posting_kind === 'rotation' ? settings?.rotation_upload_times : settings?.upload_times;
+  const wouldPublishAt =
+    item.privacy !== 'public' || settings === null
+      ? null
+      : nextFreeSlot({
+          uploadTimes: lane ?? [],
+          taken: (queue.data ?? [])
+            .map((entry) => entry.scheduled_for)
+            .filter((at): at is string => at !== null),
+          now: new Date(),
+          horizonDays: settings.auto_schedule_days
+        });
 
   return (
     <div className={styles.screen}>
@@ -182,6 +212,14 @@ export function Review(): React.JSX.Element {
             </Banner>
           )}
           {state.hint !== '' && <div className={styles.hint}>{state.hint}</div>}
+          <div className={styles.hint}>
+            {item.privacy !== 'public'
+              ? `Approving uploads it as ${item.privacy}, without a publish time.`
+              : wouldPublishAt === null
+                ? 'Approving gives it no time yet: the schedule is full as far ahead as it books.'
+                : `Approving would publish it ${new Date(wouldPublishAt).toLocaleString()}.`}
+            {item.rotation_paused && ' This video is out of rotation.'}
+          </div>
 
           {item.description !== '' && <div className={styles.description}>{item.description}</div>}
 
