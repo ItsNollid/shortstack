@@ -1,92 +1,137 @@
-# ShortStack: Claude Handoff Documentation
+# ShortStack — where things actually stand
 
-Welcome, Claude! This document outlines the architecture, quirks, and current state of the ShortStack application to help you seamlessly take over the project for UI redesign and further feature development.
+A Windows desktop app for one creator: it watches a folder of finished Shorts, lets you approve
+them, and gets them onto your YouTube channel at times you choose. Electron + React + SQLite.
 
-## 🏗️ Architecture Overview
+**Read this before trusting anything:** the previous handoff document said the backend was
+finished. It was not. What follows is meant to be accurate, including about what is still unknown.
 
-ShortStack is a desktop application built with **Electron**, **React**, **Vite**, and **SQLite**. 
+---
 
-It uses a standard two-process architecture:
-- **Main Process (Node.js)**: Handles backend tasks like SQLite database access, file system scanning, background scheduling, and the YouTube OAuth2/Upload API.
-- **Renderer Process (React)**: The frontend UI. It communicates with the main process *exclusively* via an IPC bridge.
+## Run it
 
-### Key Directories
-- `src/main/`: All backend Node.js code (Database, IPC handlers, background scanners, YouTube APIs).
-- `src/renderer/`: All frontend React code (Pages, Components, Hooks, CSS).
-- `src/preload/`: The preload script that exposes the `window.api` bridge to the renderer.
-- `src/shared/`: Shared types and constants (`types.ts` is the source of truth for all data models).
+```bash
+npm install
+npm run dev            # the app, dev profile, dry-run
+npm test               # 366 tests
+npm run typecheck      # main + renderer
+npm run build          # electron-vite build
+npm run preview:ui     # the interface in a browser, with stubbed data, for design work
+npm run docs:legal     # regenerate docs/legal/*.md from the text bundled in the app
+```
 
-## 🔌 IPC Communication
-The frontend cannot access the database or file system directly. It calls functions on `window.api`, which are intercepted by the `ipcMain` handlers in `src/main/ipc.ts`. 
+### Profiles — the safety net
 
-> [!IMPORTANT]
-> When adding new features that require backend access, you must:
-> 1. Add the type definition to `window.api` in `src/preload/index.ts`.
-> 2. Add the corresponding handler in `src/main/ipc.ts`.
+An unpackaged run **always** uses `%APPDATA%\shortstack-dev` and refuses to upload. Touching the
+live profile takes **both** `SHORTSTACK_PROFILE=live` and `SHORTSTACK_UPLOAD_MODE=live`. This
+exists because a dev instance was previously running against the real profile with a scheduler
+that uploaded the same video every hour.
 
-## 🗄️ Database Quirks (Crucial)
+---
 
-We use `better-sqlite3`. There are a few strict rules to follow to prevent fatal crashes:
+## How it is built
 
-1. **No JavaScript Booleans**: SQLite hates `true` and `false`. The `setSetting` and `updateQueueItem` handlers have been modified to convert JS booleans to strings (e.g., `'true'`, `'false'`) before inserting them into the database, and they convert them back to booleans on read. **Always double-check type conversions when writing new database queries.**
-2. **Snake Case vs Camel Case**: The database columns are strictly `snake_case` (e.g., `category_id`, `setup_complete`). The frontend React code generally expects `camelCase`, but to avoid massive conversion overhead, most of the frontend hooks have been updated to accept the raw `snake_case` properties returned from the backend. Stick to `snake_case` for any data properties passed through IPC.
-3. **JSON Tags**: The `tags` column in the database stores a stringified JSON array. You must `JSON.parse()` it on the frontend before mapping over it, and `JSON.stringify()` it before sending it back to the backend.
+```
+src/shared/    Vocabulary and rules both sides need. Pure, heavily tested.
+src/main/      Everything with a side effect: database, scheduler, YouTube, files, icons.
+src/renderer/  React. Talks to main only through the typed contract in shared/ipc.ts.
+```
 
-## 🚀 The Uploader & Scheduler
+The rule that holds the rest together: **anything that makes a decision is a pure function with
+tests, and anything that performs an effect is a thin wrapper around one.** The state machine, the
+scheduler's choices, slot allocation, drag-and-drop rules, the publish plan and every piece of
+user-facing wording work this way.
 
-- **File Scanner**: `src/main/files/scanner.ts` watches the user's selected folder for new `.mp4` files and adds them to the queue as `Pending`.
-- **Scheduler**: `src/main/scheduler.ts` runs on a loop. It looks for items where `scheduled_for` is in the past AND `approved = 1`. 
-- **Approval Gate**: Videos will **never** be uploaded automatically unless the user manually approves them. This is a hard safety gate.
-- **YouTube API**: `src/main/youtube/uploader.ts` handles the actual chunked upload to Google's servers. 
+### The parts worth knowing
 
-> [!WARNING]
-> Do **NOT** remove the manual approval gate in the scheduler unless specifically requested by the user, to prevent accidental channel spam.
+| Where | What it decides |
+|---|---|
+| `main/domain/queueState.ts` | The state machine. Every lifecycle change goes through `transition()`. |
+| `main/scheduler/decide.ts` | What the 30-second tick should do. Returns actions; performs none. |
+| `main/scheduler/effects.ts` | Performs them. The retry ladder lives here. |
+| `shared/slots.ts` | Which publish slot a day offers. Built as local wall-clock, stored as UTC. |
+| `shared/calendarDnd.ts` | Whether a drop is allowed, and why not. |
+| `shared/queueActions.ts` | Which bulk actions a selection can take. |
+| `shared/consent.ts` | What the approval dialog promises, per upload mode. |
+| `shared/presentation.ts` | Every state's label, tone and explanation. One place. |
 
-## 🛠️ Build Process Caveat
+Several of those have tests that cross-check them **against the state machine itself**, so the UI
+cannot offer an action the backend will refuse.
 
-The project uses `electron-builder`. On Windows, if Developer Mode is not enabled, the `winCodeSign` module will fail to create symbolic links at the very end of the `npm run package` command, causing the installer generation to crash.
+### The invariant that matters most
 
-**However**, the unpacked executable is successfully generated *before* this failure. 
-You can always find the working compiled app at: `dist/win-unpacked/ShortStack.exe`. 
-Do not waste time trying to fix the `winCodeSign` symlink error unless you have admin rights to change Windows developer settings.
+**A queue item with a `youtube_video_id` or a `remote_tombstone` never uploads again.** Everything
+about duplicate protection rests on it. If you change the state machine, that is the property to
+keep.
 
-## 🤖 Phase 2, 3, and 4 (The Marathon Sprint)
+---
 
-Subagent teams recently completed a massive architecture expansion. Claude, be aware of these new modules when redesigning the UI:
+## What was wrong, and is now fixed
 
-1. **Analytics Dashboard (`src/main/youtube/analytics.ts`)**: We implemented a `fetchChannelAnalytics` hook that queries the YouTube API v2 for the last 28 days of views, watch time, and subscriber growth. It is wired to `Analytics.tsx` via Recharts. 
-2. **Local AI Engine (`src/main/ai/ollama.ts`)**: The app now integrates with **Ollama**. There is a `window.api.generateMetadata()` function that pings `localhost:11434` to auto-generate optimized titles and tags. The `MetadataEditor.tsx` has a new button to trigger this. Ensure this button looks amazing in your redesign.
-3. **Multi-Platform Support**: The database `queue` table has been upgraded to support a `platforms` JSON string array. Stubs for TikTok and Instagram OAuth flows exist in `src/main/platforms/`. The user will inject their developer API keys into these files later. 
-4. **Calendar View**: A basic CSS-grid Calendar layout was created in `src/renderer/pages/Calendar.tsx`. You will need to implement the actual JavaScript drag-and-drop logic for scheduling queued videos into specific days.
-## ⚙️ How the App Works (Behavioral Spec)
+The original build was audited against its own code, the live database and the official API docs.
+The confirmed faults:
 
-Claude, use this spec to verify that your redesigned UI still executes the intended functionality properly.
+- One approval caused an upload **every hour, forever** — the scheduler re-picked rows it had
+  already uploaded.
+- Pause did not survive a restart, and was overridden at boot.
+- Privacy defaults were ignored; everything would have gone out **public**.
+- One failing item blocked the entire queue (`LIMIT 1` with no error handling).
+- SQL was built from keys supplied by the renderer.
+- Uploads were not resumable — a dropped connection restarted a 157 MB file, or duplicated it.
+- `useIPC` refetched forever; the AI button did nothing; Analytics never loaded; the Calendar was a
+  mock; the tray icon was `createEmpty()`, so it was invisible.
+- OAuth listened on all interfaces with no `state` parameter, and dropped refresh tokens.
+- No migrations, no tests, no typecheck.
 
-1. **Folder Scanning & Ingestion**:
-   - The user selects a specific folder during setup. This path is stored in the `shorts_folder` database setting.
-   - The user can click a "Scan Folder" button (or trigger `window.api.scanFolder()`). The backend hashes every `.mp4` in that folder and inserts new unique videos into the `videos` table, and automatically stubs a corresponding row in the `queue` table (with status 'pending' and empty metadata).
-2. **The Queue & AI Metadata**:
-   - The `Queue.tsx` page displays all items. Items have 3 primary states: `Pending` (not approved), `Approved` (approved but not uploaded), and `Scheduled` (approved and given a future date).
-   - In the `MetadataEditor.tsx`, the user can click "Auto-Generate with AI". This calls `window.api.generateMetadata(filename)`, which sends a prompt to a local Ollama daemon (`localhost:11434`) asking for a JSON object with a title, description, and tags. This JSON is parsed and populated into the UI inputs.
-3. **Approval & Scheduling**:
-   - The user manually tweaks the metadata and hits "Save".
-   - The user clicks an "Approve" button, which flips `approved` to `1` in the database. 
-   - *Optional:* The user can assign a `scheduled_for` ISO timestamp to the queue item (e.g., via the Calendar drag-and-drop).
-4. **The Background Scheduler**:
-   - `src/main/scheduler.ts` runs a `node-cron` job. Every time it ticks, it queries the database for exactly ONE item where `approved = 1` and `(scheduled_for IS NULL OR scheduled_for <= NOW())`. 
-   - The scheduler state (paused vs running) is saved to the SQLite database `scheduler_paused` setting so it persists across reboots. If paused, the cron job skips execution.
-5. **Uploading**:
-   - If the scheduler finds an eligible video, it kicks off a chunked upload via `googleapis` (`youtube.videos.insert`).
-   - The video status updates to `uploaded`, and an entry is created in the `uploads` history table.
-   - A native desktop notification is fired upon success or failure.
-6. **Analytics**:
-   - The `Analytics.tsx` tab queries the YouTube API v2 (`fetchChannelAnalytics`) to retrieve 28-day channel metrics (views, estimated minutes watched, subscriber deltas) and displays them using Recharts.
-## 🎨 Next Steps for Redesign
+Found later, while building on top:
 
-The user wants a complete UI/UX overhaul. 
-1. Review `src/renderer/styles/globals.css` and `components.css`. 
-2. The current UI uses a basic glassmorphism dark mode. You have full creative freedom to gut and replace the CSS, but ensure you maintain the underlying `window.api` hook connections in the components (`useQueue`, `useIPC`, etc.).
-3. The Setup screen (`Setup.tsx`) is fully functional. Do not break the OAuth flow when redesigning it.
-4. **Dynamic App Icon**: The user requested a feature where the app's icon dynamically swaps to match the currently connected YouTube channel's profile picture. Please wire this up!
+- The scheduler announced its changes on a channel the renderer did not listen to, so **nothing the
+  backend did on its own ever reached the screen**. Now routed through one typed helper, with a
+  test that refuses raw channel names.
+- The legacy hourly-cron scheduler was still sitting in the tree, fully intact and one import from
+  being live. Deleted, along with the plaintext-token auth module and the non-resumable uploader.
 
-Good luck!
+---
+
+## The thing that shapes the whole product
+
+**An unaudited Google Cloud project permanently locks every API upload to private.** Not a quota,
+not a delay — no appeal, no way to publish it afterwards.
+
+So ShortStack defaults to **assisted mode**: it prepares each video, hands you the exact title,
+description, tags, visibility and time, opens Studio, and links the result back automatically by
+file name and size. Automatic API uploads exist and work, but cannot be switched on without an
+explicit confirmation that your project passed the audit.
+
+`docs/audit/` holds drafted answers for the audit form and a screencast script. `docs/legal/` holds
+the hostable policy and terms, generated from the same text the app displays.
+
+---
+
+## Still unverified
+
+Being specific about this, because the last handoff was not.
+
+- **Whether Windows repaints the taskbar button** for an installed, pinned app when `setIcon` is
+  called. The decode and mask pipeline is verified by running it; this last hop needs a packaged
+  install and a human looking at the taskbar. `setOverlayIcon` is set too, which always shows.
+- **No upload has ever run against a real channel.** The resumable uploader is tested against a
+  local mock server covering 308, 404, 5xx, crash-resume and completed-before-crash. It has not
+  been tested against Google.
+- **Whether an unaudited project may set `publishAt`** on a video uploaded through Studio. If
+  YouTube refuses, the item is flagged "set the schedule in Studio" with the exact time.
+- **Whether `fileDetails` is returned for private videos**, which is how assisted uploads are
+  detected. The paste-the-link fallback exists for when it is not.
+- **Chromium playback of H.264 + LPCM `.mov`**, which is what the test files are. The video preview
+  is a placeholder for now.
+
+---
+
+## If you are picking this up
+
+1. `npm test` and `npm run typecheck` before and after anything.
+2. Lifecycle changes go through `transition()`. Do not write queue state from anywhere else.
+3. New user-facing wording goes in `shared/presentation.ts`, not inline.
+4. New renderer events go through `broadcast()` in `main/ipc.ts`.
+5. The manual approval gate is not a formality — it is the thing standing between a folder of files
+   and someone's channel. Leave it alone.
