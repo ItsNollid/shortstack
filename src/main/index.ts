@@ -1,10 +1,10 @@
 import './bootstrap/profile';
-import { BrowserWindow, Tray, app, dialog, safeStorage } from 'electron';
+import { BrowserWindow, Notification, Tray, app, dialog, safeStorage } from 'electron';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { runtimeProfile } from './bootstrap/profile';
 import { getDb, initDatabase } from './db/appDatabase';
-import { readSettings } from './db/settingsRepo';
+import { readSettings, writeSetting } from './db/settingsRepo';
 import { broadcast, registerIpcHandlers } from './ipc';
 import { createSchedulerEffects } from './scheduler/effects';
 import { SchedulerEngine } from './scheduler/engine';
@@ -14,6 +14,7 @@ import { uploadVideoResumable, type UploadOutcome } from './youtube/resumableUpl
 import { TokenStore, type SecretStorage } from './youtube/tokenStore';
 import { AppIcon } from './icons/appIcon';
 import { readActiveChannel } from './db/channelRepo';
+import { applyStartWithWindows } from './startup';
 import { createTray } from './tray';
 import { createMainWindow } from './window';
 
@@ -126,7 +127,15 @@ async function start(): Promise<void> {
 
   mainWindow = createMainWindow({
     hideOnClose: () => readSettings(db).settings.close_to_tray,
-    isQuitting: () => isQuitting
+    isQuitting: () => isQuitting,
+    onFirstHideToTray: () => {
+      if (readSettings(db).settings.close_to_tray_notice_shown) return;
+      writeSetting(db, 'close_to_tray_notice_shown', true);
+      new Notification({
+        title: 'ShortStack is still running',
+        body: 'It keeps the schedule from the tray. Quit from the tray menu to stop it entirely.'
+      }).show();
+    }
   });
 
   // Windows shutdown or sign-out arrives on the window, not the app: stop cleanly instead of
@@ -154,6 +163,10 @@ async function start(): Promise<void> {
   // fresh copy in the background. Channel data older than 30 days must not be kept, and refreshing
   // it on every launch is what keeps that true.
   void appIcon.restore().then(() => appIcon?.refresh(readActiveChannel(db)?.avatarUrl ?? null));
+
+  // The stored preference and the operating system can drift: a reinstall, or someone removing the
+  // entry by hand. Reconciling at launch keeps the switch honest.
+  applyStartWithWindows(readSettings(db).settings.start_with_windows);
 
   engine.start();
   console.info(`[ShortStack] started (uploads ${runtimeProfile.uploads})`);

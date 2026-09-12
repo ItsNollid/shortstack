@@ -7,6 +7,8 @@ export interface WindowDeps {
   /** True when closing should hide to the tray instead of quitting. */
   hideOnClose(): boolean;
   isQuitting(): boolean;
+  /** Called the first time the window hides instead of closing, so it can be explained once. */
+  onFirstHideToTray?(): void;
 }
 
 const TITLE_BAR_BACKGROUND = '#0f0f0f';
@@ -67,6 +69,7 @@ export function createMainWindow(deps: WindowDeps): BrowserWindow {
     if (deps.isQuitting() || !deps.hideOnClose()) return;
     event.preventDefault();
     window.hide();
+    deps.onFirstHideToTray?.();
   });
 
   const developmentUrl = process.env.ELECTRON_RENDERER_URL;

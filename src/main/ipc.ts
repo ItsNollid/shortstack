@@ -15,6 +15,7 @@ import { listUploads } from './db/uploadRepo';
 import type { QueueEvent } from './domain/queueState';
 import { scanFolder } from './files/scanner';
 import type { SchedulerEngine } from './scheduler/engine';
+import { applyStartWithWindows } from './startup';
 import type { AuthService } from './youtube/authService';
 import type { YouTubeGateway } from './youtube/gateway';
 import { awaitAuthorizationCode } from './youtube/loopbackServer';
@@ -184,6 +185,8 @@ export function registerIpcHandlers(context: IpcContext): void {
       if (typeof key !== 'string') return fail('invalid', 'Unknown setting');
       const result = writeSetting(db, key, value);
       if (!result.ok) return fail('refused', result.reason);
+      // Settings that mean something to the operating system have to be told to it.
+      if (key === 'start_with_windows') applyStartWithWindows(result.settings.start_with_windows);
       void engine.kick();
       return ok(result.settings);
     },
