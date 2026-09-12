@@ -3,7 +3,7 @@ import { BrowserWindow, Tray, app, dialog, safeStorage } from 'electron';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { runtimeProfile } from './bootstrap/profile';
-import { getDb, initDatabase } from './database';
+import { getDb, initDatabase } from './db/appDatabase';
 import { readSettings } from './db/settingsRepo';
 import { broadcast, registerIpcHandlers } from './ipc';
 import { createSchedulerEffects } from './scheduler/effects';
