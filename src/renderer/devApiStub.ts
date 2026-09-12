@@ -2,6 +2,7 @@
 // preload bridge is absent, so the real app (and any packaged build) never sees it.
 import type { QueueItemDTO } from '../shared/dto';
 import type { AppEvent, ShortStackApi } from '../shared/ipc';
+import { LEGAL_VERSION } from '../shared/legal';
 import { defaultSettings, type AppSettings } from '../shared/settings';
 
 const FOLDER = String.raw`E:\Youtube\Rendered\ShortStack`;
@@ -84,7 +85,12 @@ const SAMPLE: QueueItemDTO[] = [
   })
 ];
 
-const SETTINGS: AppSettings = { ...defaultSettings(), shorts_folder: FOLDER, setup_complete: true };
+const SETTINGS: AppSettings = {
+  ...defaultSettings(),
+  shorts_folder: FOLDER,
+  setup_complete: true,
+  legal_accepted_version: LEGAL_VERSION
+};
 
 const ACTIVITY = [
   { id: 7, queue_id: 4, action: 'remote_observed', detail: 'YouTube reports it is now scheduled', created_at: iso(-2) },

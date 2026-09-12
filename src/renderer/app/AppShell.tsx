@@ -6,6 +6,7 @@ import { Diagnostics } from '../pages/Diagnostics';
 import { History } from '../pages/History';
 import { Queue } from '../pages/Queue';
 import { SettingsPage } from '../pages/settings/Settings';
+import { FirstRun } from '../pages/setup/FirstRun';
 import { VideoDetails } from '../pages/VideoDetails';
 import { Banners } from './Banners';
 import { Sidebar } from './Sidebar';
@@ -43,6 +44,8 @@ export function AppShell(): React.JSX.Element {
     <AppStatusProvider>
       <ToastProvider>
         <ApprovalProvider>
+          {/* Covers everything until the policies are accepted and setup is done. */}
+          <FirstRun />
           {/* Hash routing: a packaged app loads from file://, where path routing has no server. */}
           <HashRouter>
             <div className={styles.shell}>
