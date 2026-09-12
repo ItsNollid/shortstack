@@ -14,7 +14,8 @@
     "package": "electron-vite build && electron-builder --win",
     "package:dir": "electron-vite build && electron-builder --win --dir",
     "preview:ui": "vite --config vite.preview.config.ts",
-    "docs:legal": "tsx scripts/writeLegalDocs.ts"
+    "docs:legal": "tsx scripts/writeLegalDocs.ts",
+    "verify": "bash verify.sh"
   },
   "dependencies": {
     "@fontsource/roboto": "^5.3.0",

@@ -116,7 +116,7 @@ describe('a video from folder to published', () => {
     expect(applyQueueEvent(db, id, { type: 'approve' }, { now, uploadMethod: 'assisted' }).ok).toBe(true);
 
     // 3. The tick gives it the next free daily slot and, in assisted mode, waits for the user.
-    await engine.tick();
+    await engine.kick();
     const slotted = getQueueItem(db, id);
     expect(slotted?.schedule_source).toBe('auto');
     expect(new Date(slotted?.scheduled_for as string).getHours()).toBe(9);
@@ -126,13 +126,13 @@ describe('a video from folder to published', () => {
     state.uploads = [
       { videoId: 'yt_morning', title: 'morning-run', publishedAt: null, fileName: 'morning-run.mov', fileSize: 6 * 1024 * 1024 }
     ];
-    await engine.tick();
+    await engine.kick();
     const linked = getQueueItem(db, id);
     expect(linked?.youtube_video_id).toBe('yt_morning');
     expect(linked?.state).toBe('uploaded');
 
     // 5. The publish time goes to YouTube, which is what makes it independent of this computer.
-    await engine.tick();
+    await engine.kick();
     expect(state.planCalls).toHaveLength(1);
     expect(state.planCalls[0]?.publishAt).toBe(slotted?.scheduled_for);
     expect(getQueueItem(db, id)?.state).toBe('scheduled');
@@ -140,11 +140,11 @@ describe('a video from folder to published', () => {
     // 6. After the slot passes, YouTube reports it public and ShortStack agrees.
     setNow('2026-09-12T14:00:00');
     state.status = { privacyStatus: 'public', publishAt: null, uploadStatus: 'processed', rejectionReason: null };
-    await engine.tick();
+    await engine.kick();
     expect(getQueueItem(db, id)?.state).toBe('published');
 
     // 7. Nothing ever tried to upload it, and every step is on the record.
-    const actions = listActivity(db, id).map((entry) => entry.action);
+    const actions = listActivity(db, { queueId: id }).map((entry) => entry.action);
     expect(actions).toContain('approve');
     expect(actions).toContain('auto_slot');
     expect(actions).toContain('link_video');
@@ -152,8 +152,8 @@ describe('a video from folder to published', () => {
 
     // 8. Further ticks change nothing: a published video is finished with.
     const before = getQueueItem(db, id)?.updated_at;
-    await engine.tick();
-    await engine.tick();
+    await engine.kick();
+    await engine.kick();
     expect(getQueueItem(db, id)?.updated_at).toBe(before);
     expect(state.planCalls).toHaveLength(1);
   });
@@ -168,11 +168,11 @@ describe('a video from folder to published', () => {
     applyQueueEvent(db, id, { type: 'approve' }, { now, uploadMethod: 'assisted' });
     applyQueueEvent(db, id, { type: 'link_video', videoId: 'yt_existing' }, { now, uploadMethod: 'assisted' });
 
-    await engine.tick();
-    await engine.tick();
+    await engine.kick();
+    await engine.kick();
 
     expect(getQueueItem(db, id)?.youtube_video_id).toBe('yt_existing');
-    expect(listActivity(db, id).map((entry) => entry.action)).not.toContain('begin_upload');
+    expect(listActivity(db, { queueId: id }).map((entry) => entry.action)).not.toContain('begin_upload');
   });
 
   it('stays paused across a restart', async () => {
@@ -185,17 +185,17 @@ describe('a video from folder to published', () => {
     applyQueueEvent(db, id, { type: 'approve' }, { now, uploadMethod: 'assisted' });
 
     first.pause();
-    await first.tick();
+    await first.kick();
     expect(getQueueItem(db, id)?.scheduled_for).toBeNull();
 
     // A new engine on the same database is what a restart looks like.
     const second = buildEngine(state);
     expect(second.isPaused()).toBe(true);
-    await second.tick();
+    await second.kick();
     expect(getQueueItem(db, id)?.scheduled_for).toBeNull();
 
     second.resume();
-    await second.tick();
+    await second.kick();
     expect(getQueueItem(db, id)?.scheduled_for).not.toBeNull();
   });
 
@@ -210,9 +210,9 @@ describe('a video from folder to published', () => {
     expect(getQueueItem(db, id)?.privacy).toBe('private');
 
     applyQueueEvent(db, id, { type: 'approve' }, { now, uploadMethod: 'assisted' });
-    await engine.tick();
+    await engine.kick();
 
     expect(getQueueItem(db, id)?.scheduled_for).toBeNull();
-    expect(listActivity(db, id).map((entry) => entry.action)).not.toContain('auto_slot');
+    expect(listActivity(db, { queueId: id }).map((entry) => entry.action)).not.toContain('auto_slot');
   });
 });
