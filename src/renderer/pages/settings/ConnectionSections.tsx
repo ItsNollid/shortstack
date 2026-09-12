@@ -1,17 +1,18 @@
 import React from 'react';
 import { FolderOpen, RefreshCw } from 'lucide-react';
-import { Avatar, Banner, Button } from '../../components/ui';
+import { Banner, Button } from '../../components/ui';
 import { useAppStatus } from '../../app/status';
+import { ChannelBlock } from './ChannelBlock';
 import { useApiMutation } from '../../hooks/useApi';
 import type { SettingsWriter } from './useSettings';
 import { Section } from './parts';
 import styles from './Settings.module.css';
 
 export function ChannelSection({ onDisconnect }: { onDisconnect: () => void }): React.JSX.Element {
-  const { auth, refreshAuth } = useAppStatus();
+  const { auth, info, refreshAuth } = useAppStatus();
   const connect = useApiMutation(() => window.api.authConnect(), { onDone: refreshAuth });
   const importSecret = useApiMutation(() => window.api.authImportClientSecret(), { onDone: refreshAuth });
-  const channel = auth?.channel ?? null;
+  const refreshChannel = useApiMutation(() => window.api.authRefreshChannel(), { onDone: refreshAuth });
   const connected = auth?.state === 'ok';
 
   return (
@@ -44,27 +45,26 @@ export function ChannelSection({ onDisconnect }: { onDisconnect: () => void }): 
         </Banner>
       )}
 
+      {refreshChannel.error !== null && (
+        <Banner kind="warning" title="Could not read the channel">
+          {refreshChannel.error}
+        </Banner>
+      )}
+
+      {auth !== null && (
+        <ChannelBlock
+          auth={auth}
+          dryRun={info?.uploads === 'dry-run'}
+          connecting={connect.pending}
+          refreshing={refreshChannel.pending}
+          onConnect={() => void connect.run()}
+          onRefreshChannel={() => void refreshChannel.run()}
+        />
+      )}
+
       <div className={styles.row}>
-        <Avatar src={channel?.avatarUrl} name={channel?.title} size={40} />
-        <div className={styles.grow}>
-          <div>{channel?.title ?? 'Not connected'}</div>
-          <div className={styles.sectionText}>
-            {connected
-              ? (channel?.handle ?? 'Connected')
-              : auth?.state === 'expired'
-                ? 'The connection expired. Reconnect to carry on.'
-                : 'Connect to upload and schedule.'}
-          </div>
-        </div>
         <Button onClick={() => void importSecret.run()} disabled={importSecret.pending}>
           {auth?.hasClientSecret === true ? 'Replace credentials' : 'Install credentials'}
-        </Button>
-        <Button
-          variant={connected ? 'secondary' : 'primary'}
-          disabled={connect.pending || auth?.hasClientSecret !== true}
-          onClick={() => void connect.run()}
-        >
-          {connect.pending ? 'Waiting for Google…' : connected ? 'Reconnect' : 'Connect'}
         </Button>
       </div>
 

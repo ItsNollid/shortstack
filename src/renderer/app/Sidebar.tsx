@@ -3,6 +3,7 @@ import { Activity, CalendarDays, ChartColumn, ListVideo, Pause, Play, ScrollText
 import { NavLink } from 'react-router-dom';
 import { Avatar, Button } from '../components/ui';
 import { useApiMutation } from '../hooks/useApi';
+import { connectionStage, describeConnection } from '../../shared/connection';
 import { useAppStatus } from './status';
 import styles from './Sidebar.module.css';
 
@@ -24,6 +25,13 @@ const subscriberLabel = (count: number | null): string =>
 export function Sidebar(): React.JSX.Element {
   const { auth, info, scheduler, refreshScheduler } = useAppStatus();
   const channel = auth?.channel ?? null;
+  const connection =
+    auth === null
+      ? null
+      : describeConnection(
+          connectionStage({ state: auth.state, hasClientSecret: auth.hasClientSecret, hasChannel: channel !== null }),
+          { channelTitle: channel?.title, dryRun: info?.uploads === 'dry-run' }
+        );
   const paused = scheduler?.paused ?? true;
 
   const pause = useApiMutation(() => window.api.schedulerPause(), { onDone: refreshScheduler });
@@ -39,9 +47,9 @@ export function Sidebar(): React.JSX.Element {
       <div className={styles.channel}>
         <Avatar src={channel?.avatarUrl} name={channel?.title} size={32} />
         <div className={styles.channelText}>
-          <div className={styles.channelName}>{channel?.title ?? 'Not connected'}</div>
+          <div className={styles.channelName}>{connection?.headline ?? 'Loading…'}</div>
           <div className={styles.channelMeta}>
-            {channel === null ? 'Connect in Settings' : channel.handle ?? subscriberLabel(channel.subscriberCount)}
+            {channel === null ? (connection?.badge ?? '') : (channel.handle ?? subscriberLabel(channel.subscriberCount))}
           </div>
         </div>
       </div>

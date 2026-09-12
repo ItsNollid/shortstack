@@ -2,6 +2,7 @@ import React from 'react';
 import { Check, Circle } from 'lucide-react';
 import { BrandMark } from '../../components/BrandMark';
 import { Banner, Button } from '../../components/ui';
+import { connectionStage } from '../../../shared/connection';
 import { useAppStatus } from '../../app/status';
 import { useApiMutation } from '../../hooks/useApi';
 import styles from './FirstRun.module.css';
@@ -26,7 +27,11 @@ export function SetupChecklist({ onFinish, pending }: { onFinish: () => void; pe
   });
 
   const hasSecret = auth?.hasClientSecret === true;
-  const connected = auth?.state === 'ok';
+  // Signed in but with an unknown channel is not a finished step: nothing can be attributed yet.
+  const connected =
+    auth !== null &&
+    connectionStage({ state: auth.state, hasClientSecret: auth.hasClientSecret, hasChannel: auth.channel !== null }) ===
+      'connected';
   const hasFolder = settings !== null && settings.shorts_folder !== '';
   const problem = importSecret.error ?? connect.error ?? chooseFolder.error ?? setFolder.error;
 

@@ -152,6 +152,8 @@ export function installDevApiStub(): void {
         missingScopes: [],
         channel: { id: 'UC_sample', title: 'Sample Channel', handle: '@samplechannel', avatarUrl: null, subscriberCount: 12400 }
       }),
+    authRefreshChannel: () =>
+      Promise.resolve({ ok: false as const, error: { code: 'preview', message: 'Not available in the browser preview' } }),
     aiStatus: () => ok({ running: true, models: ['llama3.2'], message: 'Ready' }),
     aiGenerate: () =>
       ok({

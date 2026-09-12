@@ -1,5 +1,6 @@
 import React from 'react';
 import type { QueueItemDTO } from '../../shared/dto';
+import { connectionStage, describeConnection } from '../../shared/connection';
 import { approvalPlan } from '../../shared/consent';
 import { privacyHint } from '../../shared/privacyCopy';
 import { useAppStatus } from '../app/status';
@@ -19,8 +20,15 @@ const PRIVACY_LABEL: Record<string, string> = { public: 'Public', unlisted: 'Unl
 /** Express consent before ShortStack acts for the user: it names the channel, what will happen
  *  without further input, and the exact visibility and time of every video in the selection. */
 export function ApproveDialog({ items, pending, problem, onCancel, onConfirm }: ApproveDialogProps): React.JSX.Element {
-  const { auth, settings } = useAppStatus();
+  const { auth, info, settings } = useAppStatus();
   const channel = auth?.channel ?? null;
+  const connection =
+    auth === null
+      ? null
+      : describeConnection(
+          connectionStage({ state: auth.state, hasClientSecret: auth.hasClientSecret, hasChannel: channel !== null }),
+          { channelTitle: channel?.title, dryRun: info?.uploads === 'dry-run' }
+        );
   const method = settings?.upload_method ?? 'assisted';
   const plan = approvalPlan(items, method, channel?.title ?? null);
 
@@ -49,8 +57,8 @@ export function ApproveDialog({ items, pending, problem, onCancel, onConfirm }: 
       <div className={styles.channel}>
         <Avatar src={channel?.avatarUrl} name={channel?.title} size={32} />
         <div>
-          <div className={styles.channelName}>{channel?.title ?? 'No channel connected'}</div>
-          <div className={styles.channelMeta}>{channel?.handle ?? 'Connect a channel in Settings first'}</div>
+          <div className={styles.channelName}>{connection?.headline ?? 'No channel yet'}</div>
+          <div className={styles.channelMeta}>{channel?.handle ?? connection?.detail ?? ''}</div>
         </div>
       </div>
 

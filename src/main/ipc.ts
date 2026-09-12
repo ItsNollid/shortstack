@@ -54,6 +54,25 @@ export function registerIpcHandlers(context: IpcContext): void {
   const changed = () => broadcast(context.getWindow(), 'queue:changed');
   let signInAbort: AbortController | null = null;
 
+  /** Fetches the channel behind the stored grant and records it. Returns why not, if it failed. */
+  const captureChannel = async (): Promise<string | null> => {
+    const profile = await context.gateway.fetchChannelProfile();
+    if (!profile.ok) return profile.reason;
+    upsertChannel(
+      db,
+      {
+        id: profile.value.id,
+        title: profile.value.title,
+        handle: profile.value.handle,
+        avatarUrl: profile.value.avatarUrl,
+        subscriberCount: profile.value.subscriberCount
+      },
+      new Date()
+    );
+    void context.appIcon.refresh(profile.value.avatarUrl);
+    return null;
+  };
+
   const applyToMany = (ids: number[], event: QueueEvent) => {
     const updated = [];
     let firstReason: string | null = null;
@@ -219,21 +238,11 @@ export function registerIpcHandlers(context: IpcContext): void {
       const exchanged = await auth.exchangeCode(code.code, code.verifier, code.redirectUri);
       if (!exchanged.ok) return fail('sign_in_failed', exchanged.reason);
 
-      const profile = await context.gateway.fetchChannelProfile();
-      if (profile.ok) {
-        upsertChannel(
-          db,
-          {
-            id: profile.value.id,
-            title: profile.value.title,
-            handle: profile.value.handle,
-            avatarUrl: profile.value.avatarUrl,
-            subscriberCount: profile.value.subscriberCount
-          },
-          new Date()
-        );
-        void context.appIcon.refresh(profile.value.avatarUrl);
-      }
+      // The sign-in itself succeeded, so this still returns ok: the grant is stored and the user
+      // should not be told to try again. But a failure here is why the app would otherwise know it
+      // is signed in without knowing whose channel it is holding, so it is said out loud.
+      const channelProblem = await captureChannel();
+      if (channelProblem !== null) console.warn('[ShortStack] signed in, but reading the channel failed:', channelProblem);
       broadcast(context.getWindow(), 'auth:changed');
       void engine.kick();
       return ok(await authStatus());
@@ -269,6 +278,14 @@ export function registerIpcHandlers(context: IpcContext): void {
 
       await fs.mkdir(context.credentialsDir, { recursive: true });
       await fs.writeFile(path.join(context.credentialsDir, 'client_secret.json'), contents, { mode: 0o600 });
+      broadcast(context.getWindow(), 'auth:changed');
+      return ok(await authStatus());
+    },
+
+    authRefreshChannel: async () => {
+      if (auth.state() !== 'ok') return fail('not_connected', 'Connect a channel first');
+      const problem = await captureChannel();
+      if (problem !== null) return fail('channel_unavailable', problem);
       broadcast(context.getWindow(), 'auth:changed');
       return ok(await authStatus());
     },

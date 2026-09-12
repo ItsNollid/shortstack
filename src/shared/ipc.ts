@@ -90,6 +90,9 @@ export interface ShortStackApi {
   authCancel(): Promise<Result<null>>;
   authDisconnect(): Promise<Result<AuthStatus>>;
   authImportClientSecret(): Promise<Result<AuthStatus>>;
+  /** Re-reads the channel behind the stored sign-in. Separate from connecting, because the sign-in
+   *  can succeed while this fails, and that left the app unable to say whose channel it held. */
+  authRefreshChannel(): Promise<Result<AuthStatus>>;
 
   aiStatus(): Promise<Result<AiStatus>>;
   aiGenerate(queueId: number): Promise<Result<MetadataSuggestionDTO>>;
@@ -136,6 +139,7 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'authCancel',
   'authDisconnect',
   'authImportClientSecret',
+  'authRefreshChannel',
   'aiStatus',
   'aiGenerate',
   'analyticsGet',
