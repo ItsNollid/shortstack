@@ -50,7 +50,12 @@ function findBox(buffer: Buffer, type: string, from = 0, to = buffer.length): Bo
 
 const fixed1616 = (buffer: Buffer, offset: number): number => buffer.readUInt32BE(offset) / 65536;
 
+/** A truncated file can leave a header sitting exactly at the end with no payload behind it, so
+ *  every read is checked against the box's own bounds first rather than against the file's. */
+const has = (box: BoxRef, bytes: number): boolean => box.start + bytes <= box.end;
+
 function parseMvhd(buffer: Buffer, box: BoxRef): number | null {
+  if (!has(box, 1)) return null;
   const version = buffer.readUInt8(box.start);
   const body = box.start + 4;
   if (version === 1) {
@@ -66,6 +71,7 @@ function parseMvhd(buffer: Buffer, box: BoxRef): number | null {
 }
 
 function parseTkhd(buffer: Buffer, box: BoxRef): { width: number; height: number } | null {
+  if (!has(box, 1)) return null;
   const version = buffer.readUInt8(box.start);
   const afterTimes = box.start + 4 + (version === 1 ? 32 : 20);
   const matrix = afterTimes + 16; // reserved(8) + layer(2) + alternate_group(2) + volume(2) + reserved(2)
@@ -93,7 +99,9 @@ export function parseMoov(moov: Buffer): VideoProbe {
     if (trak.type !== 'trak') continue;
     const mdia = findBox(moov, 'mdia', trak.start, trak.end);
     const handler = mdia === null ? null : findBox(moov, 'hdlr', mdia.start, mdia.end);
-    if (handler !== null && moov.toString('latin1', handler.start + 8, handler.start + 12) !== 'vide') continue;
+    if (handler !== null && (!has(handler, 12) || moov.toString('latin1', handler.start + 8, handler.start + 12) !== 'vide')) {
+      continue;
+    }
 
     const tkhd = findBox(moov, 'tkhd', trak.start, trak.end);
     const dimensions = tkhd === null ? null : parseTkhd(moov, tkhd);
@@ -124,7 +132,10 @@ export async function probeVideoFile(filePath: string, maxMoovBytes = 64 * 1024 
       let boxSize = size32;
       if (size32 === 1) {
         if (bytesRead < 16) return EMPTY;
-        boxSize = Number(header.readBigUInt64BE(8));
+        const large = header.readBigUInt64BE(8);
+        // Past this, arithmetic on the offset stops being exact. Same guard the in-memory walk uses.
+        if (large > BigInt(Number.MAX_SAFE_INTEGER)) return EMPTY;
+        boxSize = Number(large);
         headerSize = 16;
       } else if (size32 === 0) {
         boxSize = size - offset;
@@ -132,7 +143,10 @@ export async function probeVideoFile(filePath: string, maxMoovBytes = 64 * 1024 
       if (boxSize < headerSize) return EMPTY;
 
       if (type === 'moov') {
-        const payloadSize = Math.min(boxSize - headerSize, maxMoovBytes);
+        // The size in the header is a claim. Allocate against what the file can actually supply, so
+        // a short file declaring a huge box costs nothing.
+        const available = Math.max(0, size - (offset + headerSize));
+        const payloadSize = Math.min(boxSize - headerSize, available, maxMoovBytes);
         const moov = Buffer.alloc(payloadSize);
         await handle.read(moov, 0, payloadSize, offset + headerSize);
         return parseMoov(moov);
