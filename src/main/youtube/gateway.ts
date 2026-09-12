@@ -1,9 +1,13 @@
 // The only code that talks to the YouTube Data API. Everything goes through one interface so a
 // dry-run implementation can stand in during development and tests.
 import type { Privacy } from '../../shared/queue';
+import type { ChannelAnalytics } from '../../shared/analytics';
+import { ANALYTICS_METRICS, parseAnalyticsReport, reportRange } from './analyticsReport';
 import { classifyFailure } from './resumableUpload';
 
 export const API_BASE = 'https://www.googleapis.com/youtube/v3';
+// Analytics lives on its own host and its own API, hence the second base.
+export const ANALYTICS_BASE = 'https://youtubeanalytics.googleapis.com/v2';
 
 export interface ChannelProfile {
   id: string;
@@ -46,12 +50,14 @@ export interface YouTubeGateway {
   fetchVideoStatus(videoId: string): Promise<GatewayResult<VideoStatusSnapshot>>;
   setPublishPlan(videoId: string, plan: { privacyStatus: Privacy; publishAt: string | null }): Promise<GatewayResult<VideoStatusSnapshot>>;
   listRecentUploads(playlistId: string, limit?: number): Promise<GatewayResult<RecentUpload[]>>;
+  fetchChannelAnalytics(days: number, now?: Date): Promise<GatewayResult<ChannelAnalytics>>;
 }
 
 export interface GatewayDeps {
   accessToken(): Promise<string>;
   fetch?: typeof fetch;
   baseUrl?: string;
+  analyticsBaseUrl?: string;
 }
 
 const SCHEDULE_REFUSAL_CODES = new Set(['invalidPublishAt', 'forbiddenPrivacySetting', 'forbidden', 'insufficientPermissions']);
@@ -72,10 +78,12 @@ const asPrivacy = (value: unknown): Privacy =>
 export class HttpYouTubeGateway implements YouTubeGateway {
   private readonly doFetch: typeof fetch;
   private readonly baseUrl: string;
+  private readonly analyticsBaseUrl: string;
 
   constructor(private readonly deps: GatewayDeps) {
     this.doFetch = deps.fetch ?? fetch;
     this.baseUrl = deps.baseUrl ?? API_BASE;
+    this.analyticsBaseUrl = deps.analyticsBaseUrl ?? ANALYTICS_BASE;
   }
 
   private async request(path: string, init: RequestInit = {}): Promise<Response> {
@@ -237,6 +245,35 @@ export class HttpYouTubeGateway implements YouTubeGateway {
         })
     };
   }
+
+  /** Analytics is a separate API on a separate host, so it does not go through request(). */
+  async fetchChannelAnalytics(days: number, now: Date = new Date()): Promise<GatewayResult<ChannelAnalytics>> {
+    const { startDate, endDate } = reportRange(now, days);
+    const query = new URLSearchParams({
+      ids: 'channel==MINE',
+      startDate,
+      endDate,
+      metrics: ANALYTICS_METRICS.join(','),
+      dimensions: 'day',
+      sort: 'day'
+    });
+    const response = await this.doFetch(`${this.analyticsBaseUrl}/reports?${query.toString()}`, {
+      headers: { Authorization: `Bearer ${await this.deps.accessToken()}` }
+    });
+    const body = await response.text();
+    if (!response.ok) return failure(response.status, body, 'Reading your analytics');
+
+    try {
+      return { ok: true, value: parseAnalyticsReport(JSON.parse(body), startDate, endDate) };
+    } catch {
+      return {
+        ok: false,
+        reason: 'Your analytics came back in a form ShortStack could not read',
+        code: 'bad_report',
+        retryable: false
+      };
+    }
+  }
 }
 
 /** Used whenever uploads are in dry-run: reads are refused rather than silently faked. */
@@ -261,6 +298,10 @@ export class DryRunYouTubeGateway implements YouTubeGateway {
   }
 
   async listRecentUploads(): Promise<GatewayResult<RecentUpload[]>> {
+    return this.refusal;
+  }
+
+  async fetchChannelAnalytics(): Promise<GatewayResult<ChannelAnalytics>> {
     return this.refusal;
   }
 }

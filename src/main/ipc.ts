@@ -180,6 +180,12 @@ export function registerIpcHandlers(context: IpcContext): void {
       return ok(engine.status());
     },
 
+    analyticsGet: async (days) => {
+      const window = typeof days === 'number' && Number.isFinite(days) ? Math.min(365, Math.max(1, Math.round(days))) : 28;
+      const result = await context.gateway.fetchChannelAnalytics(window);
+      if (!result.ok) return fail(result.code ?? 'analytics_failed', result.reason);
+      return ok(result.value);
+    },
     uploadsList: async () => ok(listUploads(db)),
     activityList: async (queueId) => {
       if (queueId === undefined) return ok(listActivity(db));

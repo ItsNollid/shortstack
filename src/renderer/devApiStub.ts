@@ -172,6 +172,30 @@ export function installDevApiStub(): void {
       return ok(item);
     },
     activityList: () => ok(ACTIVITY),
+    analyticsGet: (days: number) => {
+      const end = new Date(Date.now() - 86_400_000);
+      const list = Array.from({ length: days }, (_, index) => {
+        const date = new Date(end.getTime() - (days - 1 - index) * 86_400_000).toISOString().slice(0, 10);
+        const views = Math.round(400 + 260 * Math.sin(index / 3) + index * 9);
+        return { date, views, minutesWatched: Math.round(views * 0.7), subscribersGained: index % 4, subscribersLost: index % 7 === 0 ? 1 : 0 };
+      });
+      const sum = (pick: (day: (typeof list)[number]) => number): number => list.reduce((total, day) => total + pick(day), 0);
+      const gained = sum((day) => day.subscribersGained);
+      const lost = sum((day) => day.subscribersLost);
+      return ok({
+        startDate: list[0]!.date,
+        endDate: list[list.length - 1]!.date,
+        totals: {
+          views: sum((day) => day.views),
+          minutesWatched: sum((day) => day.minutesWatched),
+          likes: Math.round(sum((day) => day.views) * 0.04),
+          subscribersGained: gained,
+          subscribersLost: lost,
+          netSubscribers: gained - lost
+        },
+        days: list
+      });
+    },
     uploadsList: () => ok([]),
     on: (event: AppEvent, listener: (payload: unknown) => void) => {
       const set = listeners.get(event) ?? new Set();
