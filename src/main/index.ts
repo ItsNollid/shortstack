@@ -13,6 +13,7 @@ import { DryRunYouTubeGateway, HttpYouTubeGateway, type YouTubeGateway } from '.
 import { uploadVideoResumable, type UploadOutcome } from './youtube/resumableUpload';
 import { TokenStore, type SecretStorage } from './youtube/tokenStore';
 import { AppIcon } from './icons/appIcon';
+import { handleMediaRequests, registerMediaScheme } from './media/mediaProtocol';
 import { readActiveChannel } from './db/channelRepo';
 import { applyStartWithWindows } from './startup';
 import { createTray } from './tray';
@@ -30,6 +31,7 @@ export const getMainWindow = (): BrowserWindow | null => mainWindow;
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
+  registerMediaScheme();
   app.on('second-instance', showWindow);
   app.setAppUserModelId(app.isPackaged ? 'com.shortstack.app' : process.execPath);
   app.whenReady().then(start).catch(failToStart);
@@ -106,6 +108,8 @@ async function start(): Promise<void> {
       broadcast(mainWindow, 'scheduler:status');
     }
   });
+
+  handleMediaRequests({ db });
 
   appIcon = new AppIcon({
     window: () => mainWindow,

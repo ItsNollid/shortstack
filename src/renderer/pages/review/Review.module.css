@@ -1,57 +1,69 @@
-.screen { display: flex; flex-direction: column; gap: var(--space-4); height: 100%; }
+.screen { display: flex; flex-direction: column; gap: var(--space-3); height: 100%; min-height: 0; }
 
-.head { display: flex; align-items: center; gap: var(--space-4); }
-.count { font-size: var(--text-xl); }
+.head { display: flex; align-items: center; gap: var(--space-3); }
+.count { font-size: var(--text-lg); }
 .of { color: var(--text-faint); font-size: var(--text-md); }
 .spacer { flex: 1; }
+.nav { display: flex; gap: var(--space-2); align-items: center; }
 
-.track { height: 4px; border-radius: var(--radius-pill); background: var(--hover); overflow: hidden; }
+.track { height: 3px; border-radius: var(--radius-pill); background: var(--hover); overflow: hidden; flex: none; }
 .fill { height: 100%; background: var(--live); transition: width var(--duration) var(--ease); }
 
-.card {
+.body {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  gap: var(--space-5);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-lg);
-  background: var(--raised);
-  padding: var(--space-5);
-}
-@media (max-width: 900px) { .card { grid-template-columns: minmax(0, 1fr); } }
-
-.preview {
-  aspect-ratio: 9 / 16;
-  max-height: 380px;
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
-  background: linear-gradient(160deg, #2a2a2a, #161616);
-  display: grid;
-  place-items: center;
-  color: var(--text-faint);
-  font-size: var(--text-sm);
-}
-
-.body { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
-.title { font-size: var(--text-xl); overflow-wrap: anywhere; }
-.file { color: var(--text-faint); font-size: var(--text-sm); overflow-wrap: anywhere; }
-.meta { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
-.description {
-  color: var(--text-muted);
-  white-space: pre-wrap;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
   overflow-y: auto;
-  max-height: 140px;
+  padding-bottom: var(--space-2);
+}
+@media (max-width: 1000px) { .body { grid-template-columns: minmax(0, 1fr); } }
+
+.left { display: flex; flex-direction: column; gap: var(--space-3); position: sticky; top: 0; }
+
+.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px var(--space-3);
   font-size: var(--text-sm);
 }
+.factLabel { color: var(--text-faint); }
+.factValue { color: var(--text-muted); overflow-wrap: anywhere; }
 
-.actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.right { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+@media (max-width: 700px) { .pair { grid-template-columns: 1fr; } }
+
+.saving { color: var(--text-faint); font-size: var(--text-sm); }
+.saved { color: var(--live); font-size: var(--text-sm); }
+
+/* The decision bar stays put while the details above it scroll. */
+.decide {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.outcome { flex: 1; min-width: 220px; }
+.outcomeLine { font-size: var(--text-md); }
+.outcomeNote { color: var(--text-muted); font-size: var(--text-sm); }
+
+.group { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
+.divider { width: 1px; align-self: stretch; background: var(--line-strong); margin: 0 var(--space-1); }
 
 .key {
   display: inline-grid;
   place-items: center;
-  min-width: 16px;
-  height: 16px;
+  min-width: 15px;
+  height: 15px;
   padding: 0 3px;
   margin-left: 6px;
   border-radius: 3px;
@@ -59,5 +71,13 @@
   font-size: 10px;
   font-weight: 600;
 }
+.dangerKey { background: rgba(255, 107, 97, 0.22); }
 
 .hint { color: var(--text-faint); font-size: var(--text-sm); }
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  padding-top: var(--space-1);
+}
