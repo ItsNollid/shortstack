@@ -14,6 +14,7 @@ export interface QueueRowProps {
   item: QueueItemDTO;
   selected: boolean;
   onToggle: (id: number) => void;
+  onOpen: (id: number) => void;
 }
 
 const scheduleSourceLabel: Record<string, string> = {
@@ -22,7 +23,7 @@ const scheduleSourceLabel: Record<string, string> = {
   hold: 'held back'
 };
 
-export function QueueRow({ item, selected, onToggle }: QueueRowProps): React.JSX.Element {
+export function QueueRow({ item, selected, onToggle, onOpen }: QueueRowProps): React.JSX.Element {
   const problem =
     item.attention_code !== null
       ? presentAttention(item.attention_code).hint
@@ -35,11 +36,15 @@ export function QueueRow({ item, selected, onToggle }: QueueRowProps): React.JSX
   return (
     <div
       className={`${styles.row} ${selected ? styles.selected : ''}`}
-      onClick={() => onToggle(item.id)}
+      onClick={() => onOpen(item.id)}
       role="button"
       tabIndex={0}
       onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
+        // Enter opens the video; Space selects it, matching how file lists behave elsewhere.
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          onOpen(item.id);
+        } else if (event.key === ' ') {
           event.preventDefault();
           onToggle(item.id);
         }

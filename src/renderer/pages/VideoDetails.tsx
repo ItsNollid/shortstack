@@ -1,0 +1,252 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
+import type { QueueItemDTO } from '../../shared/dto';
+import { DEFAULT_CATEGORY_ID, VIDEO_CATEGORIES } from '../../shared/categories';
+import { PRIVACY_OPTIONS, privacyHint } from '../../shared/privacyCopy';
+import type { Privacy } from '../../shared/queue';
+import type { BulkAction } from '../../shared/queueActions';
+import {
+  DESCRIPTION_MAX_BYTES,
+  TAGS_MAX_CHARS,
+  TITLE_MAX_CHARS,
+  charCount,
+  tagsCharCount,
+  utf8Bytes
+} from '../../shared/settings';
+import { descriptionProblem, tagsProblem, titleProblem, type QueueMetadataPatch } from '../../shared/videoMetadata';
+import { Banner, Button, Select, Switch, TagInput, TextArea, TextField } from '../components/ui';
+import { useApiMutation, useApiQuery } from '../hooks/useApi';
+import styles from './VideoDetails.module.css';
+import { VideoSidePanel } from './VideoSidePanel';
+
+interface Draft {
+  title: string;
+  description: string;
+  tags: string[];
+  category_id: string;
+  privacy: Privacy;
+  notify_subscribers: boolean;
+  made_for_kids: boolean;
+}
+
+const draftOf = (item: QueueItemDTO): Draft => ({
+  title: item.title,
+  description: item.description,
+  tags: item.tags,
+  category_id: item.category_id === '' ? DEFAULT_CATEGORY_ID : item.category_id,
+  privacy: item.privacy,
+  notify_subscribers: item.notify_subscribers,
+  made_for_kids: item.made_for_kids
+});
+
+const sameDraft = (a: Draft, b: Draft): boolean =>
+  a.title === b.title &&
+  a.description === b.description &&
+  a.category_id === b.category_id &&
+  a.privacy === b.privacy &&
+  a.notify_subscribers === b.notify_subscribers &&
+  a.made_for_kids === b.made_for_kids &&
+  a.tags.length === b.tags.length &&
+  a.tags.every((tag, index) => tag === b.tags[index]);
+
+export function VideoDetails({ onApprove }: { onApprove: (item: QueueItemDTO) => void }): React.JSX.Element {
+  const { id = '' } = useParams();
+  const queueId = Number(id);
+  const item = useApiQuery(() => window.api.queueGet(queueId), {
+    key: `video:${queueId}`,
+    invalidateOn: ['queue:changed'],
+    enabled: Number.isFinite(queueId)
+  });
+
+  const loaded = item.data;
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [baseline, setBaseline] = useState<QueueItemDTO | null>(null);
+
+  // Adopt fresh server data only while there is nothing unsaved to lose; otherwise say so and let
+  // the user decide, rather than silently overwriting what they typed.
+  useEffect(() => {
+    if (loaded === null) return;
+    setDraft((current) => {
+      if (current === null || baseline === null || baseline.id !== loaded.id) {
+        setBaseline(loaded);
+        return draftOf(loaded);
+      }
+      if (sameDraft(current, draftOf(baseline))) {
+        setBaseline(loaded);
+        return draftOf(loaded);
+      }
+      return current;
+    });
+  }, [loaded, baseline]);
+
+  const save = useApiMutation((patch: QueueMetadataPatch, expected: string) =>
+    window.api.queueUpdateMetadata(queueId, patch, expected)
+  );
+  const act = useApiMutation((action: BulkAction, ids: number[]) => {
+    if (action === 'unapprove') return window.api.queueUnapprove(ids);
+    if (action === 'reject') return window.api.queueReject(ids);
+    return window.api.queueRestore(ids);
+  });
+
+  const problems = useMemo(() => {
+    if (draft === null) return { title: null, description: null, tags: null };
+    return {
+      title: titleProblem(draft.title),
+      description: descriptionProblem(draft.description),
+      tags: tagsProblem(draft.tags)
+    };
+  }, [draft]);
+
+  if (!Number.isFinite(queueId)) return <Banner kind="danger" title="Unknown video" />;
+  if (item.error !== null)
+    return (
+      <Banner kind="danger" title="Could not open this video">
+        {item.error}
+      </Banner>
+    );
+  if (loaded === null || draft === null || baseline === null) return <Banner kind="info" title="Loading…" />;
+
+  const dirty = !sameDraft(draft, draftOf(baseline));
+  const changedElsewhere = loaded.updated_at !== baseline.updated_at;
+  const blocked = loaded.state === 'uploading';
+  const invalid = problems.title !== null || problems.description !== null || problems.tags !== null;
+  const set = <K extends keyof Draft>(key: K, value: Draft[K]): void => setDraft({ ...draft, [key]: value });
+
+  const submit = (): void => {
+    void save.run(draft, baseline.updated_at).then((updated) => {
+      if (updated !== null) {
+        setBaseline(updated);
+        setDraft(draftOf(updated));
+      }
+    });
+  };
+
+  return (
+    <>
+      <Link to="/queue" className={styles.back}>
+        <ArrowLeft size={15} /> Queue
+      </Link>
+
+      <div className={styles.columns}>
+        <div className={styles.form}>
+          {blocked && (
+            <Banner kind="info" title="Uploading right now">
+              Details are locked until the upload finishes, so the file and its information stay in step.
+            </Banner>
+          )}
+          {changedElsewhere && (
+            <Banner kind="warning" title="This video changed elsewhere">
+              Saving will overwrite the newer version. Discard your edits to see it instead.
+            </Banner>
+          )}
+          {save.error !== null && (
+            <Banner kind="danger" title="Not saved">
+              {save.error}
+            </Banner>
+          )}
+          {act.error !== null && (
+            <Banner kind="danger" title="That did not work">
+              {act.error}
+            </Banner>
+          )}
+
+          <TextField
+            label="Title"
+            value={draft.title}
+            onChange={(value) => set('title', value)}
+            disabled={blocked}
+            counter={`${charCount(draft.title)} / ${TITLE_MAX_CHARS}`}
+            counterOver={charCount(draft.title) > TITLE_MAX_CHARS}
+            problem={problems.title}
+          />
+
+          <TextArea
+            label="Description"
+            value={draft.description}
+            onChange={(value) => set('description', value)}
+            disabled={blocked}
+            optional
+            rows={8}
+            counter={`${utf8Bytes(draft.description)} / ${DESCRIPTION_MAX_BYTES} bytes`}
+            counterOver={utf8Bytes(draft.description) > DESCRIPTION_MAX_BYTES}
+            problem={problems.description}
+            hint="YouTube measures descriptions in bytes, so emoji and accents count for more than one."
+          />
+
+          <TagInput
+            label="Tags"
+            value={draft.tags}
+            onChange={(tags) => set('tags', tags)}
+            disabled={blocked}
+            counter={`${tagsCharCount(draft.tags)} / ${TAGS_MAX_CHARS}`}
+            counterOver={tagsCharCount(draft.tags) > TAGS_MAX_CHARS}
+            problem={problems.tags}
+          />
+
+          <div className={styles.pair}>
+            <Select
+              label="Visibility"
+              value={draft.privacy}
+              onChange={(value) => set('privacy', value)}
+              disabled={blocked}
+              options={PRIVACY_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+              hint={privacyHint(draft.privacy)}
+            />
+            <Select
+              label="Category"
+              value={draft.category_id}
+              onChange={(value) => set('category_id', value)}
+              disabled={blocked}
+              options={VIDEO_CATEGORIES.map((category) => ({ value: category.id, label: category.label }))}
+            />
+          </div>
+
+          <Switch
+            label="Tell subscribers"
+            hint="Sends the usual notification when the video goes live."
+            checked={draft.notify_subscribers}
+            onChange={(value) => set('notify_subscribers', value)}
+            disabled={blocked}
+          />
+          <Switch
+            label="Made for kids"
+            hint="YouTube turns off comments and some features on videos marked for kids."
+            checked={draft.made_for_kids}
+            onChange={(value) => set('made_for_kids', value)}
+            disabled={blocked}
+          />
+
+          {dirty && (
+            <div className={styles.saveBar}>
+              <span className={styles.saveText}>
+                {invalid ? 'Fix the highlighted fields to save.' : 'You have unsaved changes.'}
+              </span>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setBaseline(loaded);
+                  setDraft(draftOf(loaded));
+                }}
+              >
+                Discard
+              </Button>
+              <Button variant="primary" disabled={invalid || save.pending} onClick={submit}>
+                {save.pending ? 'Saving…' : 'Save'}
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <VideoSidePanel
+          item={loaded}
+          busy={act.pending || save.pending}
+          onAction={(action) => {
+            if (action === 'approve') onApprove(loaded);
+            else void act.run(action, [loaded.id]);
+          }}
+        />
+      </div>
+    </>
+  );
+}

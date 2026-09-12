@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { FolderOpen, ListVideo, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import type { QueueItemDTO } from '../../shared/dto';
 import type { Result } from '../../shared/ipc';
 import { actionableIds } from '../../shared/queueActions';
@@ -14,6 +15,7 @@ import {
 import { PageHeader } from '../components/PageHeader';
 import { Banner, Button, EmptyState, FilterChips, Skeleton } from '../components/ui';
 import { useApiMutation, useApiQuery } from '../hooks/useApi';
+import { useRequestApproval } from '../app/approval';
 import { useAppStatus } from '../app/status';
 import styles from './Queue.module.css';
 import { QueueRow } from './QueueRow';
@@ -22,6 +24,8 @@ const readQueue = (): Promise<Result<QueueItemDTO[]>> => window.api.queueList();
 
 export function Queue(): React.JSX.Element {
   const { settings } = useAppStatus();
+  const navigate = useNavigate();
+  const requestApproval = useRequestApproval();
   const queue = useApiQuery(readQueue, { key: 'queue', invalidateOn: ['queue:changed'] });
   const [filter, setFilter] = useState<QueueFilter>('all');
   const [selected, setSelected] = useState<number[]>([]);
@@ -32,12 +36,11 @@ export function Queue(): React.JSX.Element {
 
   const clear = (): void => setSelected([]);
   const scan = useApiMutation(() => window.api.videosScan(), { onDone: queue.refresh });
-  const approve = useApiMutation((ids: number[]) => window.api.queueApprove(ids), { onDone: clear });
   const unapprove = useApiMutation((ids: number[]) => window.api.queueUnapprove(ids), { onDone: clear });
   const reject = useApiMutation((ids: number[]) => window.api.queueReject(ids), { onDone: clear });
   const restore = useApiMutation((ids: number[]) => window.api.queueRestore(ids), { onDone: clear });
-  const busy = approve.pending || unapprove.pending || reject.pending || restore.pending;
-  const problem = queue.error ?? approve.error ?? unapprove.error ?? reject.error ?? restore.error ?? scan.error;
+  const busy = unapprove.pending || reject.pending || restore.pending;
+  const problem = queue.error ?? unapprove.error ?? reject.error ?? restore.error ?? scan.error;
 
   const toggle = (id: number): void =>
     setSelected((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]));
@@ -46,7 +49,7 @@ export function Queue(): React.JSX.Element {
   // Only offer what the selection can actually take, and apply it only to those videos: a mixed
   // selection must never quietly leave some behind.
   const chosen = items.filter((item) => selected.includes(item.id));
-  const canApprove = actionableIds(chosen, 'approve');
+  const approvable = chosen.filter((item) => actionableIds([item], 'approve').length === 1);
   const canUnapprove = actionableIds(chosen, 'unapprove');
   const canReject = actionableIds(chosen, 'reject');
   const canRestore = actionableIds(chosen, 'restore');
@@ -89,9 +92,9 @@ export function Queue(): React.JSX.Element {
           </span>
           {/* Approving is the only action that puts a video on a path to YouTube, so it is the one
               primary button and it is never triggered by dragging or by a bulk default. */}
-          {canApprove.length > 0 && (
-            <Button variant="primary" size="small" disabled={busy} onClick={() => void approve.run(canApprove)}>
-              Approve {canApprove.length < selected.length && `(${canApprove.length})`}
+          {approvable.length > 0 && (
+            <Button variant="primary" size="small" disabled={busy} onClick={() => requestApproval(approvable, clear)}>
+              Approve {approvable.length < selected.length && `(${approvable.length})`}
             </Button>
           )}
           {canUnapprove.length > 0 && (
@@ -133,7 +136,13 @@ export function Queue(): React.JSX.Element {
       ) : (
         <div className={styles.list}>
           {shown.map((item) => (
-            <QueueRow key={item.id} item={item} selected={selected.includes(item.id)} onToggle={toggle} />
+            <QueueRow
+              key={item.id}
+              item={item}
+              selected={selected.includes(item.id)}
+              onToggle={toggle}
+              onOpen={(id) => navigate(`/video/${id}`)}
+            />
           ))}
         </div>
       )}

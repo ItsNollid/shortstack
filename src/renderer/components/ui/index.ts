@@ -1,8 +1,11 @@
 export { Avatar } from './Avatar';
 export { Banner } from './Banner';
 export { Button } from './Button';
+export { Dialog } from './Dialog';
 export { EmptyState } from './EmptyState';
+export { Field, Select, Switch, TextArea, TextField } from './Field';
 export { FilterChips, type FilterChip } from './FilterChips';
 export { Progress } from './Progress';
 export { Skeleton } from './Skeleton';
 export { StatusPill, TonePill } from './StatusPill';
+export { TagInput } from './TagInput';

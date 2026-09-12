@@ -90,6 +90,15 @@ export function installDevApiStub(): void {
     appInfo: () => Promise.resolve({ profile: 'dev', uploads: 'dry-run', version: '1.0.0-preview', platform: 'win32' }),
     queueList: () => ok(SAMPLE),
     queueGet: (id: number) => ok(SAMPLE.find((item) => item.id === id) ?? SAMPLE[0]!),
+    queueApprove: (ids: number[]) => {
+      for (const item of SAMPLE) if (ids.includes(item.id) && item.state === 'pending') item.state = 'approved';
+      return ok(SAMPLE.filter((item) => ids.includes(item.id)));
+    },
+    queueUpdateMetadata: (id: number, patch: Record<string, unknown>) => {
+      const item = SAMPLE.find((entry) => entry.id === id) ?? SAMPLE[0]!;
+      Object.assign(item, patch, { updated_at: new Date().toISOString() });
+      return ok(item);
+    },
     settingsGetAll: () =>
       ok({
         shorts_folder: FOLDER,

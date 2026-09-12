@@ -6,40 +6,50 @@ import { Diagnostics } from '../pages/Diagnostics';
 import { History } from '../pages/History';
 import { Queue } from '../pages/Queue';
 import { SettingsPage } from '../pages/Settings';
+import { VideoDetails } from '../pages/VideoDetails';
 import { Banners } from './Banners';
 import { Sidebar } from './Sidebar';
 import { TitleBar } from './TitleBar';
+import { ApprovalProvider, useRequestApproval } from './approval';
 import { AppStatusProvider } from './status';
 import styles from './AppShell.module.css';
+
+function VideoDetailsRoute(): React.JSX.Element {
+  const requestApproval = useRequestApproval();
+  return <VideoDetails onApprove={(item) => requestApproval([item])} />;
+}
 
 export function AppShell(): React.JSX.Element {
   return (
     <AppStatusProvider>
-      {/* Hash routing: a packaged app loads from file://, where path routing has no server. */}
-      <HashRouter>
-        <div className={styles.shell}>
-          <TitleBar />
-          <div className={styles.body}>
-            <Sidebar />
-            <main className={styles.main}>
-              <div className={styles.banners}>
-                <Banners />
-              </div>
-              <div className={styles.page}>
-                <Routes>
-                  <Route path="/queue" element={<Queue />} />
-                  <Route path="/calendar" element={<Calendar />} />
-                  <Route path="/history" element={<History />} />
-                  <Route path="/analytics" element={<Analytics />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/diagnostics" element={<Diagnostics />} />
-                  <Route path="*" element={<Navigate to="/queue" replace />} />
-                </Routes>
-              </div>
-            </main>
+      <ApprovalProvider>
+        {/* Hash routing: a packaged app loads from file://, where path routing has no server. */}
+        <HashRouter>
+          <div className={styles.shell}>
+            <TitleBar />
+            <div className={styles.body}>
+              <Sidebar />
+              <main className={styles.main}>
+                <div className={styles.banners}>
+                  <Banners />
+                </div>
+                <div className={styles.page}>
+                  <Routes>
+                    <Route path="/queue" element={<Queue />} />
+                    <Route path="/calendar" element={<Calendar />} />
+                    <Route path="/history" element={<History />} />
+                    <Route path="/analytics" element={<Analytics />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/video/:id" element={<VideoDetailsRoute />} />
+                    <Route path="/diagnostics" element={<Diagnostics />} />
+                    <Route path="*" element={<Navigate to="/queue" replace />} />
+                  </Routes>
+                </div>
+              </main>
+            </div>
           </div>
-        </div>
-      </HashRouter>
+        </HashRouter>
+      </ApprovalProvider>
     </AppStatusProvider>
   );
 }
