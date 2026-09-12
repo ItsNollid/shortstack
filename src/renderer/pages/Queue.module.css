@@ -75,3 +75,14 @@
 .facts { color: var(--text-faint); font-size: var(--text-sm); text-align: right; }
 
 .warning { color: var(--pending); font-size: var(--text-sm); }
+
+.rerun {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  border-radius: var(--radius-sm);
+  background: rgba(167, 139, 250, 0.16);
+  color: var(--auto);
+  font-size: var(--text-xs);
+  vertical-align: 1px;
+}

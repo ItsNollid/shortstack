@@ -7,9 +7,13 @@ import { actionableIds } from '../../shared/queueActions';
 import {
   FILTER_EMPTY,
   FILTER_LABELS,
+  KIND_FILTERS,
+  KIND_LABELS,
   QUEUE_FILTERS,
   countByFilter,
   matchesFilter,
+  matchesKind,
+  type KindFilter,
   type QueueFilter
 } from '../../shared/queueFilters';
 import { PageHeader } from '../components/PageHeader';
@@ -28,19 +32,29 @@ export function Queue(): React.JSX.Element {
   const requestApproval = useRequestApproval();
   const queue = useApiQuery(readQueue, { key: 'queue', invalidateOn: ['queue:changed'] });
   const [filter, setFilter] = useState<QueueFilter>('all');
+  const [kind, setKind] = useState<KindFilter>('any');
   const [selected, setSelected] = useState<number[]>([]);
 
   const items = queue.data ?? [];
   const counts = useMemo(() => countByFilter(items.map((item) => item.state)), [items]);
-  const shown = useMemo(() => items.filter((item) => matchesFilter(item.state, filter)), [items, filter]);
+  const shown = useMemo(
+    () => items.filter((item) => matchesFilter(item.state, filter) && matchesKind(item.posting_kind, kind)),
+    [items, filter, kind]
+  );
 
   const clear = (): void => setSelected([]);
   const scan = useApiMutation(() => window.api.videosScan(), { onDone: queue.refresh });
   const unapprove = useApiMutation((ids: number[]) => window.api.queueUnapprove(ids), { onDone: clear });
   const reject = useApiMutation((ids: number[]) => window.api.queueReject(ids), { onDone: clear });
   const restore = useApiMutation((ids: number[]) => window.api.queueRestore(ids), { onDone: clear });
-  const busy = unapprove.pending || reject.pending || restore.pending;
-  const problem = queue.error ?? unapprove.error ?? reject.error ?? restore.error ?? scan.error;
+  const markReupload = useApiMutation(
+    (ids: number[], published: boolean) => window.api.rotationMarkPublishedBefore(ids, published),
+    { onDone: clear }
+  );
+  const postAgain = useApiMutation((ids: number[]) => window.api.rotationPostAgain(ids), { onDone: clear });
+  const busy = unapprove.pending || reject.pending || restore.pending || markReupload.pending || postAgain.pending;
+  const problem =
+    queue.error ?? unapprove.error ?? reject.error ?? restore.error ?? markReupload.error ?? postAgain.error ?? scan.error;
 
   const toggle = (id: number): void =>
     setSelected((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]));
@@ -83,6 +97,12 @@ export function Queue(): React.JSX.Element {
         <div className={styles.chips}>
           <FilterChips chips={chips} selected={filter} onSelect={setFilter} label="Filter the queue" />
         </div>
+        <FilterChips
+          chips={KIND_FILTERS.map((id) => ({ id, label: KIND_LABELS[id] }))}
+          selected={kind}
+          onSelect={setKind}
+          label="Announcements or re-runs"
+        />
       </div>
 
       {selected.length > 0 && (
@@ -110,6 +130,26 @@ export function Queue(): React.JSX.Element {
           {canReject.length > 0 && (
             <Button variant="danger" size="small" disabled={busy} onClick={() => void reject.run(canReject)}>
               Reject {canReject.length < selected.length && `(${canReject.length})`}
+            </Button>
+          )}
+          {chosen.some((item) => !item.published_before) && (
+            <Button
+              size="small"
+              disabled={busy}
+              title="Their next posting becomes a re-run and will not notify subscribers"
+              onClick={() => void markReupload.run(selected, true)}
+            >
+              These are re-uploads
+            </Button>
+          )}
+          {chosen.some((item) => item.published_before) && (
+            <Button size="small" disabled={busy} onClick={() => void markReupload.run(selected, false)}>
+              Not re-uploads
+            </Button>
+          )}
+          {chosen.some((item) => item.state === 'published') && (
+            <Button size="small" disabled={busy} onClick={() => void postAgain.run(selected)}>
+              Post again
             </Button>
           )}
           <Button variant="ghost" size="small" onClick={clear}>

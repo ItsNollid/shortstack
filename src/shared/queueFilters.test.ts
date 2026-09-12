@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { QUEUE_STATES } from './queue';
-import { FILTER_EMPTY, FILTER_LABELS, QUEUE_FILTERS, countByFilter, matchesFilter } from './queueFilters';
+import {
+  FILTER_EMPTY,
+  FILTER_LABELS,
+  KIND_FILTERS,
+  KIND_LABELS,
+  QUEUE_FILTERS,
+  countByFilter,
+  matchesFilter,
+  matchesKind
+} from './queueFilters';
 
 describe('queue filters', () => {
   it('labels and empty-state copy exist for every chip', () => {
@@ -28,5 +37,28 @@ describe('queue filters', () => {
     expect(counts.needs_approval).toBe(2);
     expect(counts.published).toBe(1);
     expect(counts.rejected).toBe(1);
+  });
+});
+
+describe('the kind filter', () => {
+  it('has a label for every option', () => {
+    for (const filter of KIND_FILTERS) expect(KIND_LABELS[filter].length).toBeGreaterThan(0);
+  });
+
+  it('lets everything through on "any"', () => {
+    expect(matchesKind('new', 'any')).toBe(true);
+    expect(matchesKind('rotation', 'any')).toBe(true);
+  });
+
+  it('separates announcements from re-runs', () => {
+    expect(matchesKind('new', 'new')).toBe(true);
+    expect(matchesKind('rotation', 'new')).toBe(false);
+    expect(matchesKind('rotation', 'rotation')).toBe(true);
+    expect(matchesKind('new', 'rotation')).toBe(false);
+  });
+
+  it('is independent of the state filter, so the two can be combined', () => {
+    // A pending re-run is both "Needs approval" and "Re-runs"; neither filter should exclude it.
+    expect(matchesFilter('pending', 'needs_approval') && matchesKind('rotation', 'rotation')).toBe(true);
   });
 });

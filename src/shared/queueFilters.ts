@@ -62,3 +62,19 @@ export function countByFilter(states: readonly QueueState[]): Record<QueueFilter
   }
   return counts;
 }
+
+// A second axis, deliberately separate from the state chips: whether a posting is an announcement
+// or a re-run says nothing about where it is in its lifecycle, so mixing them into one row of chips
+// would ask the user to think about two questions as if they were one.
+export const KIND_FILTERS = ['any', 'new', 'rotation'] as const;
+export type KindFilter = (typeof KIND_FILTERS)[number];
+
+export const KIND_LABELS: Record<KindFilter, string> = {
+  any: 'All videos',
+  new: 'New',
+  rotation: 'Re-runs'
+};
+
+export function matchesKind(postingKind: 'new' | 'rotation', filter: KindFilter): boolean {
+  return filter === 'any' || postingKind === filter;
+}

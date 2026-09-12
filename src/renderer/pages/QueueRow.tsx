@@ -63,7 +63,14 @@ export function QueueRow({ item, selected, onToggle, onOpen }: QueueRowProps): R
       </div>
 
       <div className={styles.name}>
-        <div className={styles.title}>{item.title}</div>
+        <div className={styles.title}>
+          {item.posting_kind === 'rotation' && (
+            <span className={styles.rerun} title={`Posting ${item.postings} of this video. Re-runs never notify subscribers.`}>
+              Re-run {item.postings > 1 ? `#${item.postings}` : ''}
+            </span>
+          )}
+          {item.title}
+        </div>
         <div className={styles.file}>{item.filename}</div>
         {problem !== null && <div className={styles.problem}>{problem}</div>}
         {notAShort !== null && <div className={styles.warning}>{notAShort}</div>}
