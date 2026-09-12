@@ -1,0 +1,23 @@
+.row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.value {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text-muted);
+  padding: 6px var(--space-3);
+  font-size: var(--text-sm);
+  max-height: 96px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.empty { color: var(--text-faint); font-style: italic; }
+
+.label { font-size: var(--text-sm); color: var(--text-faint); margin-bottom: 4px; }

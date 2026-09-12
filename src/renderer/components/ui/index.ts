@@ -1,6 +1,7 @@
 export { Avatar } from './Avatar';
 export { Banner } from './Banner';
 export { Button } from './Button';
+export { CopyField } from './CopyField';
 export { Dialog } from './Dialog';
 export { EmptyState } from './EmptyState';
 export { Field, Select, Switch, TextArea, TextField } from './Field';

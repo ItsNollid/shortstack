@@ -122,7 +122,15 @@ export function installDevApiStub(): void {
         missingScopes: [],
         channel: { id: 'UC_sample', title: 'Sample Channel', handle: '@samplechannel', avatarUrl: null, subscriberCount: 12400 }
       }),
-    aiStatus: () => ok({ running: false, models: [], message: 'Ollama is not running' }),
+    aiStatus: () => ok({ running: true, models: ['llama3.2'], message: 'Ready' }),
+    aiGenerate: () =>
+      ok({
+        title: 'Rain on a tent for three straight minutes',
+        description: 'Recorded on a wet night in the Peaks. Headphones recommended.',
+        tags: ['rain sounds', 'camping', 'asmr']
+      }),
+    clipboardWrite: () => ok(null),
+    queueLinkVideo: () => Promise.resolve({ ok: false as const, error: { code: 'preview', message: 'Not available in the browser preview' } }),
     activityList: () => ok([]),
     uploadsList: () => ok([]),
     on: (_event: AppEvent, _listener: (payload: unknown) => void) => () => undefined

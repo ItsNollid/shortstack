@@ -98,6 +98,9 @@ export interface ShortStackApi {
   revealFile(queueId: number): Promise<Result<null>>;
   openExternal(url: string): Promise<Result<null>>;
   openStudioUpload(): Promise<Result<null>>;
+  /** Copying runs in the main process: the renderer loads from file://, where the browser
+   *  clipboard API is not reliably available. */
+  clipboardWrite(text: string): Promise<Result<null>>;
 
   /** Returns an unsubscribe function: the old preload leaked a listener on every mount. */
   on(event: AppEvent, listener: (payload: unknown) => void): () => void;
@@ -136,7 +139,8 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'selectFolder',
   'revealFile',
   'openExternal',
-  'openStudioUpload'
+  'openStudioUpload',
+  'clipboardWrite'
 ];
 
 export const APP_EVENTS: readonly AppEvent[] = ['queue:changed', 'scheduler:status', 'auth:changed', 'upload:progress', 'toast'];

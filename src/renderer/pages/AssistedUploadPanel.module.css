@@ -1,0 +1,51 @@
+.panel {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--raised);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.head { display: flex; align-items: baseline; gap: var(--space-3); }
+.title { font-size: var(--text-lg); flex: 1; }
+
+.steps { display: flex; flex-direction: column; gap: var(--space-3); counter-reset: step; }
+
+.step {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.number {
+  counter-increment: step;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--hover);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+.number::before { content: counter(step); }
+
+.stepBody { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.stepTitle { font-size: var(--text-md); font-weight: 500; }
+.stepText { color: var(--text-muted); font-size: var(--text-sm); }
+.stepActions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+
+.setting {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+.settingLabel { color: var(--text-faint); min-width: 72px; }
+.settingValue { color: var(--text); font-weight: 500; }
+
+.link { display: flex; gap: var(--space-2); align-items: flex-start; }
+.linkInput { flex: 1; }

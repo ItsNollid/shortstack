@@ -81,6 +81,8 @@ export function useApiQuery<T>(fetcher: () => Promise<Result<T>>, options: Query
 
 export interface MutationResult<A extends unknown[], T> {
   run: (...args: A) => Promise<T | null>;
+  /** The most recent successful result, for writes whose answer is worth showing. */
+  data: T | null;
   pending: boolean;
   error: string | null;
   clearError: () => void;
@@ -99,6 +101,7 @@ export function useApiMutation<A extends unknown[], T>(
 
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<T | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -113,6 +116,7 @@ export function useApiMutation<A extends unknown[], T>(
     try {
       const result = await actionRef.current(...args);
       if (result.ok) {
+        if (mounted.current) setData(result.data);
         optionsRef.current.onDone?.(result.data);
         return result.data;
       }
@@ -129,7 +133,7 @@ export function useApiMutation<A extends unknown[], T>(
     }
   }, []);
 
-  return { run, pending, error, clearError: useCallback(() => setError(null), []) };
+  return { run, data, pending, error, clearError: useCallback(() => setError(null), []) };
 }
 
 /** Subscribes to a backend event for its payload (progress, toasts) rather than to invalidate. */

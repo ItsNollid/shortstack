@@ -16,7 +16,10 @@ import {
 } from '../../shared/settings';
 import { descriptionProblem, tagsProblem, titleProblem, type QueueMetadataPatch } from '../../shared/videoMetadata';
 import { Banner, Button, Select, Switch, TagInput, TextArea, TextField } from '../components/ui';
+import { useAppStatus } from '../app/status';
 import { useApiMutation, useApiQuery } from '../hooks/useApi';
+import { AiAssistPanel, type AiField } from './AiAssistPanel';
+import { AssistedUploadPanel } from './AssistedUploadPanel';
 import styles from './VideoDetails.module.css';
 import { VideoSidePanel } from './VideoSidePanel';
 
@@ -51,6 +54,7 @@ const sameDraft = (a: Draft, b: Draft): boolean =>
   a.tags.every((tag, index) => tag === b.tags[index]);
 
 export function VideoDetails({ onApprove }: { onApprove: (item: QueueItemDTO) => void }): React.JSX.Element {
+  const { settings } = useAppStatus();
   const { id = '' } = useParams();
   const queueId = Number(id);
   const item = useApiQuery(() => window.api.queueGet(queueId), {
@@ -112,6 +116,14 @@ export function VideoDetails({ onApprove }: { onApprove: (item: QueueItemDTO) =>
   const blocked = loaded.state === 'uploading';
   const invalid = problems.title !== null || problems.description !== null || problems.tags !== null;
   const set = <K extends keyof Draft>(key: K, value: Draft[K]): void => setDraft({ ...draft, [key]: value });
+  const acceptSuggestion = (field: AiField, value: string | string[]): void => {
+    if (field === 'tags' && Array.isArray(value)) set('tags', value);
+    else if (field !== 'tags' && typeof value === 'string') set(field, value);
+  };
+
+  const assisted =
+    settings?.upload_method === 'assisted' &&
+    (loaded.state === 'approved' || loaded.state === 'awaiting_manual_upload');
 
   const submit = (): void => {
     void save.run(draft, baseline.updated_at).then((updated) => {
@@ -150,6 +162,15 @@ export function VideoDetails({ onApprove }: { onApprove: (item: QueueItemDTO) =>
               {act.error}
             </Banner>
           )}
+
+          {assisted && <AssistedUploadPanel item={loaded} />}
+
+          <AiAssistPanel
+            queueId={loaded.id}
+            current={{ title: draft.title, description: draft.description, tags: draft.tags }}
+            onAccept={acceptSuggestion}
+            disabled={blocked}
+          />
 
           <TextField
             label="Title"

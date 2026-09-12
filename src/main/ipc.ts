@@ -1,7 +1,7 @@
 // Typed IPC handlers. Every argument is validated here: the renderer is the least trusted part
 // of the app, and the previous version let it choose SQL column names.
 import type Database from 'better-sqlite3';
-import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron';
+import { BrowserWindow, app, clipboard, dialog, ipcMain, shell } from 'electron';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { AppEvent, AppInfo, AuthStatus, Result, ShortStackApi } from '../shared/ipc';
@@ -309,6 +309,12 @@ export function registerIpcHandlers(context: IpcContext): void {
     openExternal: async (url) => {
       if (typeof url !== 'string' || !/^https:\/\//i.test(url)) return fail('invalid', 'Only https links can be opened');
       await shell.openExternal(url);
+      return ok(null);
+    },
+    clipboardWrite: async (text) => {
+      if (typeof text !== 'string') return fail('invalid', 'Expected text to copy');
+      if (text.length > 100_000) return fail('invalid', 'That is too much text to copy');
+      clipboard.writeText(text);
       return ok(null);
     },
     openStudioUpload: async () => {
