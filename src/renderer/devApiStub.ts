@@ -86,6 +86,16 @@ const SAMPLE: QueueItemDTO[] = [
 
 const SETTINGS: AppSettings = { ...defaultSettings(), shorts_folder: FOLDER, setup_complete: true };
 
+const ACTIVITY = [
+  { id: 7, queue_id: 4, action: 'remote_observed', detail: 'YouTube reports it is now scheduled', created_at: iso(-2) },
+  { id: 6, queue_id: 5, action: 'begin_upload', detail: 'Upload started', created_at: iso(-3) },
+  { id: 5, queue_id: 6, action: 'missed_slot', detail: 'Missed its scheduled time', created_at: iso(-5) },
+  { id: 4, queue_id: 3, action: 'auto_slot', detail: 'Automatically scheduled to publish at 18:00', created_at: iso(-6) },
+  { id: 3, queue_id: 3, action: 'approve', detail: 'Approved for upload', created_at: iso(-6.2) },
+  { id: 2, queue_id: 1, action: 'edit_metadata', detail: 'Details edited', created_at: iso(-30) },
+  { id: 1, queue_id: null, action: 'disconnect', detail: 'YouTube data removed from this video', created_at: iso(-50) }
+];
+
 const ok = <T>(data: T): Promise<{ ok: true; data: T }> => Promise.resolve({ ok: true as const, data });
 
 export function installDevApiStub(): void {
@@ -133,7 +143,7 @@ export function installDevApiStub(): void {
       }),
     clipboardWrite: () => ok(null),
     queueLinkVideo: () => Promise.resolve({ ok: false as const, error: { code: 'preview', message: 'Not available in the browser preview' } }),
-    activityList: () => ok([]),
+    activityList: () => ok(ACTIVITY),
     uploadsList: () => ok([]),
     on: (_event: AppEvent, _listener: (payload: unknown) => void) => () => undefined
   };
