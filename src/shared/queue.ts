@@ -29,10 +29,20 @@ export const ATTENTION_CODES = [
 ] as const;
 export type AttentionCode = (typeof ATTENTION_CODES)[number];
 
-export type Privacy = 'public' | 'unlisted' | 'private';
-export type ScheduleSource = 'auto' | 'manual' | 'hold';
-export type RemoteSync = 'synced' | 'pending' | 'error';
-export type UploadMethod = 'assisted' | 'api';
+export const PRIVACIES = ['public', 'unlisted', 'private'] as const;
+export type Privacy = (typeof PRIVACIES)[number];
+
+export const SCHEDULE_SOURCES = ['auto', 'manual', 'hold'] as const;
+export type ScheduleSource = (typeof SCHEDULE_SOURCES)[number];
+
+export const REMOTE_SYNC_STATES = ['synced', 'pending', 'error'] as const;
+export type RemoteSync = (typeof REMOTE_SYNC_STATES)[number];
+
+export const UPLOAD_METHODS = ['assisted', 'api'] as const;
+export type UploadMethod = (typeof UPLOAD_METHODS)[number];
+
+export const PLATFORMS = ['youtube', 'tiktok', 'instagram'] as const;
+export type Platform = (typeof PLATFORMS)[number];
 
 /** Minimum gap between "now" and any publish slot, for both manual and automatic scheduling. */
 export const MIN_SCHEDULE_LEAD_MS = 30 * 60 * 1000;

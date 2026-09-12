@@ -365,3 +365,26 @@ describe('disconnect', () => {
     expect(apply(item({ state: 'uploading', upload_session_uri: 's1' }), { type: 'disconnect' })).toMatchObject({ state: 'pending', upload_session_uri: null });
   });
 });
+
+describe('uploads inherited from the old build', () => {
+  const flagged = () =>
+    item({
+      state: 'needs_attention',
+      attention_code: 'legacy_unrecorded_upload',
+      attention_from_state: 'pending',
+      schedule_source: 'hold'
+    });
+
+  it('cannot be rejected or waved away while it might already be on YouTube', () => {
+    expect(refused(flagged(), { type: 'reject' })).toMatch(/already reached YouTube/);
+    expect(refused(flagged(), { type: 'resolve_attention' })).toMatch(/Link the existing/);
+  });
+
+  it('leaves attention only by linking the real video or confirming it was never uploaded', () => {
+    expect(apply(flagged(), { type: 'link_video', videoId: 'yt-old' })).toMatchObject({
+      state: 'uploaded',
+      youtube_video_id: 'yt-old'
+    });
+    expect(apply(flagged(), { type: 'confirm_not_duplicate' })).toMatchObject({ state: 'approved', attention_code: null });
+  });
+});

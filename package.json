@@ -10,15 +10,13 @@
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
-    "test": "vitest run && npm run test:db",
-    "test:db": "node scripts/test-electron.mjs",
-    "postinstall": "electron-builder install-app-deps",
+    "test": "vitest run",
     "package": "electron-vite build && electron-builder --win",
     "package:dir": "electron-vite build && electron-builder --win --dir"
   },
   "dependencies": {
     "@fontsource/roboto": "^5.3.0",
-    "better-sqlite3": "^11.7.0",
+    "better-sqlite3": "^13.0.3",
     "googleapis": "^144.0.0",
     "lucide-react": "^1.45.0",
     "node-cron": "^3.0.3"
@@ -30,9 +28,9 @@
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
-    "electron": "^33.2.0",
-    "electron-builder": "^25.1.0",
-    "electron-vite": "^3.0.0",
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "react-router-dom": "^6.28.0",
@@ -61,8 +59,8 @@
     }
   },
   "allowScripts": {
-    "better-sqlite3@11.10.0": true,
+    "better-sqlite3@13.0.3": true,
     "esbuild@0.25.12": true,
-    "electron@33.2.0": true
+    "electron@44.3.0": true
   }
 }

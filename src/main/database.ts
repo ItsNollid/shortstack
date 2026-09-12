@@ -1,91 +1,19 @@
 import Database from 'better-sqlite3';
 import { app } from 'electron';
 import * as path from 'path';
+import { openDatabase } from './db/connection';
 
 let db: Database.Database;
 
 export const initDatabase = () => {
   const dbPath = path.join(app.getPath('userData'), 'shortstack.db');
-  db = new Database(dbPath);
-  
-  // Run migrations
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS videos (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      filename TEXT NOT NULL,
-      filepath TEXT NOT NULL,
-      file_hash TEXT UNIQUE,
-      status TEXT DEFAULT 'pending',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS queue (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      video_id INTEGER REFERENCES videos(id),
-      channel_id TEXT,
-      title TEXT,
-      description TEXT,
-      tags TEXT,
-      category_id TEXT DEFAULT '22',
-      privacy TEXT DEFAULT 'public',
-      notify_subscribers INTEGER DEFAULT 0,
-      made_for_kids INTEGER DEFAULT 0,
-      scheduled_for DATETIME,
-      approved INTEGER DEFAULT 0,
-      platforms TEXT DEFAULT '["youtube"]',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS uploads (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      queue_id INTEGER REFERENCES queue(id),
-      youtube_video_id TEXT,
-      uploaded_at DATETIME,
-      status TEXT,
-      error_message TEXT,
-      retry_count INTEGER DEFAULT 0
-    );
-
-    CREATE TABLE IF NOT EXISTS analytics (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      youtube_video_id TEXT,
-      date DATE,
-      views INTEGER,
-      watch_time_minutes REAL,
-      avg_view_duration_seconds REAL,
-      impressions INTEGER,
-      ctr REAL,
-      likes INTEGER,
-      comments INTEGER,
-      shares INTEGER,
-      subscriber_change INTEGER,
-      traffic_source TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS channel_analytics (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      channel_id TEXT,
-      date DATE,
-      total_views INTEGER,
-      total_watch_time REAL,
-      subscriber_count INTEGER,
-      top_traffic_sources TEXT,
-      audience_demographics TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS channels (
-      id TEXT PRIMARY KEY,
-      name TEXT,
-      is_active INTEGER DEFAULT 1,
-      credentials_path TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
+  const opened = openDatabase(dbPath);
+  db = opened.db;
+  const { migratedFrom, migratedTo, backupPath } = opened.migration;
+  if (migratedFrom !== migratedTo) {
+    const backupNote = backupPath === null ? '' : ` (backup: ${backupPath})`;
+    console.info(`[ShortStack] database schema ${migratedFrom} -> ${migratedTo}${backupNote}`);
+  }
 };
 
 export const getDb = () => db;

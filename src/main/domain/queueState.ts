@@ -71,7 +71,10 @@ const AUTO_SLOTTABLE: ReadonlySet<QueueState> = new Set(['approved', 'awaiting_m
 const MISSABLE: ReadonlySet<QueueState> = new Set(['approved', 'awaiting_manual_upload', 'uploaded', 'failed']);
 const RECONCILABLE: ReadonlySet<QueueState> = new Set(['uploaded', 'scheduled', 'published', 'needs_attention']);
 const SCHEDULE_RESOLVABLE: ReadonlySet<AttentionCode> = new Set(['missed_slot', 'set_schedule_in_studio']);
-const DUPLICATE_CODES: ReadonlySet<AttentionCode> = new Set(['possible_duplicate', 'duplicate_uploads']);
+// Anything that might already exist on YouTube: these block rejection and a plain resolve,
+// so a video can never be re-uploaded just because its fate is unknown.
+const DUPLICATE_CODES: ReadonlySet<AttentionCode> = new Set(['possible_duplicate', 'duplicate_uploads', 'legacy_unrecorded_upload']);
+const CONFIRMABLE_UPLOAD_CODES: ReadonlySet<AttentionCode> = new Set(['possible_duplicate', 'legacy_unrecorded_upload']);
 
 const ok = (patch: Partial<QueueStateFields>): TransitionResult => ({ ok: true, patch });
 const deny = (reason: string): TransitionResult => ({ ok: false, reason });
@@ -406,7 +409,7 @@ export function transition(item: QueueStateFields, event: QueueEvent, ctx: Trans
     }
 
     case 'confirm_not_duplicate':
-      if (item.state !== 'needs_attention' || item.attention_code !== 'possible_duplicate') {
+      if (item.state !== 'needs_attention' || item.attention_code === null || !CONFIRMABLE_UPLOAD_CODES.has(item.attention_code)) {
         return deny('This video is not flagged as a possible duplicate');
       }
       if (isOnYouTube(item)) return deny('This video is already linked on YouTube');
