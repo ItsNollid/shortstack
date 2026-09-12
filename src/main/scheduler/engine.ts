@@ -131,6 +131,8 @@ export class SchedulerEngine {
       settings: {
         uploadMethod: settings.upload_method,
         uploadTimes: settings.upload_times,
+        rotationUploadTimes: settings.rotation_upload_times,
+        autoScheduleDays: settings.auto_schedule_days,
         paused: settings.scheduler_paused
       },
       holds: {

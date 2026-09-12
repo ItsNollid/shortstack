@@ -11,6 +11,7 @@ let nextId = 1;
 function item(overrides: Partial<SchedulerItem> = {}): SchedulerItem {
   return {
     id: nextId++,
+    posting_kind: 'new',
     missing: false,
     state: 'pending',
     privacy: 'public',
@@ -35,6 +36,8 @@ function item(overrides: Partial<SchedulerItem> = {}): SchedulerItem {
 const settings = (overrides: Partial<SchedulerSettings> = {}): SchedulerSettings => ({
   uploadMethod: 'api',
   uploadTimes: ['09:00', '13:00', '18:00', '22:00'],
+  rotationUploadTimes: ['11:00', '15:00', '20:00'],
+  autoScheduleDays: 14,
   paused: false,
   ...overrides
 });
@@ -184,5 +187,74 @@ describe('remote sync and verification', () => {
   it('asks for detection while videos wait on a manual upload', () => {
     const waiting = item({ state: 'awaiting_manual_upload' });
     expect(run([waiting], settings({ uploadMethod: 'assisted' }))).toContainEqual({ type: 'detect_manual_uploads', ids: [waiting.id] });
+  });
+});
+
+describe('two scheduling lanes', () => {
+  const laneSettings = settings({
+    uploadTimes: ['09:00'],
+    rotationUploadTimes: ['15:00'],
+    autoScheduleDays: 14
+  });
+
+  const hourOf = (iso: string): number => new Date(iso).getHours();
+
+  it('draws each kind of posting from its own times', () => {
+    const actions = decide({
+      now: NOW,
+      items: [
+        item({ state: 'approved', posting_kind: 'new' }),
+        item({ state: 'approved', posting_kind: 'rotation' })
+      ],
+      settings: laneSettings,
+      holds: holds()
+    }).filter((action) => action.type === 'auto_slot');
+
+    expect(actions).toHaveLength(2);
+    const [first, second] = actions as Array<{ id: number; at: string }>;
+    expect(hourOf(first.at)).toBe(9);
+    expect(hourOf(second.at)).toBe(15);
+  });
+
+  it('gives a new video its slot before any re-run, whatever the order they arrive in', () => {
+    const rerun = item({ state: 'approved', posting_kind: 'rotation' });
+    const fresh = item({ state: 'approved', posting_kind: 'new' });
+    const actions = decide({
+      now: NOW,
+      items: [rerun, fresh],
+      settings: laneSettings,
+      holds: holds()
+    }).filter((action) => action.type === 'auto_slot') as Array<{ id: number }>;
+
+    expect(actions[0]?.id).toBe(fresh.id);
+  });
+
+  it('keeps booking one lane when the other has no times set', () => {
+    const actions = decide({
+      now: NOW,
+      items: [item({ state: 'approved', posting_kind: 'rotation' }), item({ state: 'approved', posting_kind: 'new' })],
+      settings: settings({ uploadTimes: ['09:00'], rotationUploadTimes: [], autoScheduleDays: 14 }),
+      holds: holds()
+    }).filter((action) => action.type === 'auto_slot');
+
+    // Rotation has nowhere to go, but that must not stop the new video being scheduled.
+    expect(actions).toHaveLength(1);
+  });
+
+  it('books no further ahead than the cap allows', () => {
+    const many = Array.from({ length: 40 }, () => item({ state: 'approved', posting_kind: 'new' }));
+    const actions = decide({
+      now: NOW,
+      items: many,
+      settings: settings({ uploadTimes: ['09:00'], rotationUploadTimes: [], autoScheduleDays: 5 }),
+      holds: holds()
+    }).filter((action) => action.type === 'auto_slot') as Array<{ at: string }>;
+
+    // Six days of a single daily slot: today through the fifth day ahead.
+    expect(actions.length).toBeLessThanOrEqual(6);
+    for (const action of actions) {
+      const daysAhead = (Date.parse(action.at) - NOW.getTime()) / 86_400_000;
+      expect(daysAhead).toBeLessThanOrEqual(6);
+    }
   });
 });

@@ -1,6 +1,7 @@
 // Shapes crossing the IPC bridge. Columns stay snake_case to match the database, but the
 // types are real: booleans are booleans and JSON columns arrive parsed.
 import type { AttentionCode, Platform, Privacy, QueueState, RemoteSync, ScheduleSource } from './queue';
+import type { PostingKind } from './rotation';
 
 export interface QueueItemDTO {
   id: number;
@@ -38,6 +39,14 @@ export interface QueueItemDTO {
   width: number | null;
   height: number | null;
   missing: boolean;
+  /** Whether this posting is the announcement or a re-run. Fixed when the posting was created. */
+  posting_kind: PostingKind;
+  /** Set at intake for a file already published before ShortStack saw it. */
+  published_before: boolean;
+  /** Taken out of rotation by hand. */
+  rotation_paused: boolean;
+  /** How many postings of this video exist in total, this one included. */
+  postings: number;
 }
 
 export interface VideoDTO {

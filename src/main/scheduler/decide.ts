@@ -2,17 +2,25 @@
 // this tick should take. No clock, no database, no network, so every rule is testable.
 import { MIN_SCHEDULE_LEAD_MS, type UploadMethod } from '../../shared/queue';
 import { MISSABLE_STATES, PUBLISH_GRACE_MS, desiredPublishAt, isOnYouTube, type QueueStateFields } from '../domain/queueState';
+import type { PostingKind } from '../../shared/rotation';
 import { nextFreeSlot } from '../../shared/slots';
 
 export interface SchedulerItem extends QueueStateFields {
   id: number;
+  /** Which lane this posting draws its publish time from. */
+  posting_kind: PostingKind;
   /** The file backing this item is gone or has changed. */
   missing: boolean;
 }
 
 export interface SchedulerSettings {
   uploadMethod: UploadMethod;
+  /** Times for first postings. */
   uploadTimes: readonly string[];
+  /** Times for re-runs, kept separate so a backlog of them never delays a new video. */
+  rotationUploadTimes: readonly string[];
+  /** How far ahead auto-scheduling books, so the near-term schedule stays free to change. */
+  autoScheduleDays: number;
   paused: boolean;
 }
 
@@ -98,9 +106,24 @@ export function decide({ now, items, settings, holds }: SchedulerInput): Schedul
       )
       .sort((a, b) => a.id - b.id);
 
-    for (const item of candidates) {
-      const at = nextFreeSlot({ uploadTimes: settings.uploadTimes, taken, now });
-      if (at === null) break;
+    // Each lane draws from its own times. A slot claimed by either lane is claimed for both, since
+    // both end up as real publish times on the channel; the lanes separate when videos go out, not
+    // whether they collide.
+    const lane = (kind: PostingKind): readonly string[] =>
+      kind === 'rotation' ? settings.rotationUploadTimes : settings.uploadTimes;
+
+    // New postings first: a re-run should never take the slot a new video was waiting for.
+    const ordered = [...candidates].sort((a, b) => {
+      if (a.posting_kind !== b.posting_kind) return a.posting_kind === 'new' ? -1 : 1;
+      return a.id - b.id;
+    });
+
+    for (const item of ordered) {
+      const uploadTimes = lane(item.posting_kind);
+      if (uploadTimes.length === 0) continue;
+      const at = nextFreeSlot({ uploadTimes, taken, now, horizonDays: settings.autoScheduleDays });
+      // One lane running out does not stop the other: they book independently.
+      if (at === null) continue;
       taken.push(at);
       actions.push({ type: 'auto_slot', id: item.id, at });
     }

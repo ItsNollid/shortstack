@@ -41,6 +41,10 @@ const video = (over: Partial<QueueItemDTO> & Pick<QueueItemDTO, 'id' | 'title' |
   width: 1080,
   height: 1920,
   missing: false,
+  posting_kind: 'new',
+  published_before: false,
+  rotation_paused: false,
+  postings: 1,
   ...over
 });
 
@@ -65,7 +69,15 @@ const SAMPLE: QueueItemDTO[] = [
     youtube_video_id: 'abc123',
     remote_sync: 'synced'
   }),
-  video({ id: 5, title: 'Desk tour, finally', filename: 'desk_tour.mov', state: 'uploading', upload_bytes_confirmed: 22_000_000 }),
+  video({
+    id: 5,
+    title: 'Desk tour, finally',
+    filename: 'desk_tour.mov',
+    state: 'uploading',
+    upload_bytes_confirmed: 22_000_000,
+    posting_kind: 'rotation',
+    postings: 3
+  }),
   video({
     id: 6,
     title: 'Why this render kept failing',
@@ -81,7 +93,10 @@ const SAMPLE: QueueItemDTO[] = [
     filename: 'lens_qa.mov',
     state: 'published',
     scheduled_for: iso(-52),
-    youtube_video_id: 'def456'
+    youtube_video_id: 'def456',
+    posting_kind: 'rotation',
+    published_before: true,
+    postings: 4
   })
 ];
 
