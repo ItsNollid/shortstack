@@ -1,12 +1,43 @@
 import React from 'react';
+import type { QueueItemDTO } from '../../shared/dto';
+import type { Result } from '../../shared/ipc';
+import { scheduleCapacity } from '../../shared/capacity';
+import { useApiQuery } from '../hooks/useApi';
 import { Banner, Button } from '../components/ui';
 import { useAppStatus } from './status';
 
 /** Conditions that affect everything, shown above whichever page is open. Each one names the fix
  *  rather than only the problem. */
+const readQueue = (): Promise<Result<QueueItemDTO[]>> => window.api.queueList();
+
 export function Banners(): React.JSX.Element | null {
   const { auth, scheduler, settings } = useAppStatus();
+  const queue = useApiQuery(readQueue, { key: 'queue', invalidateOn: ['queue:changed'] });
   const banners: React.JSX.Element[] = [];
+
+  // Auto-scheduling stops at a fixed horizon. Without this the extra videos simply never get a
+  // date, with nothing on screen to say why.
+  if (settings !== null && queue.data !== null) {
+    const items = queue.data;
+    const waiting = items.filter(
+      (item) => item.state === 'approved' && item.scheduled_for === null && item.privacy === 'public'
+    ).length;
+    const capacity = scheduleCapacity({
+      uploadTimes: settings.upload_times,
+      taken: items.map((item) => item.scheduled_for).filter((at): at is string => at !== null),
+      now: new Date(),
+      waiting
+    });
+    if (capacity.stranded > 0) {
+      banners.push(
+        <Banner key="capacity" kind="warning" title={`${capacity.stranded} approved videos have nowhere to go`}>
+          Your daily times are booked solid through {capacity.horizonEnd.toLocaleDateString()}. At{' '}
+          {settings.upload_times.length} a day this backlog needs {capacity.daysToClear} days to clear. Add more
+          daily times in Settings, or leave them; they will take dates as space appears.
+        </Banner>
+      );
+    }
+  }
 
   if (auth !== null && auth.state !== 'ok') {
     const text =
