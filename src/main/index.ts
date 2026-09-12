@@ -5,7 +5,7 @@ import * as path from 'path';
 import { runtimeProfile } from './bootstrap/profile';
 import { getDb, initDatabase } from './database';
 import { readSettings } from './db/settingsRepo';
-import { registerIpcHandlers } from './ipc';
+import { broadcast, registerIpcHandlers } from './ipc';
 import { createSchedulerEffects } from './scheduler/effects';
 import { SchedulerEngine } from './scheduler/engine';
 import { AuthService } from './youtube/authService';
@@ -96,7 +96,10 @@ async function start(): Promise<void> {
     now: () => new Date(),
     onChange: () => {
       tray?.refresh?.();
-      mainWindow?.webContents.send('app:queueChanged');
+      // Through the same typed helper the IPC handlers use. Sending a raw channel name here is
+      // how background work stopped reaching the screen: the renderer subscribes by exact name.
+      broadcast(mainWindow, 'queue:changed');
+      broadcast(mainWindow, 'scheduler:status');
     }
   });
 

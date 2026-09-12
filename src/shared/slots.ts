@@ -1,7 +1,7 @@
 // Picks publish slots from the user's daily upload times. Pure and timezone-aware:
 // slots are built as local wall-clock times so they survive daylight-saving changes,
 // then stored as UTC instants.
-import { MIN_SCHEDULE_LEAD_MS } from '../../shared/queue';
+import { MIN_SCHEDULE_LEAD_MS } from './queue';
 
 export interface SlotQuery {
   /** Daily times as "HH:MM" in the user's local timezone. */

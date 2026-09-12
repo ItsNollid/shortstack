@@ -2,7 +2,7 @@
 // this tick should take. No clock, no database, no network, so every rule is testable.
 import { MIN_SCHEDULE_LEAD_MS, type UploadMethod } from '../../shared/queue';
 import { MISSABLE_STATES, PUBLISH_GRACE_MS, desiredPublishAt, isOnYouTube, type QueueStateFields } from '../domain/queueState';
-import { nextFreeSlot } from '../domain/slots';
+import { nextFreeSlot } from '../../shared/slots';
 
 export interface SchedulerItem extends QueueStateFields {
   id: number;

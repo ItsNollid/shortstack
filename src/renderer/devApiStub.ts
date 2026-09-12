@@ -96,7 +96,16 @@ const ACTIVITY = [
   { id: 1, queue_id: null, action: 'disconnect', detail: 'YouTube data removed from this video', created_at: iso(-50) }
 ];
 
-const ok = <T>(data: T): Promise<{ ok: true; data: T }> => Promise.resolve({ ok: true as const, data });
+const listeners = new Map<AppEvent, Set<(payload: unknown) => void>>();
+
+// The preview has to behave like the app: a write tells the screens to refetch.
+const emit = (event: AppEvent): void => {
+  for (const listener of listeners.get(event) ?? []) listener(null);
+};
+
+const ok = <T>(data: T): Promise<{ ok: true; data: T }> =>
+  // Structured-cloned the way IPC would, so the preview cannot hand out live references.
+  Promise.resolve({ ok: true as const, data: structuredClone(data) });
 
 export function installDevApiStub(): void {
   const stub: Partial<ShortStackApi> = {
@@ -105,11 +114,13 @@ export function installDevApiStub(): void {
     queueGet: (id: number) => ok(SAMPLE.find((item) => item.id === id) ?? SAMPLE[0]!),
     queueApprove: (ids: number[]) => {
       for (const item of SAMPLE) if (ids.includes(item.id) && item.state === 'pending') item.state = 'approved';
+      emit('queue:changed');
       return ok(SAMPLE.filter((item) => ids.includes(item.id)));
     },
     queueUpdateMetadata: (id: number, patch: Record<string, unknown>) => {
       const item = SAMPLE.find((entry) => entry.id === id) ?? SAMPLE[0]!;
       Object.assign(item, patch, { updated_at: new Date().toISOString() });
+      emit('queue:changed');
       return ok(item);
     },
     settingsGetAll: () => ok(SETTINGS),
@@ -142,10 +153,32 @@ export function installDevApiStub(): void {
         tags: ['rain sounds', 'camping', 'asmr']
       }),
     clipboardWrite: () => ok(null),
-    queueLinkVideo: () => Promise.resolve({ ok: false as const, error: { code: 'preview', message: 'Not available in the browser preview' } }),
+    queueLinkVideo: () =>
+      Promise.resolve({ ok: false as const, error: { code: 'preview', message: 'Not available in the browser preview' } }),
+    queueSchedule: (id: number, at: string) => {
+      const item = SAMPLE.find((entry) => entry.id === id);
+      if (item === undefined) return Promise.resolve({ ok: false as const, error: { code: 'gone', message: 'Not found' } });
+      item.scheduled_for = at;
+      item.schedule_source = 'manual';
+      emit('queue:changed');
+      return ok(item);
+    },
+    queueHold: (id: number) => {
+      const item = SAMPLE.find((entry) => entry.id === id);
+      if (item === undefined) return Promise.resolve({ ok: false as const, error: { code: 'gone', message: 'Not found' } });
+      item.scheduled_for = null;
+      item.schedule_source = 'hold';
+      emit('queue:changed');
+      return ok(item);
+    },
     activityList: () => ok(ACTIVITY),
     uploadsList: () => ok([]),
-    on: (_event: AppEvent, _listener: (payload: unknown) => void) => () => undefined
+    on: (event: AppEvent, listener: (payload: unknown) => void) => {
+      const set = listeners.get(event) ?? new Set();
+      set.add(listener);
+      listeners.set(event, set);
+      return () => set.delete(listener);
+    }
   };
 
   window.api = new Proxy(stub as ShortStackApi, {
