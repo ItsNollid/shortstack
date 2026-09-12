@@ -1,6 +1,13 @@
 // Reading and writing the rotation facts that live on a video rather than on a single posting.
 import type Database from 'better-sqlite3';
-import { isInFlight, postingKind, shouldRotate, type PostingKind, type RotationVerdict } from '../../shared/rotation';
+import {
+  isInFlight,
+  postingKind,
+  shouldNotifySubscribers,
+  shouldRotate,
+  type PostingKind,
+  type RotationVerdict
+} from '../../shared/rotation';
 import type { QueueState } from '../../shared/queue';
 import { appendActivity } from './activityRepo';
 import { toDbValue } from './rows';
@@ -104,4 +111,92 @@ export function setRotationPaused(db: Database.Database, videoIds: readonly numb
     now
   });
   return changed;
+}
+
+export type PostingResult = { ok: true; queueId: number; kind: PostingKind } | { ok: false; reason: string };
+
+const REASONS: Record<Exclude<RotationVerdict, { rotate: true }>['reason'], string> = {
+  paused: 'This video has been taken out of rotation',
+  limit_reached: 'This video has already been posted as many times as the rotation limit allows',
+  already_queued: 'A posting of this video is already on its way out',
+  rotation_off: 'Rotation is switched off in Settings'
+};
+
+export interface PostingDefaults {
+  notifyOnNew: boolean;
+  maxPostings: number;
+  /** Ignores the limit and the pause: what the user asked for directly, rather than automation. */
+  force?: boolean;
+}
+
+/**
+ * Queues another posting of a video, copying the details from its most recent one. It starts as
+ * pending like anything else: a re-run is still something the user approves.
+ */
+export function createPosting(
+  db: Database.Database,
+  videoId: number,
+  defaults: PostingDefaults,
+  now: Date
+): PostingResult {
+  const run = db.transaction((): PostingResult => {
+    const rotation = readVideoRotation(db, videoId);
+    if (rotation === null) return { ok: false, reason: 'That video is no longer in the library' };
+
+    if (defaults.force !== true) {
+      const verdict = rotationVerdict(rotation, defaults.maxPostings);
+      if (!verdict.rotate) return { ok: false, reason: REASONS[verdict.reason] };
+    } else if (rotation.hasPostingInFlight) {
+      // Even a direct request will not queue two runs of the same file at once.
+      return { ok: false, reason: REASONS.already_queued };
+    }
+
+    const previous = db
+      .prepare(
+        `SELECT title, description, tags, category_id, privacy, made_for_kids, platforms, channel_id
+         FROM queue WHERE video_id = ? ORDER BY id DESC LIMIT 1`
+      )
+      .get(videoId) as Record<string, unknown> | undefined;
+    if (previous === undefined) return { ok: false, reason: 'That video has never been posted, so there is nothing to repeat' };
+
+    const kind = nextPostingKind(rotation);
+    const nowIso = now.toISOString();
+    const inserted = db
+      .prepare(
+        `INSERT INTO queue (
+           video_id, channel_id, title, description, tags, category_id, privacy, notify_subscribers,
+           made_for_kids, platforms, state, posting_kind, approved, attempts, upload_bytes_confirmed,
+           remote_tombstone, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 0, 0, 0, 0, ?, ?)`
+      )
+      .run(
+        videoId,
+        previous.channel_id ?? null,
+        previous.title ?? '',
+        previous.description ?? '',
+        previous.tags ?? '[]',
+        previous.category_id ?? '22',
+        previous.privacy ?? 'public',
+        // A re-run never announces itself, whatever the default says.
+        toDbValue(shouldNotifySubscribers(kind, defaults.notifyOnNew)),
+        previous.made_for_kids ?? 0,
+        previous.platforms ?? '["youtube"]',
+        kind,
+        nowIso,
+        nowIso
+      );
+
+    const queueId = Number(inserted.lastInsertRowid);
+    appendActivity(db, {
+      queueId,
+      action: 'posting_created',
+      detail:
+        kind === 'rotation'
+          ? `Queued again as a re-run (posting ${rotation.postings + 1}), without notifying subscribers`
+          : 'Queued for its first posting',
+      now
+    });
+    return { ok: true, queueId, kind };
+  });
+  return run();
 }

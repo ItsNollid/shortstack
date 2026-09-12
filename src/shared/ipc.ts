@@ -76,6 +76,13 @@ export interface ShortStackApi {
   queueResolveAttention(id: number): Promise<Result<QueueItemDTO>>;
   queueConfirmNotDuplicate(id: number): Promise<Result<QueueItemDTO>>;
 
+  /** Marks files as already published elsewhere, so their next posting is a re-run and does not
+   *  announce itself. Takes queue ids; the flag lives on the video behind them. */
+  rotationMarkPublishedBefore(ids: number[], publishedBefore: boolean): Promise<Result<number>>;
+  rotationSetPaused(ids: number[], paused: boolean): Promise<Result<number>>;
+  /** Queues another posting of each video, ignoring the limit and the pause. */
+  rotationPostAgain(ids: number[]): Promise<Result<number>>;
+
   videosScan(): Promise<Result<ScanSummary>>;
 
   settingsGetAll(): Promise<Result<AppSettings>>;
@@ -128,6 +135,9 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'queueLinkVideo',
   'queueResolveAttention',
   'queueConfirmNotDuplicate',
+  'rotationMarkPublishedBefore',
+  'rotationSetPaused',
+  'rotationPostAgain',
   'videosScan',
   'settingsGetAll',
   'settingsSet',

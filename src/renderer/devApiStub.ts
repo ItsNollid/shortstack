@@ -167,6 +167,20 @@ export function installDevApiStub(): void {
         missingScopes: [],
         channel: { id: 'UC_sample', title: 'Sample Channel', handle: '@samplechannel', avatarUrl: null, subscriberCount: 12400 }
       }),
+    rotationMarkPublishedBefore: (ids: number[], publishedBefore: boolean) => {
+      for (const item of SAMPLE) if (ids.includes(item.id)) item.published_before = publishedBefore;
+      emit('queue:changed');
+      return ok(ids.length);
+    },
+    rotationSetPaused: (ids: number[], paused: boolean) => {
+      for (const item of SAMPLE) if (ids.includes(item.id)) item.rotation_paused = paused;
+      emit('queue:changed');
+      return ok(ids.length);
+    },
+    rotationPostAgain: (ids: number[]) => {
+      emit('queue:changed');
+      return ok(ids.length);
+    },
     authRefreshChannel: () =>
       Promise.resolve({ ok: false as const, error: { code: 'preview', message: 'Not available in the browser preview' } }),
     aiStatus: () => ok({ running: true, models: ['llama3.2'], message: 'Ready' }),

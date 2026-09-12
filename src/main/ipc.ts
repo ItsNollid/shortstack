@@ -15,6 +15,7 @@ import { listUploads } from './db/uploadRepo';
 import type { QueueEvent } from './domain/queueState';
 import { scanFolder } from './files/scanner';
 import type { SchedulerEngine } from './scheduler/engine';
+import { createPosting, markPublishedBefore, setRotationPaused } from './db/rotationRepo';
 import { applyStartWithWindows } from './startup';
 import type { AuthService } from './youtube/authService';
 import type { YouTubeGateway } from './youtube/gateway';
@@ -53,6 +54,14 @@ export function registerIpcHandlers(context: IpcContext): void {
   const { db, engine, auth } = context;
   const eventContext = () => ({ now: new Date(), uploadMethod: readSettings(db).settings.upload_method });
   const changed = () => broadcast(context.getWindow(), 'queue:changed');
+
+  /** Rotation belongs to the video, but the user selects postings. */
+  const videoIdsFor = (queueIds: readonly number[]): number[] => {
+    const rows = db
+      .prepare(`SELECT DISTINCT video_id FROM queue WHERE id IN (${queueIds.map(() => '?').join(',')})`)
+      .all(...queueIds) as Array<{ video_id: number }>;
+    return rows.map((row) => row.video_id);
+  };
   let signInAbort: AbortController | null = null;
 
   /** Fetches the channel behind the stored grant and records it. Returns why not, if it failed. */
@@ -172,6 +181,47 @@ export function registerIpcHandlers(context: IpcContext): void {
     },
     queueResolveAttention: async (id) => applyToOne(id, { type: 'resolve_attention' }),
     queueConfirmNotDuplicate: async (id) => applyToOne(id, { type: 'confirm_not_duplicate' }),
+
+    rotationMarkPublishedBefore: async (ids, publishedBefore) => {
+      const parsed = asIds(ids);
+      if (parsed === null) return fail('invalid', 'Pick at least one video');
+      if (typeof publishedBefore !== 'boolean') return fail('invalid', 'Expected on or off');
+      const updated = markPublishedBefore(db, videoIdsFor(parsed), publishedBefore, new Date());
+      if (updated > 0) changed();
+      return ok(updated);
+    },
+
+    rotationSetPaused: async (ids, paused) => {
+      const parsed = asIds(ids);
+      if (parsed === null) return fail('invalid', 'Pick at least one video');
+      if (typeof paused !== 'boolean') return fail('invalid', 'Expected on or off');
+      const updated = setRotationPaused(db, videoIdsFor(parsed), paused, new Date());
+      if (updated > 0) changed();
+      return ok(updated);
+    },
+
+    rotationPostAgain: async (ids) => {
+      const parsed = asIds(ids);
+      if (parsed === null) return fail('invalid', 'Pick at least one video');
+      const { settings } = readSettings(db);
+      const now = new Date();
+      let created = 0;
+      let firstProblem: string | null = null;
+      for (const videoId of videoIdsFor(parsed)) {
+        const result = createPosting(
+          db,
+          videoId,
+          { notifyOnNew: settings.notify_subscribers, maxPostings: settings.rotation_max_postings, force: true },
+          now
+        );
+        if (result.ok) created += 1;
+        else if (firstProblem === null) firstProblem = result.reason;
+      }
+      if (created === 0) return fail('refused', firstProblem ?? 'Nothing could be posted again');
+      changed();
+      void engine.kick();
+      return ok(created);
+    },
 
     videosScan: async () => {
       const summary = await scanFolder(db);
