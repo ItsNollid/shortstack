@@ -12,12 +12,15 @@ import { AuthService } from './youtube/authService';
 import { DryRunYouTubeGateway, HttpYouTubeGateway, type YouTubeGateway } from './youtube/gateway';
 import { uploadVideoResumable, type UploadOutcome } from './youtube/resumableUpload';
 import { TokenStore, type SecretStorage } from './youtube/tokenStore';
+import { AppIcon } from './icons/appIcon';
+import { readActiveChannel } from './db/channelRepo';
 import { createTray } from './tray';
 import { createMainWindow } from './window';
 
 let mainWindow: BrowserWindow | null = null;
 let tray: (Tray & { refresh?(): void }) | null = null;
 let engine: SchedulerEngine | null = null;
+let appIcon: AppIcon | null = null;
 let isQuitting = false;
 
 export const getMainWindow = (): BrowserWindow | null => mainWindow;
@@ -103,6 +106,12 @@ async function start(): Promise<void> {
     }
   });
 
+  appIcon = new AppIcon({
+    window: () => mainWindow,
+    tray: () => tray,
+    cacheDir: path.join(app.getPath('userData'), 'icons')
+  });
+
   engine = new SchedulerEngine({ db, effects });
   registerIpcHandlers({
     db,
@@ -111,7 +120,8 @@ async function start(): Promise<void> {
     gateway,
     profile: { profile: runtimeProfile.profile, uploads: runtimeProfile.uploads },
     credentialsDir,
-    getWindow: () => mainWindow
+    getWindow: () => mainWindow,
+    appIcon
   });
 
   mainWindow = createMainWindow({
@@ -139,6 +149,11 @@ async function start(): Promise<void> {
     },
     describeStatus: () => describeStatus()
   });
+
+  // The cached picture first, so a window that opens straight away is already wearing it, then a
+  // fresh copy in the background. Channel data older than 30 days must not be kept, and refreshing
+  // it on every launch is what keeps that true.
+  void appIcon.restore().then(() => appIcon?.refresh(readActiveChannel(db)?.avatarUrl ?? null));
 
   engine.start();
   console.info(`[ShortStack] started (uploads ${runtimeProfile.uploads})`);

@@ -28,6 +28,8 @@ export interface IpcContext {
   profile: { profile: 'dev' | 'live'; uploads: 'dry-run' | 'live' };
   credentialsDir: string;
   getWindow(): BrowserWindow | null;
+  /** The app's icon follows the connected channel's picture. */
+  appIcon: { refresh(avatarUrl: string | null): Promise<boolean>; clear(): Promise<void> };
 }
 
 type Handlers = { [K in Exclude<keyof ShortStackApi, 'on'>]: ShortStackApi[K] };
@@ -223,6 +225,7 @@ export function registerIpcHandlers(context: IpcContext): void {
           },
           new Date()
         );
+        void context.appIcon.refresh(profile.value.avatarUrl);
       }
       broadcast(context.getWindow(), 'auth:changed');
       void engine.kick();
@@ -230,8 +233,10 @@ export function registerIpcHandlers(context: IpcContext): void {
     },
     authDisconnect: async () => {
       await auth.disconnect();
-      // Stored channel data goes when access is revoked, as the API policies require.
+      // Stored channel data goes when access is revoked, as the API policies require. The cached
+      // channel picture is part of that, so the icon goes back to the ShortStack mark here.
       clearChannels(db);
+      await context.appIcon.clear();
       for (const item of listQueueItems(db)) {
         if (item.youtube_video_id !== null) applyQueueEvent(db, item.id, { type: 'disconnect' }, eventContext());
       }
