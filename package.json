@@ -20,11 +20,7 @@
     "package:dev": "electron-vite build && electron-builder --win --dir --config.extraMetadata.shortstackBuildProfile=dev --config.directories.output=dist-dev"
   },
   "dependencies": {
-    "@fontsource/roboto": "^5.3.0",
-    "better-sqlite3": "^13.0.3",
-    "googleapis": "^144.0.0",
-    "lucide-react": "^1.45.0",
-    "node-cron": "^3.0.3"
+    "better-sqlite3": "^13.0.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
@@ -42,7 +38,9 @@
     "typescript": "^5.7.0",
     "vite": "^6.0.0",
     "vitest": "~3.2.7",
-    "tsx": "^4.23.13"
+    "tsx": "^4.23.13",
+    "@fontsource/roboto": "^5.3.0",
+    "lucide-react": "^1.45.0"
   },
   "build": {
     "appId": "com.shortstack.app",
@@ -62,7 +60,17 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     },
-    "npmRebuild": false
+    "npmRebuild": false,
+    "files": [
+      "out/**/*",
+      "resources/**/*",
+      "package.json",
+      "!**/*.{ts,tsx,map,md}",
+      "!**/{.DS_Store,.editorconfig,.eslintrc,.vscode,.idea,.github}"
+    ],
+    "asarUnpack": [
+      "**/better-sqlite3/**"
+    ]
   },
   "allowScripts": {
     "better-sqlite3@13.0.3": true,
