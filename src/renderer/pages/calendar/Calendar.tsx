@@ -9,7 +9,10 @@ import { Banner, Button } from '../../components/ui';
 import { useAppStatus } from '../../app/status';
 import { useToast } from '../../app/toast';
 import { useApiMutation, useApiQuery } from '../../hooks/useApi';
+import { planInsert, planNextFree, planSwap, type DropStrategy, type Scheduled } from '../../../shared/reschedule';
+import { nextFreeSlot } from '../../../shared/slots';
 import { Chip } from './Chip';
+import { DropChoice } from './DropChoice';
 import styles from './Calendar.module.css';
 
 const readQueue = (): Promise<Result<QueueItemDTO[]>> => window.api.queueList();
@@ -38,6 +41,7 @@ export function Calendar(): React.JSX.Element {
   const [cursor, setCursor] = useState(() => new Date());
   const [dragging, setDragging] = useState<QueueItemDTO | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [full, setFull] = useState<{ item: QueueItemDTO; day: Date } | null>(null);
 
   const schedule = useApiMutation((id: number, at: string) => window.api.queueSchedule(id, at));
   const hold = useApiMutation((id: number) => window.api.queueHold(id));
@@ -91,6 +95,11 @@ export function Calendar(): React.JSX.Element {
     const previous = item.scheduled_for;
     const verdict = dropOnDay({ item, day, uploadTimes, taken: items, now: new Date() });
     if (!verdict.ok) {
+      // A day that is merely full has three answers, so it is worth asking rather than refusing.
+      if (verdict.reason.startsWith('Every time on that day is taken')) {
+        setFull({ item, day });
+        return;
+      }
       toast({ text: verdict.reason, kind: 'bad' });
       return;
     }
@@ -120,6 +129,63 @@ export function Calendar(): React.JSX.Element {
         return;
       }
       toast({ text: `${item.title} has no time now`, action: { label: 'Undo', run: undoTo(item.id, previous) } });
+    });
+  };
+
+  const asScheduled = (entry: QueueItemDTO): Scheduled => ({
+    id: entry.id,
+    scheduled_for: entry.scheduled_for,
+    onYouTube: entry.youtube_video_id !== null
+  });
+
+  const applyStrategy = (strategy: DropStrategy): void => {
+    if (full === null) return;
+    const { item, day } = full;
+    const query = { moving: asScheduled(item), day, all: items.map(asScheduled), uploadTimes, now: new Date() };
+    const plan =
+      strategy === 'swap'
+        ? planSwap(query)
+        : strategy === 'insert'
+          ? planInsert(query)
+          : planNextFree(
+              query,
+              nextFreeSlot({
+                uploadTimes,
+                taken: items.filter((entry) => entry.id !== item.id && entry.scheduled_for !== null).map((entry) => entry.scheduled_for as string),
+                now: new Date()
+              })
+            );
+
+    if (plan.problem !== undefined) {
+      toast({ text: plan.problem, kind: 'bad' });
+      setFull(null);
+      return;
+    }
+
+    // Every time this plan is about to overwrite, captured as values before anything moves. Undoing
+    // only the dragged video would leave the ones it displaced where the plan put them.
+    const before = plan.changes.map((change) => ({
+      id: change.id,
+      at: items.find((entry) => entry.id === change.id)?.scheduled_for ?? null
+    }));
+
+    const applyAll = (moves: ReadonlyArray<{ id: number; at: string | null }>): Promise<unknown> =>
+      // In order, so the moves never collide with each other mid-flight.
+      moves.reduce<Promise<unknown>>(
+        (chain, move) => chain.then(() => (move.at === null ? hold.run(move.id) : schedule.run(move.id, move.at))),
+        Promise.resolve()
+      );
+
+    void applyAll(plan.changes).then(() => {
+      setFull(null);
+      const others = plan.changes.length - 1;
+      toast({
+        text:
+          others === 0
+            ? `${item.title} rescheduled`
+            : `${item.title} rescheduled, ${others} other${others === 1 ? '' : 's'} moved`,
+        action: { label: 'Undo', run: () => void applyAll([...before].reverse()) }
+      });
     });
   };
 
@@ -252,6 +318,16 @@ export function Calendar(): React.JSX.Element {
           )}
         </aside>
       </div>
+
+      <DropChoice
+        moving={full?.item ?? null}
+        day={full?.day ?? null}
+        items={items}
+        uploadTimes={uploadTimes}
+        pending={schedule.pending || hold.pending}
+        onCancel={() => setFull(null)}
+        onChoose={applyStrategy}
+      />
     </>
   );
 }
