@@ -5,6 +5,7 @@ import { Calendar } from '../pages/calendar/Calendar';
 import { Diagnostics } from '../pages/Diagnostics';
 import { History } from '../pages/History';
 import { Queue } from '../pages/Queue';
+import { Review } from '../pages/review/Review';
 import { SettingsPage } from '../pages/settings/Settings';
 import { FirstRun } from '../pages/setup/FirstRun';
 import { VideoDetails } from '../pages/VideoDetails';
@@ -59,6 +60,7 @@ export function AppShell(): React.JSX.Element {
                   <div className={styles.page}>
                     <Routes>
                       <Route path="/queue" element={<Queue />} />
+                    <Route path="/review" element={<Review />} />
                       <Route path="/calendar" element={<Calendar />} />
                       <Route path="/history" element={<History />} />
                       <Route path="/analytics" element={<Analytics />} />

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, CalendarDays, ChartColumn, ListVideo, Pause, Play, ScrollText, Settings } from 'lucide-react';
+import { Activity, CalendarDays, ChartColumn, LayoutGrid, ListVideo, Pause, Play, ScrollText, Settings } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { Avatar, Button } from '../components/ui';
 import { useApiMutation } from '../hooks/useApi';
@@ -11,6 +11,7 @@ const ICON = 18;
 
 const LINKS = [
   { to: '/queue', label: 'Queue', icon: <ListVideo size={ICON} /> },
+  { to: '/review', label: 'Review', icon: <LayoutGrid size={ICON} /> },
   { to: '/calendar', label: 'Calendar', icon: <CalendarDays size={ICON} /> },
   { to: '/history', label: 'History', icon: <ScrollText size={ICON} /> },
   { to: '/analytics', label: 'Analytics', icon: <ChartColumn size={ICON} /> },
