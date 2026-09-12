@@ -1,0 +1,262 @@
+// Typed app settings: defaults, decoding of stored strings, and validation of changes.
+// Shared so the renderer can validate inline with exactly the rules the main process enforces.
+import type { Privacy, UploadMethod } from './queue';
+
+export interface AppSettings {
+  setup_complete: boolean;
+  legal_accepted_version: string | null;
+  defaults_reviewed: boolean;
+  shorts_folder: string;
+  scheduler_paused: boolean;
+  upload_method: UploadMethod;
+  api_audit_confirmed_at: string | null;
+  default_title_template: string;
+  default_description: string;
+  default_tags: string[];
+  default_category_id: string;
+  default_privacy: Privacy;
+  notify_subscribers: boolean;
+  made_for_kids: boolean;
+  upload_times: string[];
+  auto_approve: boolean;
+  auto_approve_consented_at: string | null;
+  auto_retry_max: number;
+  ai_host: string;
+  ai_model: string;
+  close_to_tray: boolean;
+  close_to_tray_notice_shown: boolean;
+  start_with_windows: boolean;
+}
+
+export type SettingKey = keyof AppSettings;
+
+export const TITLE_MAX_CHARS = 100;
+export const DESCRIPTION_MAX_BYTES = 5000;
+export const TAGS_MAX_CHARS = 500;
+
+export function utf8Bytes(text: string): number {
+  return new TextEncoder().encode(text).length;
+}
+
+export function charCount(text: string): number {
+  return [...text].length;
+}
+
+/** YouTube's tag budget counts the commas between tags and two quote marks for tags containing spaces. */
+export function tagsCharCount(tags: readonly string[]): number {
+  if (tags.length === 0) return 0;
+  return tags.reduce((sum, tag) => sum + charCount(tag) + (tag.includes(' ') ? 2 : 0), 0) + tags.length - 1;
+}
+
+export function renderTitleTemplate(template: string, filename: string): string {
+  const base = filename.replace(/\.[^.]+$/, '');
+  return [...template.split('{filename}').join(base).trim()].slice(0, TITLE_MAX_CHARS).join('');
+}
+
+interface SettingCodec<T> {
+  defaultValue: T;
+  /** Returns undefined when the stored string can't be read. */
+  decode(raw: string): T | undefined;
+  encode(value: T): string;
+  validate(value: unknown): string | null;
+}
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const ANGLE_BRACKETS = /[<>]/;
+
+function bool(defaultValue: boolean): SettingCodec<boolean> {
+  return {
+    defaultValue,
+    decode: (raw) => (raw === 'true' || raw === '1' ? true : raw === 'false' || raw === '0' ? false : undefined),
+    encode: (value) => (value ? 'true' : 'false'),
+    validate: (value) => (typeof value === 'boolean' ? null : 'Expected on or off')
+  };
+}
+
+function text(defaultValue: string, check: (value: string) => string | null = () => null): SettingCodec<string> {
+  return {
+    defaultValue,
+    decode: (raw) => (check(raw) === null ? raw : undefined),
+    encode: (value) => value,
+    validate: (value) => (typeof value === 'string' ? check(value) : 'Expected text')
+  };
+}
+
+function nullableText(maxChars: number): SettingCodec<string | null> {
+  return {
+    defaultValue: null,
+    decode: (raw) => (raw === '' ? null : charCount(raw) <= maxChars ? raw : undefined),
+    encode: (value) => value ?? '',
+    validate: (value) =>
+      value === null || (typeof value === 'string' && value !== '' && charCount(value) <= maxChars) ? null : 'Expected text or nothing'
+  };
+}
+
+function isoDateOrNull(): SettingCodec<string | null> {
+  const isIso = (value: string) => Number.isFinite(Date.parse(value));
+  return {
+    defaultValue: null,
+    decode: (raw) => (raw === '' ? null : isIso(raw) ? raw : undefined),
+    encode: (value) => value ?? '',
+    validate: (value) => (value === null || (typeof value === 'string' && isIso(value)) ? null : 'Expected a date or nothing')
+  };
+}
+
+function oneOf<T extends string>(defaultValue: T, allowed: readonly T[]): SettingCodec<T> {
+  const isAllowed = (value: unknown): value is T => typeof value === 'string' && (allowed as readonly string[]).includes(value);
+  return {
+    defaultValue,
+    decode: (raw) => (isAllowed(raw) ? raw : undefined),
+    encode: (value) => value,
+    validate: (value) => (isAllowed(value) ? null : `Expected one of: ${allowed.join(', ')}`)
+  };
+}
+
+function integer(defaultValue: number, min: number, max: number): SettingCodec<number> {
+  const inRange = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max;
+  return {
+    defaultValue,
+    decode: (raw) => {
+      const parsed = raw.trim() === '' ? NaN : Number(raw);
+      return inRange(parsed) ? parsed : undefined;
+    },
+    encode: (value) => String(value),
+    validate: (value) => (inRange(value) ? null : `Expected a whole number from ${min} to ${max}`)
+  };
+}
+
+function stringList(defaultValue: string[], check: (value: string[]) => string | null): SettingCodec<string[]> {
+  const isList = (value: unknown): value is string[] => Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+  return {
+    defaultValue,
+    decode: (raw) => {
+      try {
+        const parsed: unknown = JSON.parse(raw);
+        return isList(parsed) && check(parsed) === null ? parsed : undefined;
+      } catch {
+        return undefined;
+      }
+    },
+    encode: (value) => JSON.stringify(value),
+    validate: (value) => (isList(value) ? check(value) : 'Expected a list of text values')
+  };
+}
+
+function checkTitleTemplate(value: string): string | null {
+  if (value.trim() === '') return "The title template can't be empty";
+  if (ANGLE_BRACKETS.test(value)) return "Titles can't contain < or >";
+  return charCount(value) > TITLE_MAX_CHARS ? `Titles can use at most ${TITLE_MAX_CHARS} characters` : null;
+}
+
+function checkDescription(value: string): string | null {
+  if (ANGLE_BRACKETS.test(value)) return "Descriptions can't contain < or >";
+  return utf8Bytes(value) > DESCRIPTION_MAX_BYTES ? `Descriptions can use at most ${DESCRIPTION_MAX_BYTES} bytes` : null;
+}
+
+function checkTags(tags: string[]): string | null {
+  if (tags.some((tag) => tag.trim() === '')) return "Tags can't be empty";
+  if (tags.some((tag) => ANGLE_BRACKETS.test(tag))) return "Tags can't contain < or >";
+  return tagsCharCount(tags) > TAGS_MAX_CHARS ? `Tags can use at most ${TAGS_MAX_CHARS} characters` : null;
+}
+
+function checkUploadTimes(times: string[]): string | null {
+  if (times.length === 0) return 'Add at least one upload time';
+  if (times.length > 12) return 'Use at most 12 upload times';
+  if (!times.every((time) => HHMM.test(time))) return 'Use 24-hour times like 09:00';
+  return new Set(times).size === times.length ? null : 'Upload times must all be different';
+}
+
+function checkHttpUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? null : 'Use an http:// or https:// address';
+  } catch {
+    return 'Enter an address like http://127.0.0.1:11434';
+  }
+}
+
+export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> } = {
+  setup_complete: bool(false),
+  legal_accepted_version: nullableText(32),
+  defaults_reviewed: bool(false),
+  shorts_folder: text('', (value) => (value.length > 1024 ? 'That folder path is too long' : null)),
+  scheduler_paused: bool(false),
+  upload_method: oneOf<UploadMethod>('assisted', ['assisted', 'api']),
+  api_audit_confirmed_at: isoDateOrNull(),
+  default_title_template: text('{filename}', checkTitleTemplate),
+  default_description: text('', checkDescription),
+  default_tags: stringList([], checkTags),
+  default_category_id: text('22', (value) => (/^\d{1,3}$/.test(value) ? null : 'Pick a category')),
+  default_privacy: oneOf<Privacy>('private', ['public', 'unlisted', 'private']),
+  notify_subscribers: bool(false),
+  made_for_kids: bool(false),
+  upload_times: stringList(['09:00', '13:00', '18:00', '22:00'], checkUploadTimes),
+  auto_approve: bool(false),
+  auto_approve_consented_at: isoDateOrNull(),
+  auto_retry_max: integer(3, 0, 10),
+  ai_host: text('http://127.0.0.1:11434', checkHttpUrl),
+  ai_model: text('', (value) => (value.length > 200 ? 'That model name is too long' : null)),
+  close_to_tray: bool(true),
+  close_to_tray_notice_shown: bool(false),
+  start_with_windows: bool(false)
+};
+
+export const SETTING_KEYS = Object.keys(SETTINGS_SCHEMA) as SettingKey[];
+
+export function isSettingKey(key: string): key is SettingKey {
+  return Object.prototype.hasOwnProperty.call(SETTINGS_SCHEMA, key);
+}
+
+function codecFor(key: SettingKey): SettingCodec<unknown> {
+  return SETTINGS_SCHEMA[key] as SettingCodec<unknown>;
+}
+
+function cloneValue<T>(value: T): T {
+  return (Array.isArray(value) ? [...value] : value) as T;
+}
+
+export function defaultSettings(): AppSettings {
+  const settings = {} as Record<SettingKey, unknown>;
+  for (const key of SETTING_KEYS) settings[key] = cloneValue(codecFor(key).defaultValue);
+  return settings as AppSettings;
+}
+
+/** Builds typed settings from stored rows. Unknown keys are ignored; unreadable values fall back to defaults. */
+export function decodeSettings(rows: ReadonlyArray<{ key: string; value: string | null }>): {
+  settings: AppSettings;
+  problems: string[];
+} {
+  const settings = defaultSettings() as unknown as Record<SettingKey, unknown>;
+  const problems: string[] = [];
+  for (const row of rows) {
+    if (!isSettingKey(row.key) || row.value === null) continue;
+    const decoded = codecFor(row.key).decode(row.value);
+    if (decoded === undefined) problems.push(`Ignored an unreadable value for ${row.key}`);
+    else settings[row.key] = decoded;
+  }
+  return { settings: settings as unknown as AppSettings, problems };
+}
+
+export function encodeSetting<K extends SettingKey>(key: K, value: AppSettings[K]): string {
+  return codecFor(key).encode(value);
+}
+
+/** Validates a single change against the key's own rules and the rules that span several settings. */
+export function validateSettingChange(current: AppSettings, key: SettingKey, value: unknown): string | null {
+  const ownProblem = codecFor(key).validate(value);
+  if (ownProblem !== null) return ownProblem;
+
+  if (key === 'upload_method' && value === 'api' && current.api_audit_confirmed_at === null) {
+    return 'Confirm that your Google Cloud project passed the YouTube API audit first';
+  }
+  if (key === 'api_audit_confirmed_at' && value === null && current.upload_method === 'api') {
+    return 'Switch back to assisted upload first';
+  }
+  if (key === 'auto_approve' && value === true && current.auto_approve_consented_at === null) {
+    return 'Review and accept what auto-approve does first';
+  }
+  if (key === 'auto_approve_consented_at' && value === null && current.auto_approve) {
+    return 'Turn off auto-approve first';
+  }
+  return null;
+}
