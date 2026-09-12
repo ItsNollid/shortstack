@@ -150,12 +150,26 @@ describe('a video from folder to published', () => {
     expect(actions).toContain('link_video');
     expect(actions).not.toContain('begin_upload');
 
-    // 8. Further ticks change nothing: a published video is finished with.
+    // 8. Further ticks change nothing: a published video is finished with, and rotation holds off
+    //    because the minimum gap since its posting has not passed. Asserted rather than assumed —
+    //    without the gap this tick would queue a second posting five hours after the first.
     const before = getQueueItem(db, id)?.updated_at;
     await engine.kick();
     await engine.kick();
     expect(getQueueItem(db, id)?.updated_at).toBe(before);
     expect(state.planCalls).toHaveLength(1);
+    expect(listQueueItems(db)).toHaveLength(1);
+
+    // 9. Once the gap has passed, it comes back around as a re-run that still needs approving.
+    setNow('2026-10-12T09:00:00');
+    await engine.kick();
+
+    const postings = listQueueItems(db);
+    expect(postings).toHaveLength(2);
+    const rerun = postings.find((entry) => entry.id !== id);
+    expect(rerun?.state).toBe('pending');
+    expect(rerun?.posting_kind).toBe('rotation');
+    expect(rerun?.notify_subscribers).toBe(false);
   });
 
   it('never starts an upload for a video that is already on YouTube', async () => {

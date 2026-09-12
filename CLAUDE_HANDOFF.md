@@ -108,6 +108,38 @@ the hostable policy and terms, generated from the same text the app displays.
 
 ---
 
+## Rotation
+
+The channel strategy this app is built for is posting the same video more than once, so each run
+reaches people who missed the last one. That shapes more of the design than anything else.
+
+**The invariant survives it.** "Never upload twice" is per *posting*, not per file. One video has
+many queue rows; each one uploads exactly once. Accidental duplicates are still refused.
+
+| Fact | Where |
+|---|---|
+| Which posting is an announcement, which a re-run | `shared/rotation.ts` |
+| Whether another posting is due | `shouldRotate` — limit, manual pause, one in flight, minimum gap |
+| What a re-run inherits | `createPosting` in `db/rotationRepo.ts` |
+| Which times it uses | `decide.ts` — new and rotation draw from separate lists |
+
+Three rules worth not breaking:
+
+1. **A re-run never notifies subscribers.** Decided by `shouldNotifySubscribers`, not by a copied
+   field, so an edit cannot undo it.
+2. **A re-run starts as pending.** Posting again is still something the user approves.
+3. **`published_before` exists for the back catalogue.** Deriving "new" from posting count alone
+   would announce every previously published video as though it had never been posted.
+
+There is a minimum gap between postings, fourteen days by default. Re-posting a short a day later
+reaches the same people and is the pattern YouTube’s repetitious content rules are aimed at. It can
+be switched off; the Settings hint says why it is there.
+
+**Review** (`/review`) is the screen for deciding at volume: one card, single-key actions, and a
+cursor that stays put as the list shrinks under it.
+
+---
+
 ## Still unverified
 
 Being specific about this, because the last handoff was not.
