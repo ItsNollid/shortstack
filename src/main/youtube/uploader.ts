@@ -1,8 +1,12 @@
 import { google } from 'googleapis';
 import * as fs from 'fs';
 import { getAuthenticatedClient } from './auth';
+import { runtimeProfile } from '../bootstrap/profile';
 
 export const uploadVideo = async (queueItem: any): Promise<string> => {
+  if (runtimeProfile.uploads !== 'live') {
+    throw new Error('Refusing to upload: ShortStack is running in dry-run mode');
+  }
   const auth = await getAuthenticatedClient();
   const youtube = google.youtube({ version: 'v3', auth });
 

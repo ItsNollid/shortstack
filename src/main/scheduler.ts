@@ -2,11 +2,16 @@ import * as cron from 'node-cron';
 import * as db from './database';
 import { uploadVideo } from './youtube/uploader';
 import { sendNotification } from './notifications';
+import { runtimeProfile } from './bootstrap/profile';
 
 let currentTask: cron.ScheduledTask | null = null;
 let isPaused = false;
 
 export const startScheduler = () => {
+  if (runtimeProfile.uploads !== 'live') {
+    console.info('[ShortStack] Legacy scheduler not started: uploads are in dry-run mode');
+    return;
+  }
   if (currentTask) currentTask.stop();
   isPaused = false;
 

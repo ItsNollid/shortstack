@@ -1,3 +1,4 @@
+import './bootstrap/profile';
 import { app, BrowserWindow, Tray, Menu, nativeImage } from 'electron';
 import * as path from 'path';
 import { initDatabase } from './database';
