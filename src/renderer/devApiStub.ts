@@ -2,6 +2,7 @@
 // preload bridge is absent, so the real app (and any packaged build) never sees it.
 import type { QueueItemDTO } from '../shared/dto';
 import type { AppEvent, ShortStackApi } from '../shared/ipc';
+import { defaultSettings, type AppSettings } from '../shared/settings';
 
 const FOLDER = String.raw`E:\Youtube\Rendered\ShortStack`;
 
@@ -83,6 +84,8 @@ const SAMPLE: QueueItemDTO[] = [
   })
 ];
 
+const SETTINGS: AppSettings = { ...defaultSettings(), shorts_folder: FOLDER, setup_complete: true };
+
 const ok = <T>(data: T): Promise<{ ok: true; data: T }> => Promise.resolve({ ok: true as const, data });
 
 export function installDevApiStub(): void {
@@ -99,12 +102,11 @@ export function installDevApiStub(): void {
       Object.assign(item, patch, { updated_at: new Date().toISOString() });
       return ok(item);
     },
-    settingsGetAll: () =>
-      ok({
-        shorts_folder: FOLDER,
-        upload_method: 'assisted',
-        default_privacy: 'public'
-      } as never),
+    settingsGetAll: () => ok(SETTINGS),
+    settingsSet: (key: string, value: unknown) => {
+      (SETTINGS as unknown as Record<string, unknown>)[key] = value;
+      return ok(SETTINGS);
+    },
     schedulerStatus: () =>
       ok({
         paused: false,

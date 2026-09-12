@@ -5,7 +5,7 @@ import { Calendar } from '../pages/Calendar';
 import { Diagnostics } from '../pages/Diagnostics';
 import { History } from '../pages/History';
 import { Queue } from '../pages/Queue';
-import { SettingsPage } from '../pages/Settings';
+import { SettingsPage } from '../pages/settings/Settings';
 import { VideoDetails } from '../pages/VideoDetails';
 import { Banners } from './Banners';
 import { Sidebar } from './Sidebar';
