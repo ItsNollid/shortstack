@@ -20,7 +20,8 @@ import { startInstagramAuth } from './platforms/instagram';
 import * as uploader from './youtube/uploader';
 import { scanFolder } from './files/scanner';
 import { pause, resume, getStatus } from './scheduler';
-import { generateMetadata } from './ai/ollama';
+import { generateMetadata, listModels } from './ai/ollamaClient';
+import { readSettings } from './db/settingsRepo';
 
 export const registerIpcHandlers = () => {
   ipcMain.handle(IPC_CHANNELS.GET_VIDEOS, () => getAllVideos());
@@ -47,7 +48,13 @@ export const registerIpcHandlers = () => {
   
   ipcMain.handle(IPC_CHANNELS.GET_CHANNEL_ANALYTICS, () => fetchChannelAnalytics());
   
-  ipcMain.handle(IPC_CHANNELS.GENERATE_METADATA, (_, filename) => generateMetadata(filename));
+  ipcMain.handle(IPC_CHANNELS.GENERATE_METADATA, async (_, filename: string) => {
+    const { settings } = readSettings(getDb());
+    const installed = await listModels({ host: settings.ai_host });
+    if (settings.ai_model === '' && !installed.ok) return installed;
+    const model = settings.ai_model !== '' ? settings.ai_model : installed.ok ? installed.value[0] : '';
+    return generateMetadata({ filename, model }, { host: settings.ai_host });
+  });
   
   ipcMain.handle(IPC_CHANNELS.GET_SETTINGS, () => getSettings());
   
