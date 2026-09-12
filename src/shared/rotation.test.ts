@@ -7,7 +7,10 @@ const state = (over: Partial<RotationState> = {}): RotationState => ({
   publishedBefore: false,
   maxPostings: 6,
   paused: false,
+  minGapDays: 0,
   hasPostingInFlight: false,
+  lastPostingAt: null,
+  now: new Date('2026-03-01T12:00:00.000Z'),
   ...over
 });
 
@@ -74,5 +77,47 @@ describe('isInFlight', () => {
       const finished = queueState === 'published' || queueState === 'rejected';
       expect(isInFlight(queueState), queueState).toBe(!finished);
     }
+  });
+});
+
+describe('the gap between postings', () => {
+  const NOW = new Date('2026-03-01T12:00:00.000Z');
+  const daysAgo = (days: number): string => new Date(NOW.getTime() - days * 86_400_000).toISOString();
+
+  it('refuses a re-run too soon after the last one', () => {
+    // Re-posting the same short the next day shows it to the same people, and is the behaviour
+    // YouTube's repetitious content policy is aimed at.
+    expect(
+      shouldRotate(state({ postings: 1, minGapDays: 14, lastPostingAt: daysAgo(3), now: NOW }))
+    ).toEqual({ rotate: false, reason: 'too_soon' });
+  });
+
+  it('allows it once enough time has passed', () => {
+    expect(shouldRotate(state({ postings: 1, minGapDays: 14, lastPostingAt: daysAgo(15), now: NOW }))).toEqual({
+      rotate: true
+    });
+  });
+
+  it('does not hold back a video that has never been posted', () => {
+    expect(shouldRotate(state({ postings: 0, minGapDays: 14, lastPostingAt: null, now: NOW }))).toEqual({
+      rotate: true
+    });
+  });
+
+  it('ignores the gap when it is set to zero', () => {
+    expect(shouldRotate(state({ postings: 1, minGapDays: 0, lastPostingAt: daysAgo(0), now: NOW }))).toEqual({
+      rotate: true
+    });
+  });
+
+  it('is not fooled by an unreadable timestamp', () => {
+    expect(shouldRotate(state({ postings: 1, minGapDays: 14, lastPostingAt: 'not a date', now: NOW }))).toEqual({
+      rotate: true
+    });
+  });
+
+  it('still puts the limit ahead of the gap, so the clearer reason wins', () => {
+    const atLimit = state({ postings: 6, maxPostings: 6, minGapDays: 14, lastPostingAt: daysAgo(1), now: NOW });
+    expect(shouldRotate(atLimit)).toEqual({ rotate: false, reason: 'limit_reached' });
   });
 });

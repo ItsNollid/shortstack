@@ -10,6 +10,11 @@ const POSTING_OPTIONS = ['0', '2', '3', '4', '6', '10', '20'].map((value) => ({
   label: value === '0' ? 'Never repeat' : `${value} postings`
 }));
 
+const GAP_OPTIONS = ['0', '7', '14', '30', '60', '90'].map((value) => ({
+  value,
+  label: value === '0' ? 'No minimum' : `At least ${value} days`
+}));
+
 const AHEAD_OPTIONS = ['7', '14', '21', '30', '60'].map((value) => ({ value, label: `${value} days` }));
 
 const RETRY_OPTIONS = ['0', '1', '3', '5', '10'].map((value) => ({
@@ -41,6 +46,15 @@ export function RotationSection({ writer }: { writer: SettingsWriter }): React.J
         options={POSTING_OPTIONS}
         hint="Counting its first posting. You can always take a single video out of rotation, or post one again by hand."
         problem={writer.problemFor('rotation_max_postings')}
+      />
+
+      <Select
+        label="Wait between postings of the same video"
+        value={String(settings.rotation_min_gap_days)}
+        onChange={(value) => writer.set('rotation_min_gap_days', Number(value))}
+        options={GAP_OPTIONS}
+        hint="Posting the same video again too soon shows it to the same people, and is what YouTube's rules on repetitious content are aimed at."
+        problem={writer.problemFor('rotation_min_gap_days')}
       />
 
       {settings.rotation_upload_times.length === 0 && settings.rotation_max_postings > 0 && (

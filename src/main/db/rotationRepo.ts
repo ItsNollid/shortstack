@@ -18,6 +18,8 @@ export interface VideoRotation {
   paused: boolean;
   postings: number;
   hasPostingInFlight: boolean;
+  /** When the most recent posting was due out, or null if none has been. */
+  lastPostingAt: string | null;
 }
 
 const ROTATION_QUERY = `
@@ -37,12 +39,19 @@ interface RotationRow {
 
 function withFlight(db: Database.Database, row: RotationRow): VideoRotation {
   const states = db.prepare('SELECT state FROM queue WHERE video_id = ?').all(row.videoId) as Array<{ state: QueueState }>;
+  const last = db
+    .prepare(
+      `SELECT COALESCE(scheduled_for, created_at) AS at FROM queue
+       WHERE video_id = ? ORDER BY COALESCE(scheduled_for, created_at) DESC LIMIT 1`
+    )
+    .get(row.videoId) as { at?: string } | undefined;
   return {
     videoId: row.videoId,
     publishedBefore: row.publishedBefore === 1,
     paused: row.paused === 1,
     postings: row.postings,
-    hasPostingInFlight: states.some((entry) => isInFlight(entry.state))
+    hasPostingInFlight: states.some((entry) => isInFlight(entry.state)),
+    lastPostingAt: last?.at ?? null
   };
 }
 
@@ -61,13 +70,21 @@ export function nextPostingKind(rotation: VideoRotation): PostingKind {
   return postingKind({ postings: rotation.postings, publishedBefore: rotation.publishedBefore });
 }
 
-export function rotationVerdict(rotation: VideoRotation, maxPostings: number): RotationVerdict {
+export function rotationVerdict(
+  rotation: VideoRotation,
+  maxPostings: number,
+  minGapDays = 0,
+  now: Date = new Date()
+): RotationVerdict {
   return shouldRotate({
     postings: rotation.postings,
     publishedBefore: rotation.publishedBefore,
     maxPostings,
     paused: rotation.paused,
-    hasPostingInFlight: rotation.hasPostingInFlight
+    minGapDays,
+    hasPostingInFlight: rotation.hasPostingInFlight,
+    lastPostingAt: rotation.lastPostingAt,
+    now
   });
 }
 
@@ -119,12 +136,14 @@ const REASONS: Record<Exclude<RotationVerdict, { rotate: true }>['reason'], stri
   paused: 'This video has been taken out of rotation',
   limit_reached: 'This video has already been posted as many times as the rotation limit allows',
   already_queued: 'A posting of this video is already on its way out',
-  rotation_off: 'Rotation is switched off in Settings'
+  rotation_off: 'Rotation is switched off in Settings',
+  too_soon: 'It has not been long enough since this video last went out'
 };
 
 export interface PostingDefaults {
   notifyOnNew: boolean;
   maxPostings: number;
+  minGapDays?: number;
   /** Ignores the limit and the pause: what the user asked for directly, rather than automation. */
   force?: boolean;
 }
@@ -144,7 +163,7 @@ export function createPosting(
     if (rotation === null) return { ok: false, reason: 'That video is no longer in the library' };
 
     if (defaults.force !== true) {
-      const verdict = rotationVerdict(rotation, defaults.maxPostings);
+      const verdict = rotationVerdict(rotation, defaults.maxPostings, defaults.minGapDays ?? 0, now);
       if (!verdict.rotate) return { ok: false, reason: REASONS[verdict.reason] };
     } else if (rotation.hasPostingInFlight) {
       // Even a direct request will not queue two runs of the same file at once.

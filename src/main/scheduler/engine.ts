@@ -4,6 +4,7 @@
 import type Database from 'better-sqlite3';
 import type { UploadMethod } from '../../shared/queue';
 import { applyQueueEvent, countQueueByState, listQueueItems } from '../db/queueRepo';
+import { createPosting, listVideoRotation, rotationVerdict } from '../db/rotationRepo';
 import { readSettings, writeSetting } from '../db/settingsRepo';
 import { decide, type SchedulerAction, type SchedulerHolds } from './decide';
 
@@ -36,6 +37,9 @@ export interface SchedulerStatus {
 }
 
 const DEFAULT_TICK_MS = 30_000;
+/** Rotation is not urgent: a few a tick keeps a large library from flooding the queue at once. */
+const MAX_ROTATIONS_PER_TICK = 5;
+
 const REMOTE_ERROR_RETRY_MS = 5 * 60_000;
 
 export class SchedulerEngine {
@@ -146,8 +150,39 @@ export class SchedulerEngine {
 
     if (retryRemoteErrors) this.lastRemoteErrorRetry = now.getTime();
     for (const action of actions) await this.perform(action, now, settings.upload_method);
-    if (actions.length > 0) this.effects.onChange?.();
+
+    const rotated = settings.scheduler_paused ? 0 : this.queueRotations(settings, now);
+    if (actions.length > 0 || rotated > 0) this.effects.onChange?.();
     return actions;
+  }
+
+  /**
+   * Queues the next posting of any video that is due another one. Kept out of decide() because it
+   * works per video rather than per posting, and its answer depends on the whole history of a file
+   * rather than the state of one queue row.
+   */
+  private queueRotations(settings: { rotation_max_postings: number; rotation_min_gap_days: number; notify_subscribers: boolean }, now: Date): number {
+    if (settings.rotation_max_postings <= 0) return 0;
+
+    let created = 0;
+    for (const rotation of listVideoRotation(this.db)) {
+      const verdict = rotationVerdict(rotation, settings.rotation_max_postings, settings.rotation_min_gap_days, now);
+      if (!verdict.rotate) continue;
+      const result = createPosting(
+        this.db,
+        rotation.videoId,
+        {
+          notifyOnNew: settings.notify_subscribers,
+          maxPostings: settings.rotation_max_postings,
+          minGapDays: settings.rotation_min_gap_days
+        },
+        now
+      );
+      if (result.ok) created += 1;
+      // A re-run arrives as pending like anything else, so nothing goes out without approval.
+      if (created >= MAX_ROTATIONS_PER_TICK) break;
+    }
+    return created;
   }
 
   private async perform(action: SchedulerAction, now: Date, uploadMethod: UploadMethod): Promise<void> {

@@ -157,3 +157,84 @@ describe('scheduler engine', () => {
     expect(status).toMatchObject({ paused: false, auth: 'ok', uploadInFlight: false });
   });
 });
+
+describe('automatic rotation', () => {
+  const settings = (over: Record<string, unknown> = {}): void => {
+    writeSetting(db, 'rotation_max_postings', 3);
+    writeSetting(db, 'rotation_min_gap_days', 14);
+    writeSetting(db, 'rotation_upload_times', ['15:00']);
+    for (const [key, value] of Object.entries(over)) writeSetting(db, key as never, value as never);
+  };
+
+  const postingsOf = (videoId: number): number =>
+    (db.prepare('SELECT COUNT(*) n FROM queue WHERE video_id = ?').get(videoId) as { n: number }).n;
+
+  const videoIdFor = (queueId: number): number =>
+    (db.prepare('SELECT video_id FROM queue WHERE id = ?').get(queueId) as { video_id: number }).video_id;
+
+  it('queues another posting once a video is due one', async () => {
+    settings();
+    const published = seedQueueItem(db, { filename: 'hit.mov', state: 'published', scheduledFor: '2026-08-01T09:00:00.000Z' });
+    const video = videoIdFor(published);
+
+    const { effects } = fakeEffects();
+    await engineFor(effects).kick();
+
+    expect(postingsOf(video)).toBe(2);
+    const created = db.prepare('SELECT state, posting_kind, notify_subscribers FROM queue WHERE video_id = ? ORDER BY id DESC LIMIT 1').get(video) as Record<string, unknown>;
+    // Still needs approving, and never announces itself.
+    expect(created.state).toBe('pending');
+    expect(created.posting_kind).toBe('rotation');
+    expect(created.notify_subscribers).toBe(0);
+  });
+
+  it('waits until enough time has passed since the last posting', async () => {
+    settings();
+    const recent = new Date(TEST_NOW.getTime() - 2 * 86_400_000).toISOString();
+    const published = seedQueueItem(db, { filename: 'recent.mov', state: 'published', scheduledFor: recent });
+    const video = videoIdFor(published);
+
+    const { effects } = fakeEffects();
+    await engineFor(effects).kick();
+
+    expect(postingsOf(video)).toBe(1);
+  });
+
+  it('does nothing while the scheduler is paused', async () => {
+    settings();
+    const published = seedQueueItem(db, { filename: 'paused.mov', state: 'published', scheduledFor: '2026-08-01T09:00:00.000Z' });
+    const video = videoIdFor(published);
+
+    const { effects } = fakeEffects();
+    const engine = engineFor(effects);
+    engine.pause();
+    await engine.kick();
+
+    expect(postingsOf(video)).toBe(1);
+  });
+
+  it('does nothing when rotation is switched off', async () => {
+    settings({ rotation_max_postings: 0 });
+    const published = seedQueueItem(db, { filename: 'off.mov', state: 'published', scheduledFor: '2026-08-01T09:00:00.000Z' });
+    const video = videoIdFor(published);
+
+    const { effects } = fakeEffects();
+    await engineFor(effects).kick();
+
+    expect(postingsOf(video)).toBe(1);
+  });
+
+  it('stops at the limit rather than posting forever', async () => {
+    settings({ rotation_max_postings: 2 });
+    const published = seedQueueItem(db, { filename: 'twice.mov', state: 'published', scheduledFor: '2026-08-01T09:00:00.000Z' });
+    const video = videoIdFor(published);
+
+    const { effects } = fakeEffects();
+    await engineFor(effects).kick();
+    expect(postingsOf(video)).toBe(2);
+
+    // The second posting is still pending, so nothing more should be queued anyway.
+    await engineFor(effects).kick();
+    expect(postingsOf(video)).toBe(2);
+  });
+});

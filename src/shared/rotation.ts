@@ -32,16 +32,23 @@ export interface RotationPolicy {
   maxPostings: number;
   /** Taken out of rotation by hand, whatever the count says. */
   paused: boolean;
+  /** Days that must pass since the last posting. Re-posting the same short a day later is both
+   *  pointless — the same people see it — and the behaviour YouTube's repetitious content policy
+   *  is aimed at. */
+  minGapDays: number;
 }
 
 export interface RotationState extends VideoPostingFacts, RotationPolicy {
   /** True while a posting of this video is queued or on its way out. */
   hasPostingInFlight: boolean;
+  /** When the most recent posting went out, or null if none has. */
+  lastPostingAt: string | null;
+  now: Date;
 }
 
 export type RotationVerdict =
   | { rotate: true }
-  | { rotate: false; reason: 'paused' | 'limit_reached' | 'already_queued' | 'rotation_off' };
+  | { rotate: false; reason: 'paused' | 'limit_reached' | 'already_queued' | 'rotation_off' | 'too_soon' };
 
 /** Whether ShortStack should queue another posting of this video right now. */
 export function shouldRotate(state: RotationState): RotationVerdict {
@@ -51,6 +58,13 @@ export function shouldRotate(state: RotationState): RotationVerdict {
   // a rotation turns into a burst.
   if (state.hasPostingInFlight) return { rotate: false, reason: 'already_queued' };
   if (state.postings >= state.maxPostings) return { rotate: false, reason: 'limit_reached' };
+
+  if (state.lastPostingAt !== null && state.minGapDays > 0) {
+    const since = state.now.getTime() - Date.parse(state.lastPostingAt);
+    if (Number.isFinite(since) && since < state.minGapDays * 24 * 60 * 60 * 1000) {
+      return { rotate: false, reason: 'too_soon' };
+    }
+  }
   return { rotate: true };
 }
 

@@ -22,6 +22,8 @@ export interface AppSettings {
   rotation_upload_times: string[];
   /** How many times a video may be posted in total. 0 switches rotation off. */
   rotation_max_postings: number;
+  /** Days that must pass before a video may be posted again. */
+  rotation_min_gap_days: number;
   /** How far ahead auto-scheduling books. Keeps the near-term schedule free to change. */
   auto_schedule_days: number;
   auto_approve: boolean;
@@ -205,6 +207,7 @@ export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> 
   upload_times: stringList(['09:00', '13:00', '18:00', '22:00'], checkUploadTimes),
   rotation_upload_times: stringList(['11:00', '15:00', '20:00'], checkRotationTimes),
   rotation_max_postings: integer(6, 0, 50),
+  rotation_min_gap_days: integer(14, 0, 365),
   auto_schedule_days: integer(14, 1, 60),
   auto_approve: bool(false),
   auto_approve_consented_at: isoDateOrNull(),
