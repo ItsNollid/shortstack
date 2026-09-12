@@ -86,10 +86,14 @@ export class TokenStore {
     }
   }
 
-  /** Removes the old plaintext file once encrypted tokens exist, so credentials stop sitting in the clear. */
+  /**
+   * Removes the old plaintext file, but only once the replacement is genuinely encrypted. Checking
+   * that the new file merely *reads* would delete the old one while the new one is plaintext too:
+   * the same secret in the clear, behind a filename implying otherwise.
+   */
   discardLegacyPlaintext(): boolean {
     if (this.legacyPlaintextFile === undefined || !fs.existsSync(this.legacyPlaintextFile)) return false;
-    if (this.read() === null) return false;
+    if (!this.isEncryptedAtRest()) return false;
     fs.rmSync(this.legacyPlaintextFile, { force: true });
     return true;
   }

@@ -1,5 +1,6 @@
 import { BrowserWindow, app, nativeImage, shell } from 'electron';
 import * as path from 'path';
+import { runtimeProfile } from './bootstrap/profile';
 import { brandIconPng } from './brandIcon';
 
 export interface WindowDeps {
@@ -32,6 +33,19 @@ export function createMainWindow(deps: WindowDeps): BrowserWindow {
   });
 
   window.once('ready-to-show', () => window.show());
+
+  // On the dev profile, renderer errors go to the terminal. A blank window with a silent console is
+  // the worst way to find out something was blocked.
+  if (runtimeProfile.profile === 'dev') {
+    window.webContents.on('console-message', (event) => {
+      if (event.level === 'error' || event.level === 'warning') {
+        console.info(`[renderer:${event.level}] ${event.message}`);
+      }
+    });
+    window.webContents.on('did-fail-load', (_event, code, description) => {
+      console.error(`[renderer] failed to load (${code}): ${description}`);
+    });
+  }
 
   // Links open in the real browser. Without this, target=_blank opened a second Electron window.
   window.webContents.setWindowOpenHandler(({ url }) => {

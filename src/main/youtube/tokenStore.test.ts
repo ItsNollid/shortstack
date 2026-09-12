@@ -130,3 +130,32 @@ describe('TokenStore', () => {
     expect(store.read()).toBeNull();
   });
 });
+
+describe('plaintext fallback', () => {
+  it('keeps the legacy plaintext file when the replacement is not actually encrypted', () => {
+    // safeStorage is unavailable on some Linux desktops, and write() falls back to plaintext. If
+    // the old file were removed anyway the secret would still be in the clear, just under a name
+    // that says otherwise.
+    const { file, legacy } = workspace();
+    fs.writeFileSync(legacy, JSON.stringify({ refresh_token: 'legacy' }));
+
+    const store = new TokenStore(file, fakeSecrets(false), legacy);
+    store.write({ refresh_token: 'fresh' });
+
+    expect(store.isEncryptedAtRest()).toBe(false);
+    expect(store.discardLegacyPlaintext()).toBe(false);
+    expect(fs.existsSync(legacy)).toBe(true);
+  });
+
+  it('removes the legacy file once the replacement really is encrypted', () => {
+    const { file, legacy } = workspace();
+    fs.writeFileSync(legacy, JSON.stringify({ refresh_token: 'legacy' }));
+
+    const store = new TokenStore(file, fakeSecrets(), legacy);
+    store.write({ refresh_token: 'fresh' });
+
+    expect(store.isEncryptedAtRest()).toBe(true);
+    expect(store.discardLegacyPlaintext()).toBe(true);
+    expect(fs.existsSync(legacy)).toBe(false);
+  });
+});

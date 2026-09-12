@@ -44,6 +44,12 @@ export class AuthService {
     return this.lastFailure ?? 'ok';
   }
 
+  /** False when the operating system had no secure storage and the tokens had to go to disk in
+   *  the clear. The user is told rather than left to assume. */
+  tokensEncrypted(): boolean {
+    return this.deps.store.read() === null || this.deps.store.isEncryptedAtRest();
+  }
+
   /** Scopes the stored grant is missing, which is how the UI knows to ask for one reconnect. */
   missingScopes(): string[] {
     return missingScopes(this.deps.store.read(), REQUIRED_SCOPES);

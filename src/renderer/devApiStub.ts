@@ -148,6 +148,7 @@ export function installDevApiStub(): void {
       ok({
         state: 'ok' as const,
         hasClientSecret: true,
+        tokensEncrypted: true,
         missingScopes: [],
         channel: { id: 'UC_sample', title: 'Sample Channel', handle: '@samplechannel', avatarUrl: null, subscriberCount: 12400 }
       }),

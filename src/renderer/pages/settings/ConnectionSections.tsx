@@ -22,6 +22,12 @@ export function ChannelSection({ onDisconnect }: { onDisconnect: () => void }): 
           connect. This keeps your channel tied to credentials you control.
         </Banner>
       )}
+      {auth !== null && !auth.tokensEncrypted && (
+        <Banner kind="danger" title="Sign-in tokens are not encrypted on this computer">
+          Windows did not offer secure storage, so ShortStack had to write them to disk in the clear.
+          Anything running as you can read them. Disconnecting deletes them.
+        </Banner>
+      )}
       {auth !== null && auth.missingScopes.length > 0 && (
         <Banner kind="warning" title="Reconnect to grant new permissions">
           Missing: {auth.missingScopes.join(', ')}

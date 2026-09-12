@@ -83,6 +83,7 @@ export function registerIpcHandlers(context: IpcContext): void {
     return {
       state: auth.state(),
       hasClientSecret: auth.clientSecret() !== null,
+      tokensEncrypted: auth.tokensEncrypted(),
       missingScopes: auth.missingScopes(),
       channel:
         channel === null
@@ -330,7 +331,10 @@ export function registerIpcHandlers(context: IpcContext): void {
     },
     openStudioUpload: async () => {
       const channel = readActiveChannel(db);
-      const url = channel === null ? 'https://studio.youtube.com' : `https://studio.youtube.com/channel/${channel.id}/videos/upload?d=ud`;
+      // Channel ids are an opaque token of URL-safe characters. Anything else is not one, and is
+      // not going into a URL that gets handed to the operating system.
+      const id = channel !== null && /^[A-Za-z0-9_-]{1,64}$/.test(channel.id) ? channel.id : null;
+      const url = id === null ? 'https://studio.youtube.com' : `https://studio.youtube.com/channel/${id}/videos/upload?d=ud`;
       await shell.openExternal(url);
       return ok(null);
     }

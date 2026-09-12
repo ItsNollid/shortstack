@@ -28,6 +28,8 @@ export interface SchedulerStatus {
 export interface AuthStatus {
   state: 'ok' | 'expired' | 'offline' | 'disconnected';
   hasClientSecret: boolean;
+  /** False means the OS offered no secure storage, so the sign-in tokens sit on disk in the clear. */
+  tokensEncrypted: boolean;
   missingScopes: string[];
   channel: { id: string; title: string; handle: string | null; avatarUrl: string | null; subscriberCount: number | null } | null;
 }
