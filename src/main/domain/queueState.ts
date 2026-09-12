@@ -68,7 +68,7 @@ export const PUBLISH_GRACE_MS = 15 * 60 * 1000;
 
 const REJECTABLE: ReadonlySet<QueueState> = new Set(['pending', 'approved', 'awaiting_manual_upload', 'failed', 'needs_attention']);
 const AUTO_SLOTTABLE: ReadonlySet<QueueState> = new Set(['approved', 'awaiting_manual_upload', 'uploading', 'uploaded', 'failed']);
-const MISSABLE: ReadonlySet<QueueState> = new Set(['approved', 'awaiting_manual_upload', 'uploaded', 'failed']);
+export const MISSABLE_STATES: ReadonlySet<QueueState> = new Set(['approved', 'awaiting_manual_upload', 'uploaded', 'failed']);
 const RECONCILABLE: ReadonlySet<QueueState> = new Set(['uploaded', 'scheduled', 'published', 'needs_attention']);
 const SCHEDULE_RESOLVABLE: ReadonlySet<AttentionCode> = new Set(['missed_slot', 'set_schedule_in_studio']);
 // Anything that might already exist on YouTube: these block rejection and a plain resolve,
@@ -363,7 +363,7 @@ export function transition(item: QueueStateFields, event: QueueEvent, ctx: Trans
     }
 
     case 'missed_slot': {
-      if (!MISSABLE.has(item.state)) return deny(`A ${item.state} video can't miss its slot`);
+      if (!MISSABLE_STATES.has(item.state)) return deny(`A ${item.state} video can't miss its slot`);
       const desired = desiredPublishAt(item);
       if (desired === null || Date.parse(desired) >= ctx.now.getTime() + MIN_SCHEDULE_LEAD_MS) {
         return deny('The slot is still reachable');
