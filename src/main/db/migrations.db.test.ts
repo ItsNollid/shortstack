@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { openDatabase } from './connection';
 import {
   LATEST_SCHEMA_VERSION,
+  MIGRATIONS,
   legacyBackfill,
   migrate,
   normalizeLegacyTags,
@@ -206,5 +207,55 @@ describe('legacy value normalization', () => {
       scheduled_for: null,
       schedule_source: 'hold'
     });
+  });
+});
+
+describe('v3 rotation', () => {
+  const migrated = (): Database.Database => {
+    const db = new Database(':memory:');
+    migrate(db, { now: () => NOW });
+    return db;
+  };
+
+  const columns = (db: Database.Database, table: string): string[] =>
+    (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map((row) => row.name);
+
+  it('adds the rotation columns', () => {
+    const db = migrated();
+    expect(columns(db, 'videos')).toContain('published_before');
+    expect(columns(db, 'videos')).toContain('rotation_paused');
+    expect(columns(db, 'queue')).toContain('posting_kind');
+    db.close();
+  });
+
+  it('treats everything that already existed as an announcement, not a re-run', () => {
+    // Upgrading must not retroactively decide that past uploads were rotation, which would be the
+    // difference between having announced them and not.
+    const db = new Database(':memory:');
+    migrate(db, { now: () => NOW, migrations: MIGRATIONS.filter((m) => m.version <= 2) });
+    db.prepare("INSERT INTO videos (filename, filepath, status, created_at) VALUES ('old.mov', 'E:/old.mov', 'pending', ?)").run(
+      NOW.toISOString()
+    );
+    db.prepare(
+      "INSERT INTO queue (video_id, title, description, tags, category_id, privacy, created_at, updated_at) VALUES (1, 'Old', '', '[]', '22', 'public', ?, ?)"
+    ).run(NOW.toISOString(), NOW.toISOString());
+
+    migrate(db, { now: () => NOW });
+
+    const rows = db.prepare('SELECT posting_kind FROM queue').all() as Array<{ posting_kind: string }>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.posting_kind).toBe('new');
+    db.close();
+  });
+
+  it('defaults a new video to rotating and never previously published', () => {
+    const db = migrated();
+    db.prepare("INSERT INTO videos (filename, filepath, status, created_at) VALUES ('fresh.mov', 'E:/fresh.mov', 'pending', ?)").run(
+      NOW.toISOString()
+    );
+    const video = db.prepare('SELECT published_before, rotation_paused FROM videos').get() as Record<string, number>;
+    expect(video.published_before).toBe(0);
+    expect(video.rotation_paused).toBe(0);
+    db.close();
   });
 });

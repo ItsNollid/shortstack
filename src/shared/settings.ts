@@ -18,6 +18,12 @@ export interface AppSettings {
   notify_subscribers: boolean;
   made_for_kids: boolean;
   upload_times: string[];
+  /** Rotation re-runs get their own times, so a backlog of them never delays a new video. */
+  rotation_upload_times: string[];
+  /** How many times a video may be posted in total. 0 switches rotation off. */
+  rotation_max_postings: number;
+  /** How far ahead auto-scheduling books. Keeps the near-term schedule free to change. */
+  auto_schedule_days: number;
   auto_approve: boolean;
   auto_approve_consented_at: string | null;
   auto_retry_max: number;
@@ -166,6 +172,12 @@ function checkUploadTimes(times: string[]): string | null {
   return new Set(times).size === times.length ? null : 'Upload times must all be different';
 }
 
+function checkRotationTimes(times: string[]): string | null {
+  if (times.length > 12) return 'Use at most 12 rotation times';
+  if (!times.every((time) => HHMM.test(time))) return 'Use 24-hour times like 15:00';
+  return new Set(times).size === times.length ? null : 'Rotation times must all be different';
+}
+
 function checkHttpUrl(value: string): string | null {
   try {
     const url = new URL(value);
@@ -191,6 +203,9 @@ export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> 
   notify_subscribers: bool(false),
   made_for_kids: bool(false),
   upload_times: stringList(['09:00', '13:00', '18:00', '22:00'], checkUploadTimes),
+  rotation_upload_times: stringList(['11:00', '15:00', '20:00'], checkRotationTimes),
+  rotation_max_postings: integer(6, 0, 50),
+  auto_schedule_days: integer(14, 1, 60),
   auto_approve: bool(false),
   auto_approve_consented_at: isoDateOrNull(),
   auto_retry_max: integer(3, 0, 10),

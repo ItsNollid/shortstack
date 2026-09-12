@@ -373,7 +373,38 @@ const v2Lifecycle: Migration = {
   }
 };
 
-export const MIGRATIONS: readonly Migration[] = [v1Baseline, v2Lifecycle];
+
+/** A video can be posted more than once on purpose. The columns that make that a first-class idea
+ *  rather than something inferred after the fact. */
+const VIDEO_COLUMNS_V3: ReadonlyArray<[string, string]> = [
+  // Set at intake for a back catalogue: files already published before ShortStack existed, whose
+  // first posting here is a re-run and must not be announced to subscribers.
+  ['published_before', 'INTEGER NOT NULL DEFAULT 0'],
+  // Taken out of rotation by hand, regardless of how many postings remain.
+  ['rotation_paused', 'INTEGER NOT NULL DEFAULT 0']
+];
+
+const QUEUE_COLUMNS_V3: ReadonlyArray<[string, string]> = [
+  // Fixed when the posting is created: whether it is the announcement or a re-run. Deriving it at
+  // read time would rewrite history every time another posting was added.
+  ['posting_kind', "TEXT NOT NULL DEFAULT 'new'"]
+];
+
+const v3Rotation: Migration = {
+  version: 3,
+  name: 'rotation: a video can be posted more than once',
+  up(db) {
+    for (const [column, type] of VIDEO_COLUMNS_V3) addColumn(db, 'videos', column, type);
+    for (const [column, type] of QUEUE_COLUMNS_V3) addColumn(db, 'queue', column, type);
+
+    // Everything that already exists was a single posting, so it is the announcement. Later
+    // postings of the same video get their kind at creation.
+    db.prepare("UPDATE queue SET posting_kind = 'new' WHERE posting_kind IS NULL OR trim(posting_kind) = ''").run();
+
+    db.exec('CREATE INDEX IF NOT EXISTS idx_queue_posting ON queue(video_id, posting_kind);');
+  }
+};
+export const MIGRATIONS: readonly Migration[] = [v1Baseline, v2Lifecycle, v3Rotation];
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
 
 export function migrate(db: Database.Database, options: MigrateOptions = {}): MigrateResult {
