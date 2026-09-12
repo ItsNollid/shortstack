@@ -5,7 +5,7 @@ import { AiSection, AppSection, PlatformsSection, VersionNote } from './AppSecti
 import { ApiModeDialog, AutoApproveDialog, DisconnectDialog } from './Confirmations';
 import { ChannelSection, FolderSection } from './ConnectionSections';
 import { LegalSection } from './LegalSection';
-import { ScheduleSection } from './ScheduleSection';
+import { RotationSection, ScheduleSection } from './ScheduleSection';
 import { DefaultsSection, UploadMethodSection } from './UploadSections';
 import { useSettings } from './useSettings';
 import styles from './Settings.module.css';
@@ -30,6 +30,7 @@ export function SettingsPage(): React.JSX.Element {
         <UploadMethodSection writer={writer} onRequestApiMode={() => setDialog('api-mode')} />
         <DefaultsSection writer={writer} />
         <ScheduleSection writer={writer} onRequestAutoApprove={() => setDialog('auto-approve')} />
+        <RotationSection writer={writer} />
         <AiSection writer={writer} />
         <AppSection writer={writer} />
         <PlatformsSection />
