@@ -15,7 +15,9 @@
     "package:dir": "electron-vite build && electron-builder --win --dir",
     "preview:ui": "vite --config vite.preview.config.ts",
     "docs:legal": "tsx scripts/writeLegalDocs.ts",
-    "verify": "bash verify.sh"
+    "verify": "bash verify.sh",
+    "icons": "tsx scripts/writeBrandIcons.ts",
+    "package:dev": "electron-vite build && electron-builder --win --dir --config.extraMetadata.shortstackBuildProfile=dev --config.directories.output=dist-dev"
   },
   "dependencies": {
     "@fontsource/roboto": "^5.3.0",
@@ -59,7 +61,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
-    }
+    },
+    "npmRebuild": false
   },
   "allowScripts": {
     "better-sqlite3@13.0.3": true,
