@@ -163,6 +163,14 @@ export function applyQueueEvent(db: Database.Database, id: number, event: QueueE
   return run();
 }
 
+/** Stores the upload session as soon as YouTube issues it, before any bytes are sent, so a
+ *  crash can resume the same upload instead of starting a second one. */
+export function recordUploadSession(db: Database.Database, id: number, sessionUri: string, now: Date): void {
+  const row = db.prepare('SELECT updated_at FROM queue WHERE id = ?').get(id) as { updated_at?: string } | undefined;
+  if (row === undefined) return;
+  writePatch(db, id, { upload_session_uri: sessionUri }, STATE_COLUMNS, now, row.updated_at ?? '');
+}
+
 export function updateQueueMetadata(
   db: Database.Database,
   id: number,

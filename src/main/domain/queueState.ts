@@ -41,7 +41,7 @@ export type QueueEvent =
   | { type: 'method_changed' }
   | { type: 'begin_manual_upload' }
   | { type: 'link_video'; videoId: string }
-  | { type: 'begin_upload'; sessionUri: string }
+  | { type: 'begin_upload'; sessionUri: string | null }
   | { type: 'upload_progress'; bytesConfirmed: number }
   | { type: 'upload_completed'; videoId: string }
   | { type: 'upload_failed'; retryable: boolean; error: string; nextAttemptAt: string | null; maxAttempts: number }
@@ -280,7 +280,9 @@ export function transition(item: QueueStateFields, event: QueueEvent, ctx: Trans
       return ok({
         state: 'uploading',
         upload_session_uri: event.sessionUri,
-        upload_bytes_confirmed: event.sessionUri === item.upload_session_uri ? item.upload_bytes_confirmed : 0,
+        // Bytes only carry over when resuming the very same session.
+        upload_bytes_confirmed:
+          event.sessionUri !== null && event.sessionUri === item.upload_session_uri ? item.upload_bytes_confirmed : 0,
         next_attempt_at: null,
         last_error: null
       });
