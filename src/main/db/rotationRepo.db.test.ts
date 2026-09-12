@@ -177,12 +177,16 @@ describe('creating another posting', () => {
     expect(createPosting(db, video, { notifyOnNew: false, maxPostings: 1, force: true }, NOW).ok).toBe(true);
   });
 
-  it('records the new posting so History shows where it came from', () => {
-    const first = seedQueueItem(db, { filename: 'logged.mov', state: 'published' });
-    const result = createPosting(db, videoIdFor(first), defaults, NOW);
-    expect(result.ok).toBe(true);
-    const actions = listActivity(db).map((entry) => entry.action);
-    expect(actions).toContain('posting_created');
+  it('records who queued it, so History can separate automation from the user', () => {
+    // The same operation from two sources. History's "Done for you" filter is the whole point of
+    // keeping the record, so the two must not land under one name.
+    const automatic = seedQueueItem(db, { filename: 'auto.mov', state: 'published' });
+    expect(createPosting(db, videoIdFor(automatic), defaults, NOW).ok).toBe(true);
+    expect(listActivity(db).map((entry) => entry.action)).toContain('posting_rotated');
+
+    const byHand = seedQueueItem(db, { filename: 'byhand.mov', state: 'published' });
+    expect(createPosting(db, videoIdFor(byHand), { ...defaults, force: true }, NOW).ok).toBe(true);
+    expect(listActivity(db).map((entry) => entry.action)).toContain('posting_created');
   });
 
   it('says so for a video that does not exist', () => {

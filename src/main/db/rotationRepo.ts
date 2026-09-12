@@ -208,7 +208,8 @@ export function createPosting(
     const queueId = Number(inserted.lastInsertRowid);
     appendActivity(db, {
       queueId,
-      action: 'posting_created',
+      // Who asked matters: History separates what ShortStack did on its own from what the user did.
+      action: defaults.force === true ? 'posting_created' : 'posting_rotated',
       detail:
         kind === 'rotation'
           ? `Queued again as a re-run (posting ${rotation.postings + 1}), without notifying subscribers`

@@ -25,7 +25,13 @@ export const ACTIVITY_ACTIONS = [
   'flag',
   'resolve_attention',
   'confirm_not_duplicate',
-  'disconnect'
+  'disconnect',
+  // Written straight to the log rather than emitted by the state machine.
+  'mark_published_before',
+  'rotation_paused',
+  'rotation_resumed',
+  'posting_created',
+  'posting_rotated'
 ] as const;
 export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number];
 
@@ -45,7 +51,9 @@ const BY_SHORTSTACK: ReadonlySet<string> = new Set<ActivityAction>([
   'missed_slot',
   'flag',
   'link_video',
-  'method_changed'
+  'method_changed',
+  // Automatic rotation is ShortStack acting on the user's behalf; pressing Post again is not.
+  'posting_rotated'
 ]);
 
 const LABELS: Record<ActivityAction, string> = {
@@ -73,7 +81,12 @@ const LABELS: Record<ActivityAction, string> = {
   flag: 'Flagged for attention',
   resolve_attention: 'Marked resolved',
   confirm_not_duplicate: 'Confirmed it never uploaded',
-  disconnect: 'YouTube data removed'
+  disconnect: 'YouTube data removed',
+  mark_published_before: 'Marked as already published',
+  rotation_paused: 'Taken out of rotation',
+  rotation_resumed: 'Put back into rotation',
+  posting_created: 'Queued to post again',
+  posting_rotated: 'Queued for another run'
 };
 
 const isKnown = (action: string): action is ActivityAction =>

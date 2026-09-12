@@ -59,3 +59,24 @@ describe('activityText', () => {
     expect(activityText('approve', '   ')).toBe('Approved');
   });
 });
+
+describe('who did what', () => {
+  it('separates automatic rotation from a user pressing Post again', () => {
+    // Both queue another posting. Only one of them is ShortStack acting on its own.
+    expect(actorOf('posting_rotated')).toBe('shortstack');
+    expect(actorOf('posting_created')).toBe('you');
+  });
+
+  it('labels every action the rotation work introduced', () => {
+    for (const action of [
+      'mark_published_before',
+      'rotation_paused',
+      'rotation_resumed',
+      'posting_created',
+      'posting_rotated'
+    ]) {
+      expect(activityLabel(action)).not.toContain('_');
+      expect(activityLabel(action).length).toBeGreaterThan(0);
+    }
+  });
+});
