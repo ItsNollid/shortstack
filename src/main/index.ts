@@ -101,7 +101,15 @@ async function start(): Promise<void> {
   });
 
   engine = new SchedulerEngine({ db, effects });
-  registerIpcHandlers();
+  registerIpcHandlers({
+    db,
+    engine,
+    auth,
+    gateway,
+    profile: { profile: runtimeProfile.profile, uploads: runtimeProfile.uploads },
+    credentialsDir,
+    getWindow: () => mainWindow
+  });
 
   mainWindow = createMainWindow({
     hideOnClose: () => readSettings(db).settings.close_to_tray,
