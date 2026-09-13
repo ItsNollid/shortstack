@@ -38,7 +38,12 @@ built into the app.
 3. Set the same version in `package.json`. The changelog entry and the package version have to
    match, or the app will not announce the release it is running.
 4. `npm run release` — verifies, regenerates the docs, builds, and uploads to GitHub.
-5. Publish the draft release on GitHub. Until it is published, nobody's app can see it.
+5. Publish the draft release on GitHub. Until it is published nobody's app can see it — drafts are
+   not readable without a token, which is exactly what makes the draft a safe place to check the
+   notes and the installer before anyone gets them.
+6. Check the assets are named with hyphens: `ShortStack-Setup-<version>.exe` and its `.blockmap`.
+   electron-builder names them that way and `latest.yml` points at those names; uploading one by
+   hand gets you dots instead, and an updater that cannot find the file it was told about.
 
 ### What your friends will see
 
