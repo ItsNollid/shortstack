@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { buildInfo } from '../../shared/buildInfo';
 import { whatsNew } from '../../shared/whatsNew';
 import { useAppStatus } from '../app/status';
@@ -19,11 +19,19 @@ export function WhatsNew(): React.JSX.Element | null {
   const { show, markSeen } = whatsNew(settings, buildInfo().version);
   const nothingToShow = show.length === 0;
 
+  // Tried once per version, never again. The mutation object is new on every render, so an effect
+  // that depended on it re-ran after every render: a handful of duplicate writes on a good day, and
+  // on a day the write failed, a write attempt on every single render for as long as the app was open.
+  const attempted = useRef<string | null>(null);
+  const markRun = mark.run;
+
   // A fresh install, or a build older than what was last seen: recorded quietly, so the next real
   // update announces only itself rather than everything that ever happened.
   useEffect(() => {
-    if (nothingToShow && markSeen !== null && !mark.pending) void mark.run(markSeen);
-  }, [nothingToShow, markSeen, mark]);
+    if (!nothingToShow || markSeen === null || attempted.current === markSeen) return;
+    attempted.current = markSeen;
+    void markRun(markSeen);
+  }, [nothingToShow, markSeen, markRun]);
 
   if (nothingToShow || markSeen === null) return null;
 
