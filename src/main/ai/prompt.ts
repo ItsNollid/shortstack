@@ -64,7 +64,7 @@ function renderVideo(video: VideoFacts, hasFrames: boolean): string[] {
   }
   lines.push(
     hasFrames
-      ? 'Still frames from this video are attached. Look at them: name the game, the map or mode, and what is happening.'
+      ? 'Still frames from this video are attached, in the order they happen. Look at them: name the game, the map or mode, and what is happening.'
       : 'No frames are available, so work from the file name and the examples.'
   );
   lines.push('');

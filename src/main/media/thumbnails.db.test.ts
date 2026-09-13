@@ -5,6 +5,7 @@ import * as path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { encodePng } from '../brandIcon';
 import { createTestDb, seedQueueItem } from '../db/testFixtures';
+import { saveFrames } from './frames';
 import { clearThumbnails, isPng, missingThumbnails, readThumbnail, saveThumbnail, thumbnailPath } from './thumbnails';
 
 let db: Database.Database;
@@ -22,6 +23,7 @@ afterEach(async () => {
 });
 
 const png = (): Buffer => encodePng(4, 4, Buffer.alloc(4 * 4 * 4, 0x40));
+const jpeg = (): Buffer => Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(64, 0x20)]);
 const videoIdFor = (queueId: number): number =>
   (db.prepare('SELECT video_id FROM queue WHERE id = ?').get(queueId) as { video_id: number }).video_id;
 
@@ -73,16 +75,25 @@ describe('saving a poster frame', () => {
 });
 
 describe('finding what still needs one', () => {
-  it('lists videos with no frame yet, one entry per file', async () => {
+  it('lists videos with nothing decoded yet, one entry per file', async () => {
     const a = seedQueueItem(db, { filename: 'a.mov' });
     seedQueueItem(db, { filename: 'b.mov' });
 
     expect(await missingThumbnails({ db, dir })).toHaveLength(2);
 
     await saveThumbnail({ db, dir }, a, png());
+    await saveFrames({ db, dir }, a, [jpeg()]);
     const remaining = await missingThumbnails({ db, dir });
     expect(remaining).toHaveLength(1);
     expect(remaining).not.toContain(a);
+  });
+
+  // A video posterised before the model frames existed has to come back round, or it would never
+  // get a strip and the model would keep working from a 216px thumbnail.
+  it('still asks for a video that has a poster but no frames', async () => {
+    const only = seedQueueItem(db, { filename: 'poster-only.mov' });
+    await saveThumbnail({ db, dir }, only, png());
+    expect(await missingThumbnails({ db, dir })).toEqual([only]);
   });
 
   it('skips files that are no longer there', async () => {

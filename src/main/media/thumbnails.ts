@@ -3,6 +3,7 @@
 import type Database from 'better-sqlite3';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { videosWithFrames } from './frames';
 
 /** PNG magic. Anything else is not a thumbnail and does not get written. */
 const PNG_HEADER = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -51,8 +52,9 @@ export async function readThumbnail(deps: ThumbnailDeps, queueId: number): Promi
 }
 
 /**
- * Queue ids whose video has no poster frame yet, one per video so the same file is not decoded
- * once for every posting of it.
+ * Queue ids whose video still needs decoding, one per video so the same file is not decoded once
+ * for every posting of it. A video counts as needing it if it is missing either the poster frame or
+ * the strip of stills the model reads, so one pass produces both.
  */
 export async function missingThumbnails(deps: ThumbnailDeps, limit = 200): Promise<number[]> {
   let have: Set<number>;
@@ -62,6 +64,8 @@ export async function missingThumbnails(deps: ThumbnailDeps, limit = 200): Promi
   } catch {
     have = new Set();
   }
+
+  const withFrames = await videosWithFrames(deps.dir);
 
   const rows = deps.db
     .prepare(
@@ -74,7 +78,7 @@ export async function missingThumbnails(deps: ThumbnailDeps, limit = 200): Promi
     .all() as Array<{ queueId: number; videoId: number }>;
 
   return rows
-    .filter((row) => !have.has(row.videoId))
+    .filter((row) => !have.has(row.videoId) || !withFrames.has(row.videoId))
     .slice(0, limit)
     .map((row) => row.queueId);
 }

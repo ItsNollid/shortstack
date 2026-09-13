@@ -86,10 +86,12 @@ export interface ShortStackApi {
 
   videosScan(): Promise<Result<ScanSummary>>;
 
-  /** Queue ids whose video has no poster frame yet, one per file. */
+  /** Queue ids whose video still needs decoding, one per file. */
   thumbnailsMissing(): Promise<Result<number[]>>;
   /** Stores a poster frame the renderer drew, as raw PNG bytes. */
   thumbnailSave(queueId: number, png: Uint8Array): Promise<Result<null>>;
+  /** Stores the strip of stills the local model reads, as raw JPEG bytes. */
+  framesSave(queueId: number, frames: Uint8Array[]): Promise<Result<null>>;
 
   settingsGetAll(): Promise<Result<AppSettings>>;
   settingsSet(key: string, value: unknown): Promise<Result<AppSettings>>;
@@ -149,6 +151,7 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'videosScan',
   'thumbnailsMissing',
   'thumbnailSave',
+  'framesSave',
   'settingsGetAll',
   'settingsSet',
   'schedulerStatus',

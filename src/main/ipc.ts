@@ -16,6 +16,7 @@ import type { QueueEvent } from './domain/queueState';
 import { scanFolder } from './files/scanner';
 import type { SchedulerEngine } from './scheduler/engine';
 import { createPosting, markPublishedBefore, setRotationPaused } from './db/rotationRepo';
+import { saveFrames, readFrames } from './media/frames';
 import { clearThumbnails, missingThumbnails, readThumbnail, saveThumbnail } from './media/thumbnails';
 import { applyStartWithWindows } from './startup';
 import type { AuthService } from './youtube/authService';
@@ -239,6 +240,16 @@ export function registerIpcHandlers(context: IpcContext): void {
       return saved.ok ? ok(null) : fail('refused', saved.reason);
     },
 
+    framesSave: async (queueId, frames) => {
+      const parsed = asId(queueId);
+      if (parsed === null) return fail('invalid', 'That video id is not valid');
+      if (!Array.isArray(frames) || frames.some((frame) => !(frame instanceof Uint8Array))) {
+        return fail('invalid', 'Expected image bytes');
+      }
+      const saved = await saveFrames({ db, dir: context.thumbnailDir }, parsed, frames.map((frame) => Buffer.from(frame)));
+      return saved.ok ? ok(null) : fail('refused', saved.reason);
+    },
+
     videosScan: async () => {
       const summary = await scanFolder(db);
       changed();
@@ -407,13 +418,17 @@ export function registerIpcHandlers(context: IpcContext): void {
               .then((result) => (result.ok ? result.value.items : []))
               .catch(() => []);
 
-      const frame = await readThumbnail({ db, dir: context.thumbnailDir }, parsed);
+      // The strip if it has been decoded, otherwise the poster, which is small but better than
+      // nothing. Either way a text-only model never receives them.
+      const strip = await readFrames({ db, dir: context.thumbnailDir }, parsed);
+      const poster = strip.length > 0 ? [] : [await readThumbnail({ db, dir: context.thumbnailDir }, parsed)];
+      const stills = (strip.length > 0 ? strip : poster).filter((image): image is Buffer => image !== null);
       const suggestion = await generateMetadata(
         {
           model,
           channelName: channel?.title ?? null,
           examples,
-          frames: frame === null ? [] : [frame.toString('base64')],
+          frames: stills.map((image) => image.toString('base64')),
           video: {
             filename: item.filename,
             durationSeconds: item.duration_s,

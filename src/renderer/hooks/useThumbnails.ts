@@ -1,9 +1,18 @@
-// Draws a poster frame for every video that has none yet, one at a time in the background.
-// Chromium is already decoding these files for the preview, so the frame comes from the same place;
-// this does it once per file and hands the result to the main process to keep.
+// Draws the stills for every video that has none yet, one at a time in the background. Chromium is
+// already decoding these files for the preview, so the frames come from the same place; this does it
+// once per file and hands the results to the main process to keep.
+//
+// One pass produces two things from the same seeks: the small PNG poster the lists show, and a
+// larger JPEG strip the local model reads. Decoding these files is the expensive part, so doing it
+// twice for the same frames would be wasteful.
 import { useEffect, useRef } from 'react';
 
-const FRAME_WIDTH = 216;
+const POSTER_WIDTH = 216;
+/** Wide enough that a model can read a scoreboard or a killfeed, which is often the only clue. */
+const STILL_WIDTH = 512;
+const STILL_QUALITY = 0.82;
+/** Matches MAX_FRAMES in src/main/media/frames.ts. */
+const STILL_COUNT = 3;
 const PER_VIDEO_TIMEOUT_MS = 15_000;
 
 /**
@@ -13,10 +22,21 @@ const PER_VIDEO_TIMEOUT_MS = 15_000;
  */
 const SAMPLE_POINTS = [0.15, 0.35, 0.55, 0.75];
 
-interface Frame {
-  png: Uint8Array;
+interface Sample {
+  poster: Uint8Array | null;
+  still: Uint8Array | null;
   score: number;
 }
+
+export interface Stills {
+  poster: Uint8Array | null;
+  strip: Uint8Array[];
+}
+
+const encode = async (canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Uint8Array | null> => {
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
+  return blob === null ? null : new Uint8Array(await blob.arrayBuffer());
+};
 
 const seekTo = async (video: HTMLVideoElement, seconds: number): Promise<void> =>
   new Promise((resolve, reject) => {
@@ -47,9 +67,10 @@ function interest(pixels: Uint8ClampedArray): number {
   return average * Math.min(1, range / 64);
 }
 
-async function drawPoster(queueId: number): Promise<Uint8Array | null> {
+async function drawStills(queueId: number): Promise<Stills> {
+  const nothing: Stills = { poster: null, strip: [] };
   const video = document.createElement('video');
-  // Must be set before src, and is what makes the frame readable back out of the canvas.
+  // Must be set before src, and is what makes the frames readable back out of the canvas.
   video.crossOrigin = 'anonymous';
   video.src = `ss-media://video/${queueId}`;
   video.muted = true;
@@ -64,32 +85,52 @@ async function drawPoster(queueId: number): Promise<Uint8Array | null> {
       video.load();
     });
 
-    if (video.videoWidth === 0 || video.videoHeight === 0) return null;
+    if (video.videoWidth === 0 || video.videoHeight === 0) return nothing;
     const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+    const shape = (width: number): HTMLCanvasElement => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = Math.round((width * video.videoHeight) / video.videoWidth);
+      return canvas;
+    };
 
-    const canvas = document.createElement('canvas');
-    canvas.width = FRAME_WIDTH;
-    canvas.height = Math.round((FRAME_WIDTH * video.videoHeight) / video.videoWidth);
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    if (context === null) return null;
+    const small = shape(POSTER_WIDTH);
+    const large = shape(STILL_WIDTH);
+    const smallContext = small.getContext('2d', { willReadFrequently: true });
+    const largeContext = large.getContext('2d');
+    if (smallContext === null || largeContext === null) return nothing;
 
-    let best: Frame | null = null;
+    const samples: Sample[] = [];
     for (const point of SAMPLE_POINTS) {
       try {
         await seekTo(video, Math.min(duration * point, Math.max(0, duration - 0.1)));
       } catch {
         continue;
       }
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const score = interest(context.getImageData(0, 0, canvas.width, canvas.height).data);
-      if (best !== null && score <= best.score) continue;
+      smallContext.drawImage(video, 0, 0, small.width, small.height);
+      const score = interest(smallContext.getImageData(0, 0, small.width, small.height).data);
 
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-      if (blob !== null) best = { png: new Uint8Array(await blob.arrayBuffer()), score };
+      // The poster only needs encoding when this frame is the best so far; the strip wants them all.
+      const best = samples.reduce((top, sample) => Math.max(top, sample.score), -1);
+      const poster = score > best ? await encode(small, 'image/png') : null;
+      largeContext.drawImage(video, 0, 0, large.width, large.height);
+      samples.push({ poster, still: await encode(large, 'image/jpeg', STILL_QUALITY), score });
     }
-    return best?.png ?? null;
+
+    // Keep the liveliest few, but hand them over in the order they happen: a model reading three
+    // stills should be seeing the video move forward, not shuffled.
+    const withStills = samples.filter((sample) => sample.still !== null);
+    const keep = new Set([...withStills].sort((left, right) => right.score - left.score).slice(0, STILL_COUNT));
+
+    // A poster is only encoded when its frame beats everything before it, so the last one is the best.
+    const posters = samples.map((sample) => sample.poster).filter((poster) => poster !== null);
+
+    return {
+      poster: posters.at(-1) ?? null,
+      strip: withStills.filter((sample) => keep.has(sample)).map((sample) => sample.still as Uint8Array)
+    };
   } catch {
-    return null;
+    return nothing;
   } finally {
     window.clearTimeout(overall);
     video.removeAttribute('src');
@@ -115,8 +156,9 @@ export function useThumbnailBackfill(enabled: boolean): void {
 
       for (const queueId of missing.data) {
         if (cancelled) return;
-        const png = await drawPoster(queueId);
-        if (png !== null) await window.api.thumbnailSave(queueId, png);
+        const { poster, strip } = await drawStills(queueId);
+        if (poster !== null) await window.api.thumbnailSave(queueId, poster);
+        if (strip.length > 0) await window.api.framesSave(queueId, strip);
       }
     })().finally(() => {
       running.current = false;

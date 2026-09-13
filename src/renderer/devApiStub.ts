@@ -185,6 +185,7 @@ export function installDevApiStub(): void {
       }),
     thumbnailsMissing: () => ok([] as number[]),
     thumbnailSave: () => ok(null),
+    framesSave: () => ok(null),
     rotationMarkPublishedBefore: (ids: number[], publishedBefore: boolean) => {
       for (const item of SAMPLE) if (ids.includes(item.id)) item.published_before = publishedBefore;
       emit('queue:changed');
