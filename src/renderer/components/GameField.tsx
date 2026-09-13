@@ -1,4 +1,4 @@
-import React, { useId, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { GAMES } from '../../shared/games';
 import type { Result } from '../../shared/ipc';
 import { useApiMutation, useApiQuery } from '../hooks/useApi';
@@ -17,6 +17,14 @@ export function GameField({ queueId, value }: { queueId: number; value: string |
   const known = useApiQuery(readKnown, { key: 'games-known', invalidateOn: ['queue:changed'] });
   const save = useApiMutation((game: string | null) => window.api.videoSetGame(queueId, game));
   const [draft, setDraft] = useState(value ?? '');
+
+  // The field follows the video it is showing, not the one it was first drawn for. The Review screen
+  // keeps it mounted while it moves to the next video, and without this the box went on showing the
+  // previous video's game — and on blur, compared that stale text against the new video's value,
+  // saw a difference, and saved the previous video's game onto the new one.
+  useEffect(() => {
+    setDraft(value ?? '');
+  }, [queueId, value]);
 
   // Suggestions this channel has actually used come first: they are the likelier answer.
   const suggestions = [...new Set([...(known.data ?? []), ...GAMES.map((game) => game.name)])];

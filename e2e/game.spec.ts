@@ -41,3 +41,34 @@ test('a game guessed from the file name is filled in already', async () => {
     await harness.close();
   }
 });
+
+// The field used to keep the first video's game in its own state while the screen moved on, and on
+// blur saved it onto whichever video was showing by then.
+test('moving to another video does not carry the game across, or save it there', async () => {
+  const harness = await launch([{ filename: 'first.mov' }, { filename: 'second.mov' }]);
+  try {
+    await goTo(harness.page, '#/video/1');
+    const field = harness.page.getByLabel('Game');
+    await field.fill('Minecraft');
+    await field.blur();
+    await harness.page.waitForTimeout(600);
+
+    await goTo(harness.page, '#/video/2');
+    await expect(harness.page.getByLabel('Game')).toHaveValue('');
+
+    // Touch the field on the second video without typing, which is what used to write the wrong game.
+    await harness.page.getByLabel('Game').focus();
+    await harness.page.getByLabel('Game').blur();
+    await harness.page.waitForTimeout(600);
+
+    const db = new Database(path.join(harness.userData, 'shortstack.db'), { readonly: true });
+    const games = db.prepare('SELECT id, game FROM videos ORDER BY id').all() as Array<{ id: number; game: string | null }>;
+    db.close();
+    expect(games).toEqual([
+      { id: 1, game: 'Minecraft' },
+      { id: 2, game: null }
+    ]);
+  } finally {
+    await harness.close();
+  }
+});
