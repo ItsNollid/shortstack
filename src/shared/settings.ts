@@ -74,6 +74,8 @@ export type SettingKey = keyof AppSettings;
 export const TITLE_MAX_CHARS = 100;
 export const DESCRIPTION_MAX_BYTES = 5000;
 export const TAGS_MAX_CHARS = 500;
+/** A footer with more would leave too little of YouTube's 60 for the hashtags each video is built with. */
+export const FOOTER_MAX_HASHTAGS = 40;
 
 export function utf8Bytes(text: string): number {
   return new TextEncoder().encode(text).length;
@@ -280,7 +282,7 @@ export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> 
     if (utf8Bytes(value) > 2000) return 'A footer that long leaves no room for a description';
     // The footer goes under every description, and past 60 hashtags on a video YouTube ignores all of
     // them. Forty leaves room for the ones each video is built with.
-    if ((value.match(/#[\p{L}\p{N}_]+/gu) ?? []).length > 40) {
+    if ((value.match(/#[\p{L}\p{N}_]+/gu) ?? []).length > FOOTER_MAX_HASHTAGS) {
       return 'Keep the footer to 40 hashtags or fewer — past 60 on a video, YouTube ignores every one of them';
     }
     return null;
@@ -315,20 +317,55 @@ export function defaultSettings(): AppSettings {
   return settings as AppSettings;
 }
 
-/** Builds typed settings from stored rows. Unknown keys are ignored; unreadable values fall back to defaults. */
+/** A stored setting that could not be used, so its default is in effect instead. */
+export interface IgnoredSetting {
+  key: SettingKey;
+  /** Exactly what is stored, so the person can have it back. */
+  stored: string;
+  /** Why it was refused, in the words saving it would get today. */
+  reason: string;
+}
+
+/** The most useful reason a stored value was refused: the rule it breaks, not just that it broke one. */
+function whyRefused(key: SettingKey, stored: string): string {
+  const codec = codecFor(key);
+  const asText = codec.validate(stored);
+  if (asText !== null && !asText.startsWith('Expected')) return asText;
+  try {
+    const asValue = codec.validate(JSON.parse(stored));
+    if (asValue !== null) return asValue;
+  } catch {
+    // Not JSON either, so the plain reading is as good as it gets.
+  }
+  return asText ?? 'It could not be read';
+}
+
+/**
+ * Builds typed settings from stored rows. Unknown keys are ignored. A value that cannot be used falls
+ * back to its default and is reported with its reason, never dropped in silence: a rule tightened
+ * after a value was saved makes that value unusable, and measured on a real channel, a footer stopped
+ * appearing under every description with nothing on screen to say so.
+ */
 export function decodeSettings(rows: ReadonlyArray<{ key: string; value: string | null }>): {
   settings: AppSettings;
   problems: string[];
+  ignored: IgnoredSetting[];
 } {
   const settings = defaultSettings() as unknown as Record<SettingKey, unknown>;
   const problems: string[] = [];
+  const ignored: IgnoredSetting[] = [];
   for (const row of rows) {
     if (!isSettingKey(row.key) || row.value === null) continue;
     const decoded = codecFor(row.key).decode(row.value);
-    if (decoded === undefined) problems.push(`Ignored an unreadable value for ${row.key}`);
-    else settings[row.key] = decoded;
+    if (decoded === undefined) {
+      const reason = whyRefused(row.key, row.value);
+      problems.push(`Ignored the stored ${row.key}: ${reason}`);
+      ignored.push({ key: row.key, stored: row.value, reason });
+    } else {
+      settings[row.key] = decoded;
+    }
   }
-  return { settings: settings as unknown as AppSettings, problems };
+  return { settings: settings as unknown as AppSettings, problems, ignored };
 }
 
 export function encodeSetting<K extends SettingKey>(key: K, value: AppSettings[K]): string {

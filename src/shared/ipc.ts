@@ -9,7 +9,7 @@ import type { Brief } from './insights';
 import type { Affordable, QuotaMood, QuotaState } from './quota';
 import type { PastUploadPage } from './pastUploads';
 import type { ActivityEntryDTO, QueueItemDTO, UploadDTO } from './dto';
-import type { AppSettings } from './settings';
+import type { AppSettings, IgnoredSetting } from './settings';
 import type { QueueMetadataPatch } from './videoMetadata';
 
 /** Failures are values, not thrown errors: Electron turns a rejection into an unreadable string. */
@@ -139,6 +139,8 @@ export interface ShortStackApi {
 
   settingsGetAll(): Promise<Result<AppSettings>>;
   settingsSet(key: string, value: unknown): Promise<Result<AppSettings>>;
+  /** Stored settings that could not be used, with what was stored and why, so none is lost in silence. */
+  settingsIgnored(): Promise<Result<IgnoredSetting[]>>;
 
   schedulerStatus(): Promise<Result<SchedulerStatus>>;
   schedulerPause(): Promise<Result<SchedulerStatus>>;
@@ -227,6 +229,7 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'framesSave',
   'settingsGetAll',
   'settingsSet',
+  'settingsIgnored',
   'schedulerStatus',
   'schedulerPause',
   'schedulerResume',

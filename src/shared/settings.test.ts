@@ -73,7 +73,7 @@ describe('decodeSettings', () => {
   it('round-trips every default through encode and decode', () => {
     const defaults = defaultSettings();
     const rows = SETTING_KEYS.map((key) => ({ key, value: encodeSetting(key, defaults[key] as never) }));
-    expect(decodeSettings(rows)).toEqual({ settings: defaults, problems: [] });
+    expect(decodeSettings(rows)).toEqual({ settings: defaults, problems: [], ignored: [] });
   });
 });
 

@@ -8,7 +8,7 @@ import {
   type SettingKey
 } from '../../shared/settings';
 
-export function readSettings(db: Database.Database): { settings: AppSettings; problems: string[] } {
+export function readSettings(db: Database.Database): ReturnType<typeof decodeSettings> {
   const rows = db.prepare('SELECT key, value FROM settings').all() as Array<{ key: string; value: string | null }>;
   return decodeSettings(rows);
 }

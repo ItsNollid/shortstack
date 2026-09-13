@@ -51,6 +51,8 @@ export interface DescriptionCheckProps {
   disabled?: boolean;
   /** A single line with Fix all, and the details a click away, for screens with little room. */
   compact?: boolean;
+  /** The most hashtags this text may carry. Left out, the house-style limit for a description. */
+  maxHashtags?: number;
   /** The description box itself, so a problem clicked in the list can be selected in it. */
   children: React.ReactNode;
 }
@@ -67,6 +69,7 @@ export function DescriptionCheck({
   game,
   disabled = false,
   compact = false,
+  maxHashtags: hashtagLimit,
   children
 }: DescriptionCheckProps): React.JSX.Element {
   const { settings, auth } = useAppStatus();
@@ -90,7 +93,7 @@ export function DescriptionCheck({
     return () => window.clearTimeout(timer);
   }, [text]);
 
-  const maxHashtags = settings?.format_max_hashtags ?? 0;
+  const maxHashtags = hashtagLimit ?? settings?.format_max_hashtags ?? 0;
   // `version` stands for what the lexicon knows, which changes without the lexicon object changing.
   const context = useMemo<CheckContext>(() => ({ lexicon, game, maxHashtags }), [lexicon, game, maxHashtags, version]);
   const skip = (issue: CheckIssue): boolean => ignored.has(issueKey(issue));

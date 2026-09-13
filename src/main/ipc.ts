@@ -300,6 +300,7 @@ export function registerIpcHandlers(context: IpcContext): void {
     },
 
     settingsGetAll: async () => ok(readSettings(db).settings),
+    settingsIgnored: async () => ok(readSettings(db).ignored),
     settingsSet: async (key, value) => {
       if (typeof key !== 'string') return fail('invalid', 'Unknown setting');
       const result = writeSetting(db, key, value);

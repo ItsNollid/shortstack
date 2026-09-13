@@ -131,3 +131,8 @@
 .draftField { align-items: center; color: var(--text); cursor: pointer; display: inline-flex; gap: 8px; }
 .draftField input { accent-color: var(--scheduled); cursor: pointer; height: 16px; width: 16px; }
 .draftField input:disabled { cursor: not-allowed; }
+
+.ignoredList {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}

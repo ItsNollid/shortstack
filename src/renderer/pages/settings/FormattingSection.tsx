@@ -1,7 +1,8 @@
-import React from 'react';
-import { Select, Switch, TextArea } from '../../components/ui';
+import React, { useState } from 'react';
+import { DescriptionCheck } from '../../components/DescriptionCheck';
+import { Banner, Button, Select, Switch, TextArea } from '../../components/ui';
 import { formatDescription, formatTitle, formattingIsActive, type TitleCase } from '../../../shared/formatting';
-import { formattingRules } from '../../../shared/settings';
+import { FOOTER_MAX_HASHTAGS, formattingRules, type IgnoredSetting } from '../../../shared/settings';
 import type { SettingsWriter } from './useSettings';
 import { CommittedText, Section } from './parts';
 import styles from './Settings.module.css';
@@ -16,12 +17,27 @@ const CASES: ReadonlyArray<{ value: TitleCase; label: string }> = [
   { value: 'title', label: 'Title Case' }
 ];
 
-export function FormattingSection({ writer }: { writer: SettingsWriter }): React.JSX.Element {
+export function FormattingSection({
+  writer,
+  ignored
+}: {
+  writer: SettingsWriter;
+  ignored: readonly IgnoredSetting[];
+}): React.JSX.Element {
   const { settings } = writer;
+  // What is in the footer box. Kept here rather than read back from the saved setting, because a footer
+  // that breaks a rule is refused, and the box used to snap back and throw away what was typed.
+  const [footerDraft, setFooterDraft] = useState<string | null>(null);
   if (settings === null) return <Section title="Formatting">Loading…</Section>;
 
   const rules = formattingRules(settings);
   const active = formattingIsActive(rules);
+  const lostFooter = ignored.find((entry) => entry.key === 'format_description_footer') ?? null;
+  const footer = footerDraft ?? settings.format_description_footer;
+  const changeFooter = (value: string): void => {
+    setFooterDraft(value);
+    writer.set('format_description_footer', value);
+  };
 
   return (
     <Section
@@ -62,15 +78,33 @@ export function FormattingSection({ writer }: { writer: SettingsWriter }): React
         />
       </div>
 
-      <TextArea
-        label="Under every description"
-        value={settings.format_description_footer}
-        onChange={(value) => writer.set('format_description_footer', value)}
-        problem={writer.problemFor('format_description_footer')}
-        rows={4}
-        hint="Added below whatever the description already says, with a blank line between. Never added twice."
-        placeholder={'Subscribe for more\n\n#shorts #gaming'}
-      />
+      {lostFooter !== null && footerDraft === null && (
+        <Banner
+          kind="warning"
+          title="Your saved footer is not being used"
+          actions={
+            <Button size="small" onClick={() => changeFooter(lostFooter.stored)}>
+              Put it back in the box
+            </Button>
+          }
+        >
+          {lostFooter.reason}. It no longer passes the rules for a footer, so nothing has gone under your descriptions
+          since. Put it back, use Fix all under the box to clean it up, and it saves as soon as it fits.
+        </Banner>
+      )}
+
+      <DescriptionCheck text={footer} onChange={changeFooter} game={null} maxHashtags={FOOTER_MAX_HASHTAGS}>
+        <TextArea
+          label="Under every description"
+          value={footer}
+          onChange={changeFooter}
+          problem={writer.problemFor('format_description_footer')}
+          rows={4}
+          spellCheck={false}
+          hint="Added below whatever the description already says, with a blank line between. Never added twice."
+          placeholder={'Subscribe for more\n\n#shorts #gaming'}
+        />
+      </DescriptionCheck>
 
       <Switch
         label="Tidy up what goes in"
