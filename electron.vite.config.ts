@@ -1,6 +1,32 @@
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
+import { execSync } from 'child_process'
 import { resolve } from 'path'
+
+// Baked in at build time so a running app can say which build it is. Without this the only way to
+// answer "am I on the newest one?" is to compare file timestamps by hand, and the packaged build in
+// dist/ is refreshed by a different command than the one in out/ — so being a version behind without
+// noticing is the normal failure, not an unlikely one.
+function buildStamp() {
+  const commit = (() => {
+    try {
+      return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim()
+    } catch {
+      return 'unknown'
+    }
+  })()
+  const dirty = (() => {
+    try {
+      return execSync('git status --porcelain', { encoding: 'utf8' }).trim() !== ''
+    } catch {
+      return false
+    }
+  })()
+  return {
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    __BUILD_COMMIT__: JSON.stringify(dirty ? `${commit}+` : commit)
+  }
+}
 
 // The production CSP forbids inline scripts, which is exactly what Vite's dev server and React
 // Refresh inject. Stripping it while serving keeps `npm run dev` working without weakening what
@@ -27,6 +53,7 @@ function stripCspWhileServing() {
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
+    define: buildStamp(),
     build: {
       rollupOptions: {
         input: {
@@ -47,6 +74,7 @@ export default defineConfig({
   },
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
+    define: buildStamp(),
     build: {
       rollupOptions: {
         input: {

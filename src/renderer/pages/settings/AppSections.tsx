@@ -4,6 +4,7 @@ import { useAppStatus } from '../../app/status';
 import { useApiQuery } from '../../hooks/useApi';
 import type { AiStatus, Result } from '../../../shared/ipc';
 import { findModel, isVisionModel, type AiModel } from '../../../shared/aiModels';
+import { buildInfo, describeBuild } from '../../../shared/buildInfo';
 import type { SettingsWriter } from './useSettings';
 import { ModelPicker } from './ModelPicker';
 import { CommittedText, Section } from './parts';
@@ -85,6 +86,11 @@ export function AppSection({ writer }: { writer: SettingsWriter }): React.JSX.El
         checked={settings.start_with_windows}
         onChange={(value) => writer.set('start_with_windows', value)}
       />
+
+      <div className={styles.sectionText}>
+        This build: {describeBuild(buildInfo())}. Run <strong>Build and run ShortStack.bat</strong> to rebuild from the
+        current code — opening the exe in dist directly runs whatever was built last.
+      </div>
     </Section>
   );
 }
