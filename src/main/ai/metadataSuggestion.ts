@@ -6,6 +6,24 @@ export interface MetadataSuggestion {
   title: string;
   description: string;
   tags: string[];
+  /** Short phrases about what happens in the clip, turned into hashtags by shared/hashtags.ts. */
+  topics?: string[];
+}
+
+/** At most six, each a short phrase: they become hashtags, and a sentence makes a useless one. */
+function cleanTopics(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const topics: string[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== 'string') continue;
+    const topic = entry.replace(/[<>]/g, '').replace(/^#+/, '').trim();
+    if (topic === '' || topic.length > 60 || seen.has(topic.toLowerCase())) continue;
+    seen.add(topic.toLowerCase());
+    topics.push(topic);
+    if (topics.length === 6) break;
+  }
+  return topics;
 }
 
 const stripAngles = (value: string): string => value.replace(/[<>]/g, '').trim();
@@ -50,9 +68,11 @@ export function sanitizeSuggestion(raw: unknown): MetadataSuggestion | null {
   const title = typeof record.title === 'string' ? clampChars(stripAngles(record.title), TITLE_MAX_CHARS) : '';
   const description = typeof record.description === 'string' ? clampBytes(stripAngles(record.description), DESCRIPTION_MAX_BYTES) : '';
   const tags = cleanTags(record.tags);
+  const topics = cleanTopics(record.topics);
 
-  if (title === '' && description === '' && tags.length === 0) return null;
-  return { title, description, tags };
+  if (title === '' && description === '' && tags.length === 0 && topics.length === 0) return null;
+  // Topics only appear when there are some, so a reply without them keeps exactly its old shape.
+  return { title, description, tags, ...(topics.length > 0 ? { topics } : {}) };
 }
 
 /** Models sometimes wrap JSON in prose or a code fence even when asked not to. */

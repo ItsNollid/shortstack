@@ -114,20 +114,16 @@ export function buildPrompt(input: PromptInput): string {
       : []),
     '--- What to write ---',
     'Title: under 100 characters. Same voice as the examples. No surrounding quotes, no "Title:" prefix.',
-    examples.length > 0
-      ? 'Description: copy the shape of the example descriptions exactly, and use at least as many hashtags as they do. If they are blocks of hashtags, write a block of hashtags for this video, using the specific game, map, mode and topic rather than generic words.'
-      : 'Description: a short line about the video, then a block of at least ten specific hashtags covering the game, map, mode and topic.',
+    // No description. On this channel it is a block of hashtags for search and nothing else, and
+    // asked to write one the model copied old hashtags, invented round numbers or wrote "#gaming".
+    // It is assembled in code from the game, these topics and the channel's habits instead.
+    'Topics: 3 to 6 things someone would actually search for about this clip, one or two words each — a play, a mode, a map, a weapon, a joke. They become hashtags, so keep them short and specific. Leave out the name of the game, which is added separately, and leave out anything generic like "gaming", "funny moments" or "epic", and filler like "moment", "scene" or "clip".',
+    // Measured: shown a lobby with a player list, the model offered the channel's own name and a
+    // friend's gamertag as topics and tags. Visible, yes; searched for, never; and not ours to use.
+    'Never use a name read off the screen — player names, gamertags, usernames, channel names, or anything typed in chat. They are visible, but nobody searches for them, and they belong to other people. This applies to topics and tags alike.',
     'Tags: 10 to 20 search phrases someone would actually type. Specific beats broad: name the game and the mode rather than "gaming".',
-    ...(vocabulary.standing.length > 0
-      ? [
-          `This channel puts these on everything, so they belong here too: ${vocabulary.standing.join(' ')}`,
-          'Every other hashtag has to be something you can actually see. Do not invent a round number, a map name or a score.'
-        ]
-      : examples.length > 0
-        ? ['The hashtags in the examples belong to those videos. Reuse one only if it is also true of this one.']
-        : []),
-    'Do not invent facts you cannot see. If you are unsure which game it is, describe what is happening instead of naming the wrong one.',
+    'Do not invent facts you cannot see: no round numbers, scores or map names unless they are on screen. If you are unsure which game it is, describe what is happening instead of naming the wrong one.',
     '',
-    'Reply with only a JSON object with the keys "title", "description" and "tags", where "tags" is an array of at least 10 strings. No other text.'
+    'Reply with only a JSON object with the keys "title", "topics" and "tags", where "topics" is an array of 3 to 6 strings and "tags" is an array of at least 10 strings. No other text.'
   ].join('\n');
 }

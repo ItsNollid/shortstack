@@ -41,7 +41,7 @@ export function FormattingSection({ writer }: { writer: SettingsWriter }): React
           value={String(settings.format_max_hashtags)}
           onCommit={(value) => writer.set('format_max_hashtags', Number(value))}
           problem={writer.problemFor('format_max_hashtags')}
-          hint="0 means no limit. YouTube ignores everything past 15."
+          hint="0 means no limit. Past 60, YouTube ignores every hashtag on the video — not just the extras."
         />
       </div>
 

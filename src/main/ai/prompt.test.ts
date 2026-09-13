@@ -55,26 +55,30 @@ describe('buildPrompt', () => {
       expect(prompt).not.toContain('#firstgame');
     });
 
-    it('keeps the ones the channel puts on everything, and says they are safe', () => {
+    it('keeps the ones the channel puts on everything in the examples', () => {
       const prompt = buildPrompt(input({ examples: [across('#round100'), across('#easteregg')] }));
       expect(prompt).toContain('#blackops3zombies');
       expect(prompt).toContain('#codzombies');
-      expect(prompt).toMatch(/puts these on everything/);
-      expect(prompt).toMatch(/Do not invent a round number/);
     });
 
-    // One upload is no evidence of a habit, so nothing is offered as safe and the older, weaker
-    // instruction is all there is.
-    it('offers nothing as standing when there is only one example', () => {
+    // One upload is no evidence of a habit, so every hashtag on it is treated as belonging to that
+    // one video, and none of them are shown.
+    it('shows none of the hashtags on a lone example', () => {
       const prompt = buildPrompt(input({ examples: [across('#round100')] }));
-      expect(prompt).not.toMatch(/puts these on everything/);
-      expect(prompt).toMatch(/belong to those videos/);
+      expect(prompt).not.toContain('#round100');
+      expect(prompt).not.toContain('#blackops3zombies');
     });
   });
 
-  it('asks for the example description shape when there are examples, and a default when there are not', () => {
-    expect(buildPrompt(input({ examples: [example()] }))).toContain('copy the shape of the example descriptions');
-    expect(buildPrompt(input())).toContain('a short line about the video');
+  // The description is assembled in code from the game, these topics and the channel's habits. Asked
+  // to write one, the model copied old hashtags, invented round numbers or wrote "#gaming #shorts".
+  it('asks for topics, not a description', () => {
+    const prompt = buildPrompt(input({ examples: [example()] }));
+    expect(prompt).toContain('Topics:');
+    expect(prompt).toContain('"topics"');
+    expect(prompt).not.toContain('copy the shape of the example descriptions');
+    expect(prompt).not.toContain('write a block of hashtags');
+    expect(prompt).toMatch(/no round numbers, scores or map names unless they are on screen/);
   });
 
   it('tells the model to look at the frames only when frames are actually attached', () => {
@@ -102,7 +106,17 @@ describe('buildPrompt', () => {
   it('asks for specific words rather than generic ones', () => {
     const prompt = buildPrompt(input({ examples: [example()] }));
     expect(prompt).toContain('Specific beats broad');
-    expect(prompt).toMatch(/game, map, mode/);
+    expect(prompt).toMatch(/a mode, a map/);
+    expect(prompt).toMatch(/leave out anything generic/);
+  });
+
+  // Measured: shown a lobby with a player list, the model offered the channel's own name and a
+  // friend's gamertag as topics. The example list also invited it, by suggesting "a character".
+  it('forbids names read off the screen, and no longer invites them', () => {
+    const prompt = buildPrompt(input());
+    expect(prompt).toMatch(/Never use a name read off the screen/);
+    expect(prompt).toMatch(/gamertags/);
+    expect(prompt).not.toMatch(/a character/);
   });
 
   it('tells the model not to guess a game it cannot identify', () => {

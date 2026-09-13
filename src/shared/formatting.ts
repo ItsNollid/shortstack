@@ -15,7 +15,7 @@ export interface FormattingRules {
   descriptionFooter: string;
   /** Strip stray quotes, collapse runs of blank lines, drop repeated tags and hashtags. */
   tidy: boolean;
-  /** Most hashtags to keep in a description. 0 means no limit. YouTube itself ignores past 15. */
+  /** Most hashtags to keep in a description. 0 means no limit. Past 60, YouTube ignores all of them. */
   maxHashtags: number;
 }
 

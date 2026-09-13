@@ -10,6 +10,8 @@ import { getQueueItem } from '../db/queueRepo';
 import { readSettings } from '../db/settingsRepo';
 import { readFrames } from '../media/frames';
 import { readThumbnail } from '../media/thumbnails';
+import { tagVocabulary } from '../../shared/channelTags';
+import { buildHashtagBlock, hashtagDescription } from '../../shared/hashtags';
 import type { MetadataSuggestion } from './metadataSuggestion';
 import { generateMetadata, listModels, type AiResult } from './ollamaClient';
 
@@ -53,7 +55,7 @@ export async function draftFor(deps: DraftDeps, queueId: number): Promise<AiResu
   const strip = await readFrames({ db, dir: deps.thumbnailDir }, queueId);
   const stills = strip.length > 0 ? strip : [await readThumbnail({ db, dir: deps.thumbnailDir }, queueId)];
 
-  return generateMetadata(
+  const suggestion = await generateMetadata(
     {
       model,
       vision: chosen?.vision,
@@ -75,4 +77,21 @@ export async function draftFor(deps: DraftDeps, queueId: number): Promise<AiResu
     },
     { host: settings.ai_host }
   );
+  if (!suggestion.ok) return suggestion;
+
+  // The description is assembled, never taken from the model. On a Short it is a block of hashtags
+  // for search and nothing else, and asked to write one the model copied old hashtags wholesale,
+  // invented round numbers or wrote "#gaming #shorts". The model's part is only the topics.
+  const standing = tagVocabulary(examples.map((example) => example.description)).standing;
+
+  // Measured: shown a lobby with a player list, the model offered the channel's own name and a
+  // friend's gamertag as topics and as tags. The channel's own name is the one that can be removed
+  // with certainty, so it is — from the hashtags and from the tags. Anyone else's rests on the prompt.
+  const ownNames = [channel?.title ?? ''].filter((name) => name.trim() !== '');
+  const squash = (value: string): string => value.replace(/[^\p{L}\p{N}]+/gu, '').toLowerCase();
+  const isOwnName = (phrase: string): boolean => ownNames.some((name) => squash(name) === squash(phrase));
+
+  const block = buildHashtagBlock({ game: item.game, topics: suggestion.value.topics ?? [], standing, exclude: ownNames });
+  const tags = suggestion.value.tags.filter((tag) => !isOwnName(tag));
+  return { ok: true, value: { ...suggestion.value, tags, description: hashtagDescription(block) } };
 }
