@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button, Banner, Select } from '../../components/ui';
-import type { AiModel } from '../../../shared/aiModels';
+import { findModel, type AiModel } from '../../../shared/aiModels';
 import styles from './Settings.module.css';
 
 export interface ModelPickerProps {
@@ -19,10 +19,15 @@ type Check = { state: 'idle' } | { state: 'running' } | { state: 'ok'; model: st
 export function ModelPicker({ models, value, onChange }: ModelPickerProps): React.JSX.Element {
   const [check, setCheck] = useState<Check>({ state: 'idle' });
 
+  // Ollama lists "llama3.2:latest" but accepts "llama3.2", so a setting written before this was a
+  // list still names a real model and must not be shown as a missing one.
+  const installed = findModel(models, value);
+  const selected = installed?.name ?? value;
+
   const runCheck = async (): Promise<void> => {
     setCheck({ state: 'running' });
-    const result = await window.api.aiTest(value);
-    setCheck(result.ok ? { state: 'ok', model: value } : { state: 'failed', reason: result.error.message });
+    const result = await window.api.aiTest(selected);
+    setCheck(result.ok ? { state: 'ok', model: selected } : { state: 'failed', reason: result.error.message });
   };
 
   const options = models.map((model) => ({
@@ -30,16 +35,14 @@ export function ModelPicker({ models, value, onChange }: ModelPickerProps): Reac
     label: model.vision ? `${model.name} — can see the video` : `${model.name} — text only`
   }));
 
-  // A model set before, on a machine where Ollama is now stopped or the model has been removed.
-  const missing = value !== '' && !models.some((model) => model.name === value);
-  if (missing) options.unshift({ value, label: `${value} — not installed` });
+  if (value !== '' && installed === undefined) options.unshift({ value, label: `${value} — not installed` });
 
   return (
     <div>
       <div className={styles.pair}>
         <Select
           label="Model"
-          value={value}
+          value={selected}
           onChange={(next) => {
             setCheck({ state: 'idle' });
             onChange(next);
@@ -59,8 +62,8 @@ export function ModelPicker({ models, value, onChange }: ModelPickerProps): Reac
         </div>
       </div>
 
-      {check.state === 'ok' && check.model === value && (
-        <Banner kind="success" title={`${value} works`}>
+      {check.state === 'ok' && check.model === selected && (
+        <Banner kind="success" title={`${selected} works`}>
           It loaded and answered. Suggestions will use it.
         </Banner>
       )}
