@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mimeFor, parseRange, queueIdFromUrl } from './mediaProtocol';
+import { mimeFor, parseMediaUrl, parseRange, queueIdFromUrl } from './mediaProtocol';
 
 describe('queueIdFromUrl', () => {
   it('accepts the shape the renderer asks for', () => {
@@ -69,5 +69,23 @@ describe('mimeFor', () => {
 
   it('does not guess at something it does not know', () => {
     expect(mimeFor('C:/a/b.txt')).toBe('application/octet-stream');
+  });
+});
+
+describe('parseMediaUrl', () => {
+  it('tells the two kinds apart', () => {
+    expect(parseMediaUrl('ss-media://video/7')).toEqual({ kind: 'video', queueId: 7 });
+    expect(parseMediaUrl('ss-media://thumb/7')).toEqual({ kind: 'thumb', queueId: 7 });
+  });
+
+  it('refuses any other host, so the scheme cannot be used to reach something else', () => {
+    for (const url of ['ss-media://file/7', 'ss-media://../7', 'ss-media://7']) {
+      expect(parseMediaUrl(url), url).toBeNull();
+    }
+  });
+
+  it('still refuses a thumbnail id that is not a positive whole number', () => {
+    expect(parseMediaUrl('ss-media://thumb/0')).toBeNull();
+    expect(parseMediaUrl('ss-media://thumb/abc')).toBeNull();
   });
 });

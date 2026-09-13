@@ -19,6 +19,7 @@ import {
 import { PageHeader } from '../components/PageHeader';
 import { Banner, Button, EmptyState, FilterChips, Skeleton } from '../components/ui';
 import { useApiMutation, useApiQuery } from '../hooks/useApi';
+import { useThumbnailBackfill } from '../hooks/useThumbnails';
 import { useRequestApproval } from '../app/approval';
 import { useAppStatus } from '../app/status';
 import styles from './Queue.module.css';
@@ -36,6 +37,8 @@ export function Queue(): React.JSX.Element {
   const [selected, setSelected] = useState<number[]>([]);
 
   const items = queue.data ?? [];
+  // Poster frames are drawn in the background once the list is on screen.
+  useThumbnailBackfill(queue.data !== null);
   const counts = useMemo(() => countByFilter(items.map((item) => item.state)), [items]);
   const shown = useMemo(
     () => items.filter((item) => matchesFilter(item.state, filter) && matchesKind(item.posting_kind, kind)),

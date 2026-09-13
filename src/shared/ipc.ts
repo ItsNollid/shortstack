@@ -85,6 +85,11 @@ export interface ShortStackApi {
 
   videosScan(): Promise<Result<ScanSummary>>;
 
+  /** Queue ids whose video has no poster frame yet, one per file. */
+  thumbnailsMissing(): Promise<Result<number[]>>;
+  /** Stores a poster frame the renderer drew, as raw PNG bytes. */
+  thumbnailSave(queueId: number, png: Uint8Array): Promise<Result<null>>;
+
   settingsGetAll(): Promise<Result<AppSettings>>;
   settingsSet(key: string, value: unknown): Promise<Result<AppSettings>>;
 
@@ -139,6 +144,8 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'rotationSetPaused',
   'rotationPostAgain',
   'videosScan',
+  'thumbnailsMissing',
+  'thumbnailSave',
   'settingsGetAll',
   'settingsSet',
   'schedulerStatus',

@@ -3,6 +3,7 @@ import { ExternalLink, FolderOpen } from 'lucide-react';
 import type { QueueItemDTO } from '../../shared/dto';
 import { formatDuration, formatFileSize, formatRelativeTime, presentAttention, shortsWarning } from '../../shared/presentation';
 import { actionableIds, type BulkAction } from '../../shared/queueActions';
+import { VideoPreview } from '../components/VideoPreview';
 import { Banner, Button, StatusPill } from '../components/ui';
 import styles from './VideoDetails.module.css';
 
@@ -28,9 +29,7 @@ export function VideoSidePanel({ item, busy, onAction }: VideoSidePanelProps): R
 
   return (
     <aside className={styles.side}>
-      <div className={styles.preview}>
-        {item.missing ? 'The file is no longer in the folder' : `${formatDuration(item.duration_s)} preview`}
-      </div>
+      <VideoPreview queueId={item.id} durationS={item.duration_s} missing={item.missing} />
 
       <div className={styles.card}>
         <div className={styles.cardTitle}>Status</div>

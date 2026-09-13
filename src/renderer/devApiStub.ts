@@ -167,6 +167,8 @@ export function installDevApiStub(): void {
         missingScopes: [],
         channel: { id: 'UC_sample', title: 'Sample Channel', handle: '@samplechannel', avatarUrl: null, subscriberCount: 12400 }
       }),
+    thumbnailsMissing: () => ok([] as number[]),
+    thumbnailSave: () => ok(null),
     rotationMarkPublishedBefore: (ids: number[], publishedBefore: boolean) => {
       for (const item of SAMPLE) if (ids.includes(item.id)) item.published_before = publishedBefore;
       emit('queue:changed');

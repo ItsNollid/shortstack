@@ -6,6 +6,7 @@ import { protocol } from 'electron';
 import * as fs from 'fs';
 import { Readable } from 'stream';
 import { extname } from 'path';
+import { readThumbnail } from './thumbnails';
 
 export const MEDIA_SCHEME = 'ss-media';
 
@@ -27,6 +28,13 @@ const MIME: Record<string, string> = {
   '.mkv': 'video/x-matroska',
   '.avi': 'video/x-msvideo'
 };
+
+/**
+ * Without this, drawing one of these videos into a canvas taints it and the poster frame cannot be
+ * read back. The scheme only ever serves files this app already knows about, so letting the app's
+ * own page read them widens nothing.
+ */
+const ALLOW_READING = { 'Access-Control-Allow-Origin': '*' } as const;
 
 export const mimeFor = (filePath: string): string => MIME[extname(filePath).toLowerCase()] ?? 'application/octet-stream';
 
@@ -61,20 +69,33 @@ export function parseRange(header: string | null, size: number): ByteRange | nul
   return end < start ? undefined : { start, end };
 }
 
-/** Pulls the queue id out of ss-media://video/<id>. Anything else is refused. */
-export function queueIdFromUrl(url: string): number | null {
+export type MediaKind = 'video' | 'thumb';
+
+/** Pulls the kind and queue id out of ss-media://video/<id> or ss-media://thumb/<id>. */
+export function parseMediaUrl(url: string): { kind: MediaKind; queueId: number } | null {
   try {
     const parsed = new URL(url);
-    if (parsed.protocol !== `${MEDIA_SCHEME}:` || parsed.hostname !== 'video') return null;
-    const id = Number(parsed.pathname.replace(/^\//, ''));
-    return Number.isInteger(id) && id > 0 ? id : null;
+    if (parsed.protocol !== `${MEDIA_SCHEME}:`) return null;
+    if (parsed.hostname !== 'video' && parsed.hostname !== 'thumb') return null;
+    // pathname always begins with a slash, so slicing it is clearer than a regex.
+    const id = Number(parsed.pathname.slice(1));
+    if (!Number.isInteger(id) || id <= 0) return null;
+    return { kind: parsed.hostname as MediaKind, queueId: id };
   } catch {
     return null;
   }
 }
 
+/** The video case specifically, which is the one with range handling. */
+export function queueIdFromUrl(url: string): number | null {
+  const parsed = parseMediaUrl(url);
+  return parsed === null || parsed.kind !== 'video' ? null : parsed.queueId;
+}
+
 export interface MediaDeps {
   db: Database.Database;
+  /** Where poster frames are cached. */
+  thumbnailDir: string;
   /** Overridable so the lookup can be tested without a real database. */
   filePathFor?(queueId: number): string | null;
 }
@@ -90,9 +111,17 @@ export function handleMediaRequests(deps: MediaDeps): void {
   const filePathFor = deps.filePathFor ?? ((queueId: number) => lookup(deps.db, queueId));
 
   protocol.handle(MEDIA_SCHEME, async (request) => {
-    const queueId = queueIdFromUrl(request.url);
-    if (queueId === null) return new Response('Not found', { status: 404 });
+    const asked = parseMediaUrl(request.url);
+    if (asked === null) return new Response('Not found', { status: 404 });
 
+    if (asked.kind === 'thumb') {
+      const image = await readThumbnail({ db: deps.db, dir: deps.thumbnailDir }, asked.queueId);
+      return image === null
+        ? new Response('No thumbnail yet', { status: 404 })
+        : new Response(image, { status: 200, headers: { 'Content-Type': 'image/png', ...ALLOW_READING } });
+    }
+
+    const queueId = asked.queueId;
     const filePath = filePathFor(queueId);
     if (filePath === null) return new Response('Not found', { status: 404 });
 
@@ -115,7 +144,7 @@ export function handleMediaRequests(deps: MediaDeps): void {
     if (range === null) {
       return new Response(body(), {
         status: 200,
-        headers: { 'Content-Type': type, 'Content-Length': String(size), 'Accept-Ranges': 'bytes' }
+        headers: { 'Content-Type': type, 'Content-Length': String(size), 'Accept-Ranges': 'bytes', ...ALLOW_READING }
       });
     }
 
@@ -125,7 +154,8 @@ export function handleMediaRequests(deps: MediaDeps): void {
         'Content-Type': type,
         'Content-Length': String(range.end - range.start + 1),
         'Content-Range': `bytes ${range.start}-${range.end}/${size}`,
-        'Accept-Ranges': 'bytes'
+        'Accept-Ranges': 'bytes',
+        ...ALLOW_READING
       }
     });
   });

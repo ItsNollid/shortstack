@@ -42,6 +42,14 @@
   border: 1px solid var(--line);
   overflow: hidden;
 }
+.thumbImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .duration {
   position: absolute;
   right: 2px;

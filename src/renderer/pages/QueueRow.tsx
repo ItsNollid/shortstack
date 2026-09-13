@@ -59,6 +59,19 @@ export function QueueRow({ item, selected, onToggle, onOpen }: QueueRowProps): R
       />
 
       <div className={styles.thumb}>
+        {!item.missing && (
+          <img
+            className={styles.thumbImage}
+            src={`ss-media://thumb/${item.id}`}
+            alt=""
+            loading="lazy"
+            draggable={false}
+            onError={(event) => {
+              // No frame yet, or none possible: the gradient behind it is the fallback.
+              event.currentTarget.style.visibility = 'hidden';
+            }}
+          />
+        )}
         <span className={styles.duration}>{formatDuration(item.duration_s)}</span>
       </div>
 

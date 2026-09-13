@@ -109,7 +109,8 @@ async function start(): Promise<void> {
     }
   });
 
-  handleMediaRequests({ db });
+  const thumbnailDir = path.join(app.getPath('userData'), 'thumbs');
+  handleMediaRequests({ db, thumbnailDir });
 
   appIcon = new AppIcon({
     window: () => mainWindow,
@@ -125,6 +126,7 @@ async function start(): Promise<void> {
     gateway,
     profile: { profile: runtimeProfile.profile, uploads: runtimeProfile.uploads },
     credentialsDir,
+    thumbnailDir,
     getWindow: () => mainWindow,
     appIcon
   });

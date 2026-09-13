@@ -16,6 +16,7 @@ import type { QueueEvent } from './domain/queueState';
 import { scanFolder } from './files/scanner';
 import type { SchedulerEngine } from './scheduler/engine';
 import { createPosting, markPublishedBefore, setRotationPaused } from './db/rotationRepo';
+import { clearThumbnails, missingThumbnails, saveThumbnail } from './media/thumbnails';
 import { applyStartWithWindows } from './startup';
 import type { AuthService } from './youtube/authService';
 import type { YouTubeGateway } from './youtube/gateway';
@@ -29,6 +30,8 @@ export interface IpcContext {
   gateway: YouTubeGateway;
   profile: { profile: 'dev' | 'live'; uploads: 'dry-run' | 'live' };
   credentialsDir: string;
+  /** Where poster frames are cached. */
+  thumbnailDir: string;
   getWindow(): BrowserWindow | null;
   /** The app's icon follows the connected channel's picture. */
   appIcon: { refresh(avatarUrl: string | null): Promise<boolean>; clear(): Promise<void> };
@@ -223,6 +226,16 @@ export function registerIpcHandlers(context: IpcContext): void {
       return ok(created);
     },
 
+    thumbnailsMissing: async () => ok(await missingThumbnails({ db, dir: context.thumbnailDir })),
+
+    thumbnailSave: async (queueId, png) => {
+      const parsed = asId(queueId);
+      if (parsed === null) return fail('invalid', 'That video id is not valid');
+      if (!(png instanceof Uint8Array)) return fail('invalid', 'Expected image bytes');
+      const saved = await saveThumbnail({ db, dir: context.thumbnailDir }, parsed, Buffer.from(png));
+      return saved.ok ? ok(null) : fail('refused', saved.reason);
+    },
+
     videosScan: async () => {
       const summary = await scanFolder(db);
       changed();
@@ -306,6 +319,8 @@ export function registerIpcHandlers(context: IpcContext): void {
       // channel picture is part of that, so the icon goes back to the ShortStack mark here.
       clearChannels(db);
       await context.appIcon.clear();
+      // Poster frames are drawn from the user's own videos, so they go with the rest of it.
+      await clearThumbnails(context.thumbnailDir);
       for (const item of listQueueItems(db)) {
         if (item.youtube_video_id !== null) applyQueueEvent(db, item.id, { type: 'disconnect' }, eventContext());
       }
