@@ -15,6 +15,7 @@ import { hashtagNames, mentionedIn } from '../../shared/blockedNames';
 import { buildHashtagBlock, hashtagDescription } from '../../shared/hashtags';
 import type { MetadataSuggestion } from './metadataSuggestion';
 import { generateMetadata, listModels, type AiResult } from './ollamaClient';
+import { buildTags } from '../../shared/tags';
 
 export interface DraftDeps {
   db: Database.Database;
@@ -122,7 +123,9 @@ export async function draftFor(deps: DraftDeps, queueId: number): Promise<AiResu
     standing: standing.filter((tag) => !hashtagNames(tag, names)),
     exclude: names
   });
-  const tags = suggestion.value.tags.filter((tag) => !mentionedIn(tag, names) && !hashtagNames(tag, names));
+  // Built like the description: the game and this clip first, then what the model offered, once anything
+  // generic, about another game or naming someone is taken out.
+  const tags = buildTags({ game: item.game, topics, modelTags: suggestion.value.tags, names });
   // A title is a sentence, and cutting a name out of one leaves it broken, so a title that names
   // someone is not used at all: the video keeps the title it already had.
   const title = mentionedIn(suggestion.value.title, names) ? item.title : suggestion.value.title;
