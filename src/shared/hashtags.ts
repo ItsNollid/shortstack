@@ -207,3 +207,37 @@ export function buildHashtagBlock(input: HashtagBlockInput): string[] {
 }
 
 export const hashtagDescription = (tags: readonly string[]): string => tags.join(' ');
+
+/** Every hashtag known to name a game. The spelling checker counts them as words, not typos. */
+export function allGameHashtags(): string[] {
+  return dedupe(Object.values(GAME_HASHTAGS).flat());
+}
+
+/**
+ * The game a hashtag someone typed names, if any: #fortnite is Fortnite, #codzombies is Call of Duty.
+ * For warning about a hashtag, so narrower than `relevantToGame`, which decides what the app adds
+ * itself and drops at any doubt. Here a hashtag only counts by its start when the game's own hashtag
+ * is long enough to mean something, so #reposted is not taken for #repo, nor #code for #cod. Where two
+ * games share a hashtag, the one it leads for wins: #callofduty is Call of Duty, not Black Ops 3.
+ */
+export function gameNamedByHashtag(tag: string): string | null {
+  const body = bodyOf(tag);
+  if (body === '') return null;
+
+  let best: { name: string; rank: number } | null = null;
+  for (const [name, tags] of Object.entries(GAME_HASHTAGS)) {
+    for (let index = 0; index < tags.length; index += 1) {
+      const own = bodyOf(tags[index] as string);
+      const rank = body === own ? index : own.length >= 5 && body.startsWith(own) ? 100 + index : null;
+      if (rank !== null && (best === null || rank < best.rank)) best = { name, rank };
+    }
+  }
+  return best?.name ?? detectGame({ title: body });
+}
+
+/** The same game, or one is part of the other: Call of Duty and Call of Duty: Black Ops 3 Zombies. */
+export function sameGameFamily(a: string, b: string): boolean {
+  const first = a.trim().toLowerCase();
+  const second = b.trim().toLowerCase();
+  return first === second || first.startsWith(second) || second.startsWith(first);
+}

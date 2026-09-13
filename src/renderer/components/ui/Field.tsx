@@ -70,10 +70,12 @@ export function TextField(props: TextFieldProps): React.JSX.Element {
 
 export interface TextAreaProps extends TextFieldProps {
   rows?: number;
+  /** Off where ShortStack checks the text itself: the browser's own checker underlines every hashtag. */
+  spellCheck?: boolean;
 }
 
 export function TextArea(props: TextAreaProps): React.JSX.Element {
-  const { value, onChange, placeholder, disabled, rows = 6, ...field } = props;
+  const { value, onChange, placeholder, disabled, rows = 6, spellCheck, ...field } = props;
   return (
     <Field {...field}>
       {(id, invalid) => (
@@ -84,6 +86,7 @@ export function TextArea(props: TextAreaProps): React.JSX.Element {
           value={value}
           placeholder={placeholder}
           disabled={disabled}
+          spellCheck={spellCheck}
           onChange={(event) => onChange(event.target.value)}
         />
       )}

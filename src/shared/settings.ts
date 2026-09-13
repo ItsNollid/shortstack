@@ -57,6 +57,8 @@ export interface AppSettings {
   format_tidy: boolean;
   /** 0 means no limit. */
   format_max_hashtags: number;
+  /** Words the description checker accepts on top of its dictionary: names, slang, in-jokes. */
+  spell_words: string[];
   close_to_tray: boolean;
   close_to_tray_notice_shown: boolean;
   start_with_windows: boolean;
@@ -187,6 +189,20 @@ function checkDescription(value: string): string | null {
   return utf8Bytes(value) > DESCRIPTION_MAX_BYTES ? `Descriptions can use at most ${DESCRIPTION_MAX_BYTES} bytes` : null;
 }
 
+const SPELL_WORD = /^[\p{L}\p{N}][\p{L}\p{N}'’-]*$/u;
+
+function checkSpellWords(words: string[]): string | null {
+  if (words.length > 2000) return 'Keep your dictionary to 2,000 words';
+  const seen = new Set<string>();
+  for (const word of words) {
+    if (word.length > 40 || !SPELL_WORD.test(word)) return `“${word.slice(0, 40)}” is not a single word`;
+    const key = word.toLowerCase();
+    if (seen.has(key)) return `“${word}” is in your dictionary twice`;
+    seen.add(key);
+  }
+  return null;
+}
+
 function checkTags(tags: string[]): string | null {
   if (tags.some((tag) => tag.trim() === '')) return "Tags can't be empty";
   if (tags.some((tag) => ANGLE_BRACKETS.test(tag))) return "Tags can't contain < or >";
@@ -266,6 +282,7 @@ export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> 
   }),
   format_tidy: bool(false),
   format_max_hashtags: integer(0, 0, 60),
+  spell_words: stringList([], checkSpellWords),
   close_to_tray: bool(true),
   close_to_tray_notice_shown: bool(false),
   start_with_windows: bool(false)

@@ -16,6 +16,7 @@ import {
 } from '../../shared/settings';
 import { descriptionProblem, tagsProblem, titleProblem, type QueueMetadataPatch } from '../../shared/videoMetadata';
 import { Banner, Button, Select, Switch, TagInput, TextArea, TextField } from '../components/ui';
+import { DescriptionCheck } from '../components/DescriptionCheck';
 import { GameField } from '../components/GameField';
 import { useAppStatus } from '../app/status';
 import { useApiMutation, useApiQuery } from '../hooks/useApi';
@@ -183,18 +184,27 @@ export function VideoDetails({ onApprove }: { onApprove: (item: QueueItemDTO) =>
             problem={problems.title}
           />
 
-          <TextArea
-            label="Description"
-            value={draft.description}
+          <DescriptionCheck
+            key={loaded.id}
+            text={draft.description}
             onChange={(value) => set('description', value)}
+            game={loaded.game}
             disabled={blocked}
-            optional
-            rows={8}
-            counter={`${utf8Bytes(draft.description)} / ${DESCRIPTION_MAX_BYTES} bytes`}
-            counterOver={utf8Bytes(draft.description) > DESCRIPTION_MAX_BYTES}
-            problem={problems.description}
-            hint="YouTube measures descriptions in bytes, so emoji and accents count for more than one."
-          />
+          >
+            <TextArea
+              label="Description"
+              value={draft.description}
+              onChange={(value) => set('description', value)}
+              disabled={blocked}
+              optional
+              rows={8}
+              spellCheck={false}
+              counter={`${utf8Bytes(draft.description)} / ${DESCRIPTION_MAX_BYTES} bytes`}
+              counterOver={utf8Bytes(draft.description) > DESCRIPTION_MAX_BYTES}
+              problem={problems.description}
+              hint="YouTube measures descriptions in bytes, so emoji and accents count for more than one."
+            />
+          </DescriptionCheck>
 
 <GameField queueId={loaded.id} value={loaded.game} />
 

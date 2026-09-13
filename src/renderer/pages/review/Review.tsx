@@ -19,6 +19,7 @@ import { nextFreeSlot } from '../../../shared/slots';
 import { PastUploadPicker } from '../../components/PastUploadPicker';
 import { VideoPreview } from '../../components/VideoPreview';
 import { Banner, Button, EmptyState, Select, StatusPill, TagInput, TextArea, TextField } from '../../components/ui';
+import { DescriptionCheck } from '../../components/DescriptionCheck';
 import { GameField } from '../../components/GameField';
 import { useRequestApproval } from '../../app/approval';
 import { useAppStatus } from '../../app/status';
@@ -252,17 +253,30 @@ export function Review(): React.JSX.Element {
             />
           </div>
 
-          <div onBlur={() => commit({ description: draft.description })}>
-            <TextArea
-              label="Description"
-              optional
-              rows={4}
-              value={draft.description}
-              onChange={(value) => setDraft({ ...draft, description: value })}
-              counter={`${utf8Bytes(draft.description)} / ${DESCRIPTION_MAX_BYTES} bytes`}
-              counterOver={utf8Bytes(draft.description) > DESCRIPTION_MAX_BYTES}
-            />
-          </div>
+          <DescriptionCheck
+            key={item.id}
+            text={draft.description}
+            onChange={(value) => {
+              // Saved at once, like the tags: a fix made here and then left for the next card would be lost.
+              setDraft({ ...draft, description: value });
+              commit({ description: value });
+            }}
+            game={item.game}
+            compact
+          >
+            <div onBlur={() => commit({ description: draft.description })}>
+              <TextArea
+                label="Description"
+                optional
+                rows={4}
+                spellCheck={false}
+                value={draft.description}
+                onChange={(value) => setDraft({ ...draft, description: value })}
+                counter={`${utf8Bytes(draft.description)} / ${DESCRIPTION_MAX_BYTES} bytes`}
+                counterOver={utf8Bytes(draft.description) > DESCRIPTION_MAX_BYTES}
+              />
+            </div>
+          </DescriptionCheck>
 
 <GameField queueId={item.id} value={item.game} />
 
