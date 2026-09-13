@@ -147,6 +147,10 @@ export function Review(): React.JSX.Element {
     const onKey = (event: KeyboardEvent): void => {
       const target = event.target as HTMLElement | null;
       if (target !== null && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      // Nor while a dialog is open. A native modal dialog traps focus but not key events, which still
+      // reach this listener — so with the approval dialog or the past-uploads picker open and a button
+      // inside it focused, "r" rejected the video behind the dialog and the arrows moved it away.
+      if (document.querySelector('dialog[open]') !== null) return;
       if (event.metaKey || event.ctrlKey || event.altKey || item === null) return;
 
       if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
