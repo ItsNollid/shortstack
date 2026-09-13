@@ -154,8 +154,10 @@ Being specific about this, because the last handoff was not.
   YouTube refuses, the item is flagged "set the schedule in Studio" with the exact time.
 - **Whether `fileDetails` is returned for private videos**, which is how assisted uploads are
   detected. The paste-the-link fallback exists for when it is not.
-- **Chromium playback of H.264 + LPCM `.mov`**, which is what the test files are. The video preview
-  is a placeholder for now.
+
+Answered since: **Chromium does play H.264 with LPCM audio in a QuickTime container.** Measured
+rather than assumed — readyState 4, 1080x1920, 17.7s, no error. Videos play in the app through the
+`ss-media://` scheme, and poster frames are drawn from them.
 
 ---
 
