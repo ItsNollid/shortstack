@@ -28,3 +28,6 @@ dist-installer/
 dist-release/
 test-results/
 playwright-report/
+
+# One person's folder of real videos, for the end-to-end tests. See e2e/fixtures.ts.
+e2e/sample-dir.txt

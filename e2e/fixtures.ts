@@ -15,7 +15,16 @@ export function sampleVideo(): string | null {
   const fromEnv = process.env.SHORTSTACK_SAMPLE_VIDEO;
   if (fromEnv !== undefined && fs.existsSync(fromEnv)) return fromEnv;
 
-  for (const folder of ['E:/Youtube/Rendered/ShortStack']) {
+  // Where to look, on whichever machine this is. Kept out of the repository because it is one
+  // person's folder layout, and a checkout on someone else's computer should skip these tests
+  // rather than hunt for a path that means nothing there.
+  const localConfig = path.join(__dirname, 'sample-dir.txt');
+  const folders = [
+    process.env.SHORTSTACK_SAMPLE_DIR,
+    fs.existsSync(localConfig) ? fs.readFileSync(localConfig, 'utf8').trim() : undefined
+  ].filter((folder): folder is string => folder !== undefined && folder !== '');
+
+  for (const folder of folders) {
     if (!fs.existsSync(folder)) continue;
     const found = fs
       .readdirSync(folder)
