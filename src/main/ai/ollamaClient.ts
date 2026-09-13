@@ -2,9 +2,15 @@
 // (start Ollama, pull a model, try again) instead of failing silently the way the old build did.
 import type { PastUpload } from '../../shared/pastUploads';
 import { extractJson, sanitizeSuggestion, type MetadataSuggestion } from './metadataSuggestion';
-import { isVisionModel, visionFrom, type AiModel } from '../../shared/aiModels';
+import { isVisionModel, thinkingFrom, visionFrom, type AiModel } from '../../shared/aiModels';
 import { classifyFailure } from './failures';
 import { buildPrompt, type VideoFacts } from './prompt';
+
+/**
+ * Long enough for a cold model to come off disk, which is the slow part: qwen3-vl:8b is 6GB and the
+ * first request after it unloads pays for all of it. Generating, once loaded, takes seconds.
+ */
+export const DEFAULT_GENERATE_TIMEOUT_MS = 180_000;
 
 export type AiFailureCode =
   | 'not_running'
@@ -35,12 +41,25 @@ export interface GenerateInput {
   frames?: readonly string[];
   /** What Ollama said about this model. Falls back to the name when the caller does not know. */
   vision?: boolean;
+  /** Whether it reasons before answering, so it can be told not to. */
+  thinking?: boolean;
+  /** Overridable, but see METADATA_FRAMES for why more is not better here. */
+  maxFrames?: number;
 }
+
+/**
+ * One frame, not the whole strip. Measured on qwen3-vl:8b, warm: one frame took 3 seconds, two took
+ * 29, three took 29 — and the extra frames bought nothing, the model naming a different wrong game
+ * each time. Ten times the wait for no better answer is not a trade worth making by default.
+ *
+ * The strip is still kept; picking a thumbnail needs a choice of moments, which this does not.
+ */
+export const METADATA_FRAMES = 1;
 
 /** Frames are only worth sending to a model that can read them; the rest ignore or choke on them. */
 export function framesFor(input: GenerateInput): string[] {
   const canSee = input.vision ?? isVisionModel(input.model);
-  return canSee ? [...(input.frames ?? [])] : [];
+  return canSee ? [...(input.frames ?? [])].slice(0, input.maxFrames ?? METADATA_FRAMES) : [];
 }
 
 export function promptFor(input: GenerateInput): string {
@@ -84,7 +103,11 @@ export async function listModels(deps: OllamaDeps): Promise<AiResult<AiModel[]>>
     const parsed = JSON.parse(await response.text()) as { models?: Array<{ name?: unknown; capabilities?: unknown }> };
     const models = (parsed.models ?? [])
       .filter((model): model is { name: string; capabilities?: unknown } => typeof model.name === 'string')
-      .map((model) => ({ name: model.name, vision: visionFrom(model.capabilities, model.name) }));
+      .map((model) => ({
+        name: model.name,
+        vision: visionFrom(model.capabilities, model.name),
+        thinking: thinkingFrom(model.capabilities)
+      }));
     return models.length === 0
       ? { ok: false, code: 'no_models', reason: 'Ollama is running but has no models downloaded yet' }
       : { ok: true, value: models };
@@ -124,7 +147,7 @@ export async function testModel(model: string, deps: OllamaDeps): Promise<AiResu
 export async function generateMetadata(input: GenerateInput, deps: OllamaDeps): Promise<AiResult<MetadataSuggestion>> {
   const doFetch = deps.fetch ?? fetch;
   try {
-    const response = await withTimeout(deps.generateTimeoutMs ?? 60_000, (signal) =>
+    const response = await withTimeout(deps.generateTimeoutMs ?? DEFAULT_GENERATE_TIMEOUT_MS, (signal) =>
       doFetch(`${deps.host}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -135,6 +158,10 @@ export async function generateMetadata(input: GenerateInput, deps: OllamaDeps): 
           images: framesFor(input),
           stream: false,
           format: 'json',
+          // Measured on qwen3-vl:8b with one frame: thinking took 84 seconds and timed out, not
+          // thinking took 3. There is nothing here worth reasoning about at length — the evidence is
+          // in front of it. Only sent to a model that reports the capability.
+          ...(input.thinking === true ? { think: false } : {}),
           // Low enough to stay on the evidence, not so low it writes the same title every time.
           options: { temperature: 0.4 }
         })
@@ -145,11 +172,19 @@ export async function generateMetadata(input: GenerateInput, deps: OllamaDeps): 
     const body = await response.text();
     if (!response.ok) return { ok: false, ...classifyFailure(response.status, body, input.model) };
 
-    const envelope = JSON.parse(body) as { response?: unknown };
-    if (typeof envelope.response !== 'string') {
+    const envelope = JSON.parse(body) as { response?: unknown; thinking?: unknown };
+    // qwen3-vl asked for JSON puts the whole answer in "thinking" and leaves "response" empty, so
+    // reading only "response" got an empty string and called a working model broken.
+    const answer =
+      typeof envelope.response === 'string' && envelope.response.trim() !== ''
+        ? envelope.response
+        : typeof envelope.thinking === 'string'
+          ? envelope.thinking
+          : null;
+    if (answer === null) {
       return { ok: false, code: 'bad_output', reason: 'Ollama returned an unexpected response' };
     }
-    const suggestion = sanitizeSuggestion(extractJson(envelope.response));
+    const suggestion = sanitizeSuggestion(extractJson(answer));
     return suggestion === null
       ? { ok: false, code: 'bad_output', reason: 'The model did not return usable title, description or tags' }
       : { ok: true, value: suggestion };

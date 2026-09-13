@@ -211,7 +211,7 @@ export function installDevApiStub(): void {
     },
     authRefreshChannel: () =>
       Promise.resolve({ ok: false as const, error: { code: 'preview', message: 'Not available in the browser preview' } }),
-    aiStatus: () => ok({ running: true, models: [{ name: 'llava:13b', vision: true }], message: 'Ready' }),
+    aiStatus: () => ok({ running: true, models: [{ name: 'llava:13b', vision: true, thinking: false }], message: 'Ready' }),
     updateStatus: () => ok({ channel: 'development' as const, state: { kind: 'idle' as const } }),
     updateCheck: () => ok({ channel: 'development' as const, state: { kind: 'idle' as const } }),
     updateDownload: () => ok(null),

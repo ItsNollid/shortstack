@@ -1,6 +1,6 @@
 import * as http from 'http';
 import { afterEach, describe, expect, it } from 'vitest';
-import { promptFor, generateMetadata, listModels } from './ollamaClient';
+import { framesFor, promptFor, generateMetadata, listModels } from './ollamaClient';
 
 type Route = (req: { method: string; path: string; body: string }) => { status: number; body: unknown; delayMs?: number };
 
@@ -36,21 +36,22 @@ afterEach(async () => {
 });
 
 describe('listModels', () => {
-  it('lists what is installed, and whether each one can see', async () => {
+  it('lists what is installed, and what each one can do', async () => {
     const host = await startOllama(() => ({
       status: 200,
       body: {
         models: [
           { name: 'llama3.2:latest', capabilities: ['completion', 'tools'] },
-          { name: 'llava:13b', capabilities: ['completion', 'vision'] }
+          // Exactly what this machine's Ollama reports for qwen3-vl:8b.
+          { name: 'qwen3-vl:8b', capabilities: ['vision', 'completion', 'tools', 'thinking'] }
         ]
       }
     }));
     await expect(listModels({ host })).resolves.toEqual({
       ok: true,
       value: [
-        { name: 'llama3.2:latest', vision: false },
-        { name: 'llava:13b', vision: true }
+        { name: 'llama3.2:latest', vision: false, thinking: false },
+        { name: 'qwen3-vl:8b', vision: true, thinking: true }
       ]
     });
   });
@@ -61,8 +62,8 @@ describe('listModels', () => {
     await expect(listModels({ host })).resolves.toEqual({
       ok: true,
       value: [
-        { name: 'llava:13b', vision: true },
-        { name: 'mistral', vision: false }
+        { name: 'llava:13b', vision: true, thinking: false },
+        { name: 'mistral', vision: false, thinking: false }
       ]
     });
   });
@@ -118,6 +119,42 @@ describe('generateMetadata', () => {
     expect(bodies.map((body) => JSON.parse(body).images)).toEqual([frames, [], []]);
   });
 
+  it('tells a thinking model not to, and leaves the others alone', async () => {
+    const bodies: string[] = [];
+    const host = await startOllama((req) => {
+      bodies.push(req.body);
+      return { status: 200, body: { response: '{"title":"t"}' } };
+    });
+
+    await generateMetadata({ ...input, thinking: true }, { host });
+    await generateMetadata({ ...input, thinking: false }, { host });
+    await generateMetadata(input, { host });
+
+    // Measured: qwen3-vl:8b left to think took 84 seconds on one frame and timed out at 60.
+    expect(bodies.map((body) => JSON.parse(body).think)).toEqual([false, undefined, undefined]);
+  });
+
+  // Ollama 0.30.8 answering for qwen3-vl:8b with format json: the JSON is in "thinking" and
+  // "response" is an empty string. Reading only "response" called a working model broken.
+  it('finds the answer when a model puts it in "thinking" instead of "response"', async () => {
+    const host = await startOllama(() => ({
+      status: 200,
+      body: { response: '', thinking: '{"title":"Round 100","description":"#bo3","tags":["cod zombies"]}' }
+    }));
+    await expect(generateMetadata(input, { host })).resolves.toMatchObject({
+      ok: true,
+      value: { title: 'Round 100' }
+    });
+  });
+
+  it('prefers a real response over anything in thinking', async () => {
+    const host = await startOllama(() => ({
+      status: 200,
+      body: { response: '{"title":"From response"}', thinking: '{"title":"From thinking"}' }
+    }));
+    await expect(generateMetadata(input, { host })).resolves.toMatchObject({ ok: true, value: { title: 'From response' } });
+  });
+
   it('sends the request Ollama expects', async () => {
     let sent = '';
     const host = await startOllama((req) => {
@@ -147,5 +184,24 @@ describe('generateMetadata', () => {
     const host = await startOllama(() => ({ status: 500, body: 'kaboom' }));
     await expect(generateMetadata(input, { host })).resolves.toMatchObject({ ok: false, code: 'error' });
     await expect(generateMetadata(input, { host: 'http://127.0.0.1:1' })).resolves.toMatchObject({ ok: false, code: 'not_running' });
+  });
+});
+
+describe('how many frames are worth sending', () => {
+  const threeFrames = ['a', 'b', 'c'];
+  const base = { model: 'qwen3-vl:8b', video: { filename: 'clip.mov', durationSeconds: null, width: null, height: null } };
+
+  // Measured warm on qwen3-vl:8b: one frame 3s, two 29s, three 29s — and the extra frames made the
+  // answer no better, the model naming a different wrong game each time.
+  it('sends one by default, however many are available', () => {
+    expect(framesFor({ ...base, vision: true, frames: threeFrames })).toEqual(['a']);
+  });
+
+  it('sends more only when a caller asks for them', () => {
+    expect(framesFor({ ...base, vision: true, frames: threeFrames, maxFrames: 3 })).toEqual(threeFrames);
+  });
+
+  it('still sends none at all to a model that cannot read them', () => {
+    expect(framesFor({ ...base, vision: false, frames: threeFrames, maxFrames: 3 })).toEqual([]);
   });
 });

@@ -5,6 +5,11 @@ export interface AiModel {
   name: string;
   /** Whether it can read an image: what Ollama reports, or a guess from the name if it reports nothing. */
   vision: boolean;
+  /**
+   * Whether it reasons before answering. Measured on qwen3-vl:8b: left to think, one frame took 84
+   * seconds and timed out; told not to, 3. It is not optional information.
+   */
+  thinking: boolean;
 }
 
 /**
@@ -13,6 +18,11 @@ export interface AiModel {
  */
 export function visionFrom(capabilities: unknown, name: string): boolean {
   return Array.isArray(capabilities) ? capabilities.includes('vision') : isVisionModel(name);
+}
+
+/** Only Ollama knows this one; there is no telling it from the name. */
+export function thinkingFrom(capabilities: unknown): boolean {
+  return Array.isArray(capabilities) && capabilities.includes('thinking');
 }
 const VISION_FAMILIES = [
   'llava',

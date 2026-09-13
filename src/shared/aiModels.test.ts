@@ -17,8 +17,8 @@ describe('isVisionModel', () => {
 
 describe('findModel', () => {
   const models = [
-    { name: 'llama3.2:latest', vision: false },
-    { name: 'llava:13b', vision: true }
+    { name: 'llama3.2:latest', vision: false, thinking: false },
+    { name: 'llava:13b', vision: true, thinking: false }
   ];
 
   it('matches the exact name Ollama reported', () => {
@@ -27,7 +27,7 @@ describe('findModel', () => {
 
   // Typing "llama3.2" is a valid request to Ollama, so it has to find the installed llama3.2:latest.
   it('matches a name written without its tag', () => {
-    expect(findModel(models, 'llama3.2')).toEqual({ name: 'llama3.2:latest', vision: false });
+    expect(findModel(models, 'llama3.2')).toEqual({ name: 'llama3.2:latest', vision: false, thinking: false });
   });
 
   it('does not match a different model or an empty setting', () => {
