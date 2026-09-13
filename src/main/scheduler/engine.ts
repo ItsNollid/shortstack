@@ -3,7 +3,7 @@
 // injected effect, so the engine is testable without network, Electron or timers.
 import type Database from 'better-sqlite3';
 import type { UploadMethod } from '../../shared/queue';
-import { applyQueueEvent, countQueueByState, listQueueItems } from '../db/queueRepo';
+import { applyQueueEvent, countQueueByState, getQueueItem, listQueueItems } from '../db/queueRepo';
 import { createPosting, listVideoRotation, rotationVerdict } from '../db/rotationRepo';
 import { readSettings, writeSetting } from '../db/settingsRepo';
 import { decide, type SchedulerAction, type SchedulerHolds } from './decide';
@@ -19,11 +19,20 @@ export interface SchedulerEffects {
   onChange?(): void;
 }
 
+/** A video due in Studio soon, for a notification. */
+export interface UploadReminder {
+  queueId: number;
+  title: string;
+  publishAt: string;
+}
+
 export interface EngineOptions {
   db: Database.Database;
   effects: SchedulerEffects;
   now?: () => Date;
   tickMs?: number;
+  /** Called once per video and slot when an upload in Studio is due within the reminder window. */
+  remind?: (reminder: UploadReminder) => void;
 }
 
 export interface SchedulerStatus {
@@ -53,12 +62,17 @@ export class SchedulerEngine {
   private apiBackoffUntil: string | null = null;
   private uploadQuotaUntil: string | null = null;
   private lastRemoteErrorRetry = 0;
+  private lastDetectAt: string | null = null;
+  /** Video and slot pairs already reminded about, so a reminder comes once rather than every tick. */
+  private readonly reminded = new Set<string>();
+  private readonly remind?: (reminder: UploadReminder) => void;
 
   constructor(options: EngineOptions) {
     this.db = options.db;
     this.effects = options.effects;
     this.now = options.now ?? (() => new Date());
     this.tickMs = options.tickMs ?? DEFAULT_TICK_MS;
+    this.remind = options.remind;
   }
 
   /** Starts ticking. The persisted pause is respected: starting never silently resumes uploads. */
@@ -144,7 +158,8 @@ export class SchedulerEngine {
         apiBackoffUntil: this.apiBackoffUntil,
         uploadQuotaUntil: this.uploadQuotaUntil,
         uploadInFlight: this.uploadInFlight,
-        retryRemoteErrors
+        retryRemoteErrors,
+        lastDetectAt: this.lastDetectAt
       }
     });
 
@@ -152,7 +167,10 @@ export class SchedulerEngine {
     for (const action of actions) await this.perform(action, now, settings.upload_method);
 
     const rotated = settings.scheduler_paused ? 0 : this.queueRotations(settings, now);
-    if (actions.length > 0 || rotated > 0) this.effects.onChange?.();
+    // Looking at the channel and reminding change nothing here, and used to refresh every screen on every
+    // tick. A look that does link a video says so itself.
+    const changed = actions.some((action) => action.type !== 'detect_manual_uploads' && action.type !== 'remind_manual_upload');
+    if (changed || rotated > 0) this.effects.onChange?.();
     return actions;
   }
 
@@ -217,8 +235,17 @@ export class SchedulerEngine {
         this.applyOutcome(await this.effects.verifyRemote(action.id));
         return;
       case 'detect_manual_uploads':
+        this.lastDetectAt = now.toISOString();
         this.applyOutcome(await this.effects.detectManualUploads(action.ids));
         return;
+      case 'remind_manual_upload': {
+        const key = `${action.id}@${action.at}`;
+        if (this.reminded.has(key)) return;
+        this.reminded.add(key);
+        const item = getQueueItem(this.db, action.id);
+        if (item !== undefined) this.remind?.({ queueId: action.id, title: item.title, publishAt: action.at });
+        return;
+      }
     }
   }
 

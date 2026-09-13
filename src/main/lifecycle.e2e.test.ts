@@ -124,10 +124,13 @@ describe('a video from folder to published', () => {
     expect(new Date(slotted?.scheduled_for as string).getHours()).toBe(9);
     expect(slotted?.state).toBe('awaiting_manual_upload');
 
-    // 4. The user uploads it in Studio; detection matches it by file name and size.
+    // 4. The user uploads it in Studio; detection matches it by file name and size. The channel was
+    //    looked at a moment ago and is not looked at again on every tick — each look costs quota — so
+    //    this happens a few minutes on, as it would for anyone uploading by hand.
     state.uploads = [
       { videoId: 'yt_morning', title: 'morning-run', publishedAt: null, fileName: 'morning-run.mov', fileSize: 6 * 1024 * 1024 }
     ];
+    setNow('2026-09-12T08:03:00');
     await engine.kick();
     const linked = getQueueItem(db, id);
     expect(linked?.youtube_video_id).toBe('yt_morning');

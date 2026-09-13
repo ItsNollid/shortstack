@@ -130,7 +130,22 @@ async function start(): Promise<void> {
     cacheDir: path.join(app.getPath('userData'), 'icons')
   });
 
-  engine = new SchedulerEngine({ db, effects });
+  engine = new SchedulerEngine({
+    db,
+    effects,
+    remind: (reminder) => {
+      if (!Notification.isSupported()) return;
+      const at = new Date(reminder.publishAt);
+      const sameDay = at.toDateString() === new Date().toDateString();
+      const when = at.toLocaleString([], sameDay ? { hour: "numeric", minute: "2-digit" } : { weekday: "long", hour: "numeric", minute: "2-digit" });
+      const notice = new Notification({
+        title: 'Time to upload in YouTube Studio',
+        body: `“${reminder.title}” goes out at ${when}. ShortStack links it as soon as it appears on your channel.`
+      });
+      notice.on("click", showWindow);
+      notice.show();
+    }
+  });
   draftWorker = new DraftWorker({
     db,
     draftDeps: {

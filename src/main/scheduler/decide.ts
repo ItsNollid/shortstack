@@ -34,6 +34,8 @@ export interface SchedulerHolds {
   uploadInFlight: boolean;
   /** The engine raises this periodically so failed remote syncs get another chance. */
   retryRemoteErrors: boolean;
+  /** When the channel was last looked at for videos uploaded in Studio. Null before the first look. */
+  lastDetectAt: string | null;
 }
 
 export interface SchedulerInput {
@@ -50,13 +52,34 @@ export type SchedulerAction =
   | { type: 'start_upload'; id: number }
   | { type: 'sync_remote'; id: number }
   | { type: 'verify_remote'; id: number }
-  | { type: 'detect_manual_uploads'; ids: number[] };
+  | { type: 'detect_manual_uploads'; ids: number[] }
+  | { type: 'remind_manual_upload'; id: number; at: string };
 
 export const MAX_SYNC_PER_TICK = 3;
 export const MAX_VERIFY_PER_TICK = 5;
+/** How long before its slot the person is reminded to upload a video in Studio. */
+export const REMIND_BEFORE_MS = 2 * 60 * 60_000;
+/** How often to look for a Studio upload while one is due within the reminder window. */
+export const DETECT_SOON_MS = 2 * 60_000;
+/** How often otherwise. Each look costs two units of the daily allowance. */
+export const DETECT_IDLE_MS = 10 * 60_000;
 
 const passed = (iso: string | null, now: Date): boolean => iso === null || Date.parse(iso) <= now.getTime();
 const linkedToYouTube = (item: SchedulerItem): boolean => item.youtube_video_id !== null && !item.remote_tombstone;
+
+/** Waiting for the person to upload it in Studio: moved to waiting, or approved and not moved yet because of a pause. */
+const awaitsStudioUpload = (item: SchedulerItem, method: UploadMethod): boolean =>
+  !isOnYouTube(item) && (item.state === 'awaiting_manual_upload' || (method === 'assisted' && item.state === 'approved'));
+
+/** Whether it is time to look at the channel again: often while a slot is close, rarely otherwise. */
+function detectionDue(waiting: readonly SchedulerItem[], lastDetectAt: string | null, now: Date): boolean {
+  if (lastDetectAt === null) return true;
+  const soon = waiting.some((item) => {
+    const at = desiredPublishAt(item);
+    return at !== null && Date.parse(at) - now.getTime() <= REMIND_BEFORE_MS;
+  });
+  return now.getTime() - Date.parse(lastDetectAt) >= (soon ? DETECT_SOON_MS : DETECT_IDLE_MS);
+}
 
 function bySoonestSlotThenId(a: SchedulerItem, b: SchedulerItem): number {
   const left = a.scheduled_for === null ? Number.POSITIVE_INFINITY : Date.parse(a.scheduled_for);
@@ -174,8 +197,25 @@ export function decide({ now, items, settings, holds }: SchedulerInput): Schedul
       .slice(0, MAX_VERIFY_PER_TICK);
     for (const item of due) actions.push({ type: 'verify_remote', id: item.id });
 
-    const awaiting = items.filter((item) => item.state === 'awaiting_manual_upload' && !isOnYouTube(item)).map((item) => item.id);
-    if (awaiting.length > 0) actions.push({ type: 'detect_manual_uploads', ids: awaiting });
+    // Studio uploads are looked for while paused, and for videos still marked approved: pausing stops
+    // ShortStack acting, not noticing what the person did themselves. Not on every tick, though. A look
+    // is two API calls, and every 30 seconds that came to 5,760 units a day, over half the allowance.
+    const waiting = items.filter((item) => awaitsStudioUpload(item, settings.uploadMethod));
+    if (waiting.length > 0 && detectionDue(waiting, holds.lastDetectAt, now)) {
+      actions.push({ type: 'detect_manual_uploads', ids: waiting.map((item) => item.id) });
+    }
+  }
+
+  // 6. Remind the person to upload in Studio as a slot comes close. It is only a reminder, so it comes
+  //    while paused too — the missed-slot check at the top does not stop for a pause either.
+  if (settings.uploadMethod === 'assisted') {
+    for (const item of items) {
+      if (item.missing || !awaitsStudioUpload(item, 'assisted')) continue;
+      const at = desiredPublishAt(item);
+      if (at === null) continue;
+      const left = Date.parse(at) - now.getTime();
+      if (left >= MIN_SCHEDULE_LEAD_MS && left <= REMIND_BEFORE_MS) actions.push({ type: 'remind_manual_upload', id: item.id, at });
+    }
   }
 
   return actions;

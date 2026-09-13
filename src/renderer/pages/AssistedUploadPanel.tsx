@@ -90,7 +90,7 @@ export function AssistedUploadPanel({ item }: { item: QueueItemDTO }): React.JSX
 
         <Step
           title="Let ShortStack know"
-          text="ShortStack checks your channel every couple of minutes and links the video by its file name and size. If it does not find it, paste the link here."
+          text="ShortStack looks at your channel every two minutes once this video is due within two hours, and every ten minutes before that, and links it by its file name and size. Paste the link here to link it straight away."
         >
           {link.error !== null && (
             <Banner kind="danger" title="Could not link that video">

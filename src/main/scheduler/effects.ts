@@ -191,6 +191,7 @@ export async function detectManualUploads(deps: EffectsDeps, itemIds: readonly n
   const uploads = await deps.gateway.listRecentUploads(playlistId);
   if (!uploads.ok) return uploads.hold === undefined ? OK : hold(deps, uploads.hold, 15);
 
+  let linkedAny = false;
   for (const itemId of itemIds) {
     const item = getQueueItem(deps.db, itemId);
     if (item === undefined || item.youtube_video_id !== null) continue;
@@ -200,6 +201,7 @@ export async function detectManualUploads(deps: EffectsDeps, itemIds: readonly n
 
     const linked = applyQueueEvent(deps.db, itemId, { type: 'link_video', videoId: match.videoId }, context(deps));
     if (linked.ok) {
+      linkedAny = true;
       recordUpload(deps.db, {
         queueId: itemId,
         youtubeVideoId: match.videoId,
@@ -209,6 +211,8 @@ export async function detectManualUploads(deps: EffectsDeps, itemIds: readonly n
       });
     }
   }
+  // Looking is not a change; linking a video is, and the engine leaves saying so to whatever made it.
+  if (linkedAny) deps.onChange?.();
   return OK;
 }
 

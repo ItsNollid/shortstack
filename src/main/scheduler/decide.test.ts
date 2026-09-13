@@ -48,6 +48,7 @@ const holds = (overrides: Partial<SchedulerHolds> = {}): SchedulerHolds => ({
   uploadQuotaUntil: null,
   uploadInFlight: false,
   retryRemoteErrors: false,
+  lastDetectAt: null,
   ...overrides
 });
 
