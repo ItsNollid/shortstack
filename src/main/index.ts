@@ -89,7 +89,8 @@ async function start(): Promise<void> {
     accessToken: () => auth.accessToken(),
     authState: () => auth.state(),
     uploadMethod: () => readSettings(db).settings.upload_method,
-    uploadsPlaylistId: () => null,
+    // Was hardcoded null, which quietly disabled the whole of assisted-upload detection.
+    uploadsPlaylistId: () => readActiveChannel(db)?.uploadsPlaylistId ?? null,
     maxAttempts: () => readSettings(db).settings.auto_retry_max,
     statFile: async (filePath) => {
       try {

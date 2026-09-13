@@ -80,7 +80,8 @@ export function registerIpcHandlers(context: IpcContext): void {
         title: profile.value.title,
         handle: profile.value.handle,
         avatarUrl: profile.value.avatarUrl,
-        subscriberCount: profile.value.subscriberCount
+        subscriberCount: profile.value.subscriberCount,
+        uploadsPlaylistId: profile.value.uploadsPlaylistId
       },
       new Date()
     );

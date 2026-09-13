@@ -7,8 +7,30 @@ import * as os from 'os';
 import * as path from 'path';
 import { migrate } from '../src/main/db/migrations';
 
+/**
+ * A real video file to seed from. Some tests need one that actually plays — a made-up path makes the
+ * player error and fall back, which looks like a passing test measuring nothing.
+ */
+export function sampleVideo(): string | null {
+  const fromEnv = process.env.SHORTSTACK_SAMPLE_VIDEO;
+  if (fromEnv !== undefined && fs.existsSync(fromEnv)) return fromEnv;
+
+  for (const folder of ['E:/Youtube/Rendered/ShortStack']) {
+    if (!fs.existsSync(folder)) continue;
+    const found = fs
+      .readdirSync(folder)
+      .filter((name) => /.(mov|mp4|m4v|webm)$/i.test(name))
+      .map((name) => path.join(folder, name))
+      .sort((a, b) => fs.statSync(a).size - fs.statSync(b).size);
+    if (found.length > 0) return found[0] as string;
+  }
+  return null;
+}
+
 export interface SeededVideo {
   filename: string;
+  /** Copy a real playable file in, so the preview has something to decode. */
+  realFile?: string;
   privacy?: 'public' | 'unlisted' | 'private';
   state?: string;
   scheduledFor?: string | null;
@@ -30,9 +52,18 @@ function seed(userData: string, videos: readonly SeededVideo[], settings: Record
 
   const now = new Date().toISOString();
   for (const video of videos) {
+    let filepath = `E:/Shorts/${video.filename}`;
+    let size = 1024;
+    if (video.realFile !== undefined) {
+      const media = path.join(userData, 'media');
+      fs.mkdirSync(media, { recursive: true });
+      filepath = path.join(media, video.filename);
+      fs.copyFileSync(video.realFile, filepath);
+      size = fs.statSync(filepath).size;
+    }
     const inserted = db
       .prepare('INSERT INTO videos (filename, filepath, status, created_at, missing, file_size) VALUES (?, ?, ?, ?, 0, ?)')
-      .run(video.filename, `E:/Shorts/${video.filename}`, 'pending', now, 1024);
+      .run(video.filename, filepath, 'pending', now, size);
     db.prepare(
       `INSERT INTO queue (video_id, title, description, tags, category_id, privacy, notify_subscribers, made_for_kids,
                           approved, platforms, state, posting_kind, scheduled_for, attempts, upload_bytes_confirmed,

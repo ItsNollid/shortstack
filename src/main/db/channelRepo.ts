@@ -7,19 +7,23 @@ export interface ChannelRecord {
   handle: string | null;
   avatarUrl: string | null;
   subscriberCount: number | null;
+  /** The playlist every upload lands in. Assisted mode reads it to match a Studio upload to a file. */
+  uploadsPlaylistId: string | null;
   updatedAt: string;
 }
 
 /** Stores the connected channel. The channels table existed but nothing ever wrote to it. */
 export function upsertChannel(db: Database.Database, channel: Omit<ChannelRecord, 'updatedAt'>, now: Date): void {
   db.prepare(
-    `INSERT INTO channels (id, name, handle, avatar_url, subscriber_count, is_active, credentials_path, created_at, updated_at)
-     VALUES (@id, @name, @handle, @avatar_url, @subscriber_count, 1, NULL, @now, @now)
+    `INSERT INTO channels (id, name, handle, avatar_url, subscriber_count, uploads_playlist_id, is_active, credentials_path, created_at, updated_at)
+     VALUES (@id, @name, @handle, @avatar_url, @subscriber_count, @uploads_playlist_id, 1, NULL, @now, @now)
      ON CONFLICT(id) DO UPDATE SET
        name = excluded.name,
        handle = excluded.handle,
        avatar_url = excluded.avatar_url,
        subscriber_count = excluded.subscriber_count,
+       -- Keep what we had if this refresh did not carry one, rather than forgetting it.
+       uploads_playlist_id = COALESCE(excluded.uploads_playlist_id, channels.uploads_playlist_id),
        is_active = 1,
        updated_at = excluded.updated_at`
   ).run({
@@ -28,6 +32,7 @@ export function upsertChannel(db: Database.Database, channel: Omit<ChannelRecord
     handle: toDbValue(channel.handle),
     avatar_url: toDbValue(channel.avatarUrl),
     subscriber_count: toDbValue(channel.subscriberCount),
+    uploads_playlist_id: toDbValue(channel.uploadsPlaylistId),
     now: now.toISOString()
   });
   db.prepare('UPDATE channels SET is_active = 0 WHERE id <> ?').run(channel.id);
@@ -43,6 +48,7 @@ export function readActiveChannel(db: Database.Database): ChannelRecord | null {
     title: typeof row.name === 'string' ? row.name : 'Your channel',
     handle: typeof row.handle === 'string' ? row.handle : null,
     avatarUrl: typeof row.avatar_url === 'string' ? row.avatar_url : null,
+    uploadsPlaylistId: typeof row.uploads_playlist_id === 'string' ? row.uploads_playlist_id : null,
     subscriberCount: typeof row.subscriber_count === 'number' ? row.subscriber_count : null,
     updatedAt: typeof row.updated_at === 'string' ? row.updated_at : ''
   };

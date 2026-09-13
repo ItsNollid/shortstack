@@ -404,7 +404,19 @@ const v3Rotation: Migration = {
     db.exec('CREATE INDEX IF NOT EXISTS idx_queue_posting ON queue(video_id, posting_kind);');
   }
 };
-export const MIGRATIONS: readonly Migration[] = [v1Baseline, v2Lifecycle, v3Rotation];
+
+/** Where the channel keeps its uploads. Without it, a video uploaded in Studio can never be matched
+ *  back to the file it came from, which is the whole of assisted mode. */
+const CHANNEL_COLUMNS_V4: ReadonlyArray<[string, string]> = [['uploads_playlist_id', 'TEXT']];
+
+const v4UploadsPlaylist: Migration = {
+  version: 4,
+  name: 'remember the channel uploads playlist',
+  up(db) {
+    for (const [column, type] of CHANNEL_COLUMNS_V4) addColumn(db, 'channels', column, type);
+  }
+};
+export const MIGRATIONS: readonly Migration[] = [v1Baseline, v2Lifecycle, v3Rotation, v4UploadsPlaylist];
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
 
 export function migrate(db: Database.Database, options: MigrateOptions = {}): MigrateResult {
