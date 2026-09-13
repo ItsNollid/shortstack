@@ -3,6 +3,9 @@ import {
   MIN_PER_GROUP,
   allFacts,
   buildBrief,
+  cadenceFact,
+  conversionFact,
+  gameFact,
   median,
   questionTitleFact,
   retentionFact,
@@ -189,7 +192,7 @@ describe('allFacts', () => {
   it('always answers for every measure, even on an empty channel', () => {
     const facts = allFacts([]);
     expect(facts.map((fact) => fact.id).sort()).toEqual(
-      ['question-title', 'retention', 'shouted-title', 'tags', 'time-of-day', 'weekday'].sort()
+      ['cadence', 'conversion', 'game', 'question-title', 'retention', 'shouted-title', 'tags', 'time-of-day', 'weekday'].sort()
     );
     for (const fact of facts) {
       expect(fact.confidence).toBe('insufficient');
@@ -200,5 +203,93 @@ describe('allFacts', () => {
   it('never claims more than MIN_PER_GROUP videos support', () => {
     const facts = allFacts(many(MIN_PER_GROUP - 1, () => video()));
     expect(facts.every((fact) => fact.confidence === 'insufficient')).toBe(true);
+  });
+});
+
+describe('gameFact', () => {
+  it('waits until two games each have enough videos', () => {
+    const only = many(8, () => video({ title: 'CS2 CLUTCH' }));
+    expect(gameFact(only).confidence).toBe('insufficient');
+    expect(gameFact(only).statement).toMatch(/nothing to compare/i);
+  });
+
+  it('names the game that gets the most views', () => {
+    const cs = many(5, () => video({ title: 'CS2 CLUTCH', views: 900, subscribersGained: 1 }));
+    const mc = many(5, () => video({ title: 'MINECRAFT BASE TOUR', views: 200, subscribersGained: 1 }));
+    const fact = gameFact([...cs, ...mc]);
+
+    expect(fact.statement).toContain('Counter-Strike 2');
+    expect(fact.statement).toContain('Minecraft');
+    expect(fact.statement).toContain('900');
+  });
+
+  // Reach and subscribers are different questions, and often have different answers.
+  it('says when a different game converts better than the one that travels furthest', () => {
+    const cs = many(5, () => video({ title: 'CS2 CLUTCH', views: 10_000, subscribersGained: 1 }));
+    const mc = many(5, () => video({ title: 'MINECRAFT BASE TOUR', views: 1000, subscribersGained: 20 }));
+    const fact = gameFact([...cs, ...mc]);
+
+    expect(fact.statement).toMatch(/Counter-Strike 2 gets the most views/);
+    expect(fact.statement).toMatch(/But Minecraft brings more subscribers per view/);
+  });
+
+  it('leaves out videos whose game cannot be told', () => {
+    const cs = many(4, () => video({ title: 'CS2 CLUTCH', views: 900 }));
+    const mc = many(4, () => video({ title: 'MINECRAFT BASE', views: 200 }));
+    const unknown = many(20, () => video({ title: 'ALRIGHT GUYS IM GOING TO BED', views: 5 }));
+    expect(gameFact([...cs, ...mc, ...unknown]).sampleSize).toBe(8);
+  });
+});
+
+describe('conversionFact', () => {
+  it('reports what a thousand views is worth in subscribers', () => {
+    const fact = conversionFact(many(10, () => video({ views: 1000, subscribersGained: 4 })));
+    expect(fact.statement).toContain('4.0 subscribers per thousand');
+  });
+
+  // What reaching strangers looks like: wide reach, poor conversion.
+  it('notices when the widest-reaching videos convert worst', () => {
+    const wide = many(5, () => video({ views: 20_000, subscribersGained: 4 }));
+    const narrow = many(5, () => video({ views: 500, subscribersGained: 5 }));
+    expect(conversionFact([...wide, ...narrow]).statement).toMatch(/travel furthest convert worst/);
+  });
+
+  it('says nothing about the pattern when there is not one', () => {
+    const fact = conversionFact(many(10, () => video({ views: 1000, subscribersGained: 3 })));
+    expect(fact.statement).not.toMatch(/travel furthest/);
+  });
+});
+
+describe('cadenceFact', () => {
+  const day = (index: number, views: number): VideoStat =>
+    video({ publishedAt: new Date(Date.UTC(2026, 0, 1 + index)).toISOString(), views });
+
+  it('waits for enough uploads', () => {
+    expect(cadenceFact(many(5, () => video())).confidence).toBe('insufficient');
+  });
+
+  it('says so when uploads are too evenly spaced to compare', () => {
+    expect(cadenceFact(Array.from({ length: 10 }, (_, index) => day(index, 500))).statement).toMatch(/evenly spaced/);
+  });
+
+  it('compares a short gap against a long one', () => {
+    // Gaps of 1, 2, 3, 4, 5 days and then 10, 11, 12, 13, 14, with the close ones doing far better.
+    const closeDays = [0, 1, 3, 6, 10, 15];
+    const spreadDays = [25, 36, 48, 61, 75];
+    const fact = cadenceFact([
+      ...closeDays.map((offset) => day(offset, 1000)),
+      ...spreadDays.map((offset) => day(offset, 200))
+    ]);
+
+    expect(fact.confidence).not.toBe('insufficient');
+    expect(fact.statement).toMatch(/posted sooner after the previous one do better/);
+  });
+
+  // Uploading in batches and then going quiet clusters every gap at one of two numbers. Splitting
+  // on the median value put all of them on the same side of it and reported nothing.
+  it('still compares when the gaps cluster at two numbers rather than spreading out', () => {
+    const batch = [0, 1, 2, 3, 4, 5].map((offset) => day(offset, 1000));
+    const later = [25, 35, 45, 55, 65].map((offset) => day(offset, 200));
+    expect(cadenceFact([...batch, ...later]).confidence).not.toBe('insufficient');
   });
 });

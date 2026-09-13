@@ -10,6 +10,8 @@
 // cannot be told a better hour by anyone, and saying so is more useful than a recommendation built
 // on two videos.
 
+import { detectGame } from './games';
+
 export interface VideoStat {
   videoId: string;
   title: string;
@@ -300,12 +302,174 @@ export function tagFact(videos: readonly VideoStat[], topFraction = 0.25): Fact 
   };
 }
 
+/**
+ * Subscribers per thousand views. Reach and conversion are different questions, and a video can
+ * answer one well and the other not at all: something that travels a long way on the Shorts feed and
+ * turns nobody into a subscriber is a different problem from one nobody sees.
+ */
+export const subscribersPerThousand = (video: VideoStat): number =>
+  video.views === 0 ? 0 : (video.subscribersGained / video.views) * 1000;
+
+/** Which game does best — the largest lever there is, because it decides what gets recorded next. */
+export function gameFact(videos: readonly VideoStat[]): Fact {
+  const byGame = new Map<string, VideoStat[]>();
+  let identified = 0;
+
+  for (const video of videos) {
+    const game = detectGame({ title: video.title, description: video.description, tags: video.tags });
+    if (game === null) continue;
+    identified += 1;
+    const existing = byGame.get(game);
+    if (existing === undefined) byGame.set(game, [video]);
+    else existing.push(video);
+  }
+
+  const usable = [...byGame.entries()].filter(([, list]) => list.length >= MIN_PER_GROUP);
+  if (usable.length < 2) {
+    return {
+      id: 'game',
+      statement:
+        usable.length === 0
+          ? `No game yet has ${MIN_PER_GROUP} videos that can be identified from their titles and tags.`
+          : `Only ${usable[0]?.[0]} has enough videos to judge, so there is nothing to compare it against yet.`,
+      sampleSize: identified,
+      confidence: 'insufficient'
+    };
+  }
+
+  const ranked = usable
+    .map(([game, list]) => ({
+      game,
+      views: median(list.map((video) => video.views)),
+      subs: median(list.map(subscribersPerThousand)),
+      count: list.length
+    }))
+    .sort((left, right) => right.views - left.views);
+
+  const best = ranked[0] as (typeof ranked)[number];
+  const worst = ranked[ranked.length - 1] as (typeof ranked)[number];
+  const bestForSubs = [...ranked].sort((left, right) => right.subs - left.subs)[0] as (typeof ranked)[number];
+
+  // Reach and subscribers are different questions, and the answer is often a different game.
+  const reach = `${best.game} gets the most views: a median of ${Math.round(best.views)} across ${best.count} videos, against ${Math.round(worst.views)} for ${worst.game}.`;
+  const subs =
+    bestForSubs.game === best.game
+      ? ` It also brings the most subscribers, at ${bestForSubs.subs.toFixed(1)} per thousand views.`
+      : ` But ${bestForSubs.game} brings more subscribers per view: ${bestForSubs.subs.toFixed(1)} per thousand against ${best.subs.toFixed(1)}.`;
+
+  return {
+    id: 'game',
+    statement: reach + subs,
+    sampleSize: identified,
+    confidence: confidenceFor(Math.min(...usable.map(([, list]) => list.length)))
+  };
+}
+
+/** What a view is worth in subscribers, and whether the videos that travel furthest convert. */
+export function conversionFact(videos: readonly VideoStat[]): Fact {
+  const usable = videos.filter((video) => video.views > 0);
+  if (usable.length < MIN_PER_GROUP * 2) {
+    return {
+      id: 'conversion',
+      statement: `Too few videos with views to say what turns people into subscribers — ${usable.length} so far.`,
+      sampleSize: usable.length,
+      confidence: 'insufficient'
+    };
+  }
+
+  const sorted = [...usable].sort((left, right) => right.views - left.views);
+  const half = Math.floor(sorted.length / 2);
+  const mostSeen = median(sorted.slice(0, half).map(subscribersPerThousand));
+  const leastSeen = median(sorted.slice(half).map(subscribersPerThousand));
+  const overall = median(usable.map(subscribersPerThousand));
+
+  const note =
+    mostSeen < leastSeen * 0.8
+      ? ' The ones that travel furthest convert worst, which is what reaching strangers looks like.'
+      : mostSeen > leastSeen * 1.25
+        ? ' The ones that travel furthest also convert best.'
+        : '';
+
+  return {
+    id: 'conversion',
+    statement: `A video earns ${overall.toFixed(1)} subscribers per thousand views.${note}`,
+    sampleSize: usable.length,
+    confidence: confidenceFor(half)
+  };
+}
+
+/** Whether posting closer together or further apart goes with doing better. */
+export function cadenceFact(videos: readonly VideoStat[]): Fact {
+  const sorted = [...videos]
+    .filter((video) => !Number.isNaN(Date.parse(video.publishedAt)))
+    .sort((left, right) => Date.parse(left.publishedAt) - Date.parse(right.publishedAt));
+
+  if (sorted.length < MIN_PER_GROUP * 2 + 1) {
+    return {
+      id: 'cadence',
+      statement: 'Not enough uploads yet to say whether posting closer together or further apart matters.',
+      sampleSize: sorted.length,
+      confidence: 'insufficient'
+    };
+  }
+
+  const gaps = sorted.slice(1).map((video, index) => ({
+    video,
+    hours: (Date.parse(video.publishedAt) - Date.parse((sorted[index] as VideoStat).publishedAt)) / 3_600_000
+  }));
+  // Split by rank, not by value. Someone who uploads a batch and then goes quiet has gaps clustered
+  // at two numbers, and a split on the median value puts every one of them on the same side.
+  const byGap = [...gaps].sort((left, right) => left.hours - right.hours);
+  const half = Math.floor(byGap.length / 2);
+  const shortest = byGap.slice(0, half);
+  const longest = byGap.slice(byGap.length - half);
+  const shortestHours = median(shortest.map((gap) => gap.hours));
+  const longestHours = median(longest.map((gap) => gap.hours));
+
+  // Evenly spaced uploads have nothing to compare: both halves are the same gap.
+  if (half < MIN_PER_GROUP || longestHours <= shortestHours * 1.5) {
+    return {
+      id: 'cadence',
+      statement: 'Uploads are too evenly spaced to compare a short gap against a long one.',
+      sampleSize: sorted.length,
+      confidence: 'insufficient'
+    };
+  }
+
+  const soonAfter = shortest.map((gap) => gap.video);
+  const longAfter = longest.map((gap) => gap.video);
+
+  const soonViews = median(soonAfter.map((video) => video.views));
+  const longViews = median(longAfter.map((video) => video.views));
+  const smaller = Math.min(soonViews, longViews);
+  const lift = smaller === 0 ? 0 : Math.abs(soonViews - longViews) / smaller;
+
+  if (lift < MEANINGFUL_LIFT) {
+    return {
+      id: 'cadence',
+      statement: `How long you leave between uploads makes little difference: ${Math.round(soonViews)} views after a short gap against ${Math.round(longViews)} after a long one.`,
+      sampleSize: sorted.length,
+      confidence: confidenceFor(Math.min(soonAfter.length, longAfter.length))
+    };
+  }
+
+  return {
+    id: 'cadence',
+    statement: `Videos posted ${soonViews > longViews ? 'sooner' : 'later'} after the previous one do better: ${Math.round(Math.max(soonViews, longViews))} views against ${Math.round(smaller)}, split at a gap of ${Math.round(shortestHours)} hours against ${Math.round(longestHours)}.`,
+    sampleSize: sorted.length,
+    confidence: confidenceFor(Math.min(soonAfter.length, longAfter.length))
+  };
+}
+
 /** Everything measurable, in the order a person would want to read it. */
 export function allFacts(videos: readonly VideoStat[]): Fact[] {
   return [
+    gameFact(videos),
+    conversionFact(videos),
     timeOfDayFact(videos),
     weekdayFact(videos),
     retentionFact(videos),
+    cadenceFact(videos),
     questionTitleFact(videos),
     shoutedTitleFact(videos),
     tagFact(videos)
