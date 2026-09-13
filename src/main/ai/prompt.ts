@@ -9,6 +9,8 @@ export interface VideoFacts {
   durationSeconds: number | null;
   width: number | null;
   height: number | null;
+  /** The game, when the user has said. Named rather than guessed at. */
+  game?: string | null;
   /** Whatever is already in the form, which is often the best clue about the subject. */
   currentTitle?: string;
   currentDescription?: string;
@@ -63,6 +65,11 @@ function renderExamples(examples: readonly PastUpload[], vocabulary: TagVocabula
 
 function renderVideo(video: VideoFacts, hasFrames: boolean): string[] {
   const lines = ['--- The new video ---', `File name: ${video.filename}`];
+  // Named, not guessed. Shown the same lobby frame four times, qwen3-vl:8b answered The Last of Us,
+  // Left 4 Dead, ARK and The Forest — so when the user has said, the model is told and not asked.
+  if (video.game !== undefined && video.game !== null && video.game.trim() !== '') {
+    lines.push(`Game: ${video.game.trim()}`);
+  }
   if (video.durationSeconds !== null) lines.push(`Length: ${Math.round(video.durationSeconds)} seconds`);
   if (video.width !== null && video.height !== null) lines.push(`Frame: ${video.width}x${video.height}`);
   if (video.currentTitle !== undefined && video.currentTitle.trim() !== '') {
@@ -71,10 +78,15 @@ function renderVideo(video: VideoFacts, hasFrames: boolean): string[] {
   if (video.currentDescription !== undefined && video.currentDescription.trim() !== '') {
     lines.push(`Existing description: ${truncate(video.currentDescription.trim(), EXAMPLE_DESCRIPTION_CHARS)}`);
   }
+  const knowsGame = video.game !== undefined && video.game !== null && video.game.trim() !== '';
   lines.push(
     hasFrames
-      ? 'Still frames from this video are attached, in the order they happen. Look at them: name the game, the map or mode, and what is happening.'
-      : 'No frames are available, so work from the file name and the examples.'
+      ? knowsGame
+        ? 'Still frames from this video are attached, in the order they happen. The game is already named above and is correct — do not contradict it. Use the frames for the map, the mode and what is happening.'
+        : 'Still frames from this video are attached, in the order they happen. Look at them: name the game, the map or mode, and what is happening.'
+      : knowsGame
+        ? 'No frames are available. The game above is correct; work from it, the file name and the examples.'
+        : 'No frames are available, so work from the file name and the examples.'
   );
   lines.push('');
   return lines;

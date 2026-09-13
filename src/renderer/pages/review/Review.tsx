@@ -19,6 +19,7 @@ import { nextFreeSlot } from '../../../shared/slots';
 import { PastUploadPicker } from '../../components/PastUploadPicker';
 import { VideoPreview } from '../../components/VideoPreview';
 import { Banner, Button, EmptyState, Select, StatusPill, TagInput, TextArea, TextField } from '../../components/ui';
+import { GameField } from '../../components/GameField';
 import { useRequestApproval } from '../../app/approval';
 import { useAppStatus } from '../../app/status';
 import { useToast } from '../../app/toast';
@@ -258,6 +259,8 @@ export function Review(): React.JSX.Element {
               counterOver={utf8Bytes(draft.description) > DESCRIPTION_MAX_BYTES}
             />
           </div>
+
+<GameField queueId={item.id} value={item.game} />
 
           <TagInput
             label="Tags"

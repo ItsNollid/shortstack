@@ -65,6 +65,7 @@ export async function draftFor(deps: DraftDeps, queueId: number): Promise<AiResu
       frames: stills.filter((image): image is Buffer => image !== null).map((image) => image.toString('base64')),
       video: {
         filename: item.filename,
+        game: item.game,
         durationSeconds: item.duration_s,
         width: item.width,
         height: item.height,

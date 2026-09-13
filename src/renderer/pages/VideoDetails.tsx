@@ -16,6 +16,7 @@ import {
 } from '../../shared/settings';
 import { descriptionProblem, tagsProblem, titleProblem, type QueueMetadataPatch } from '../../shared/videoMetadata';
 import { Banner, Button, Select, Switch, TagInput, TextArea, TextField } from '../components/ui';
+import { GameField } from '../components/GameField';
 import { useAppStatus } from '../app/status';
 import { useApiMutation, useApiQuery } from '../hooks/useApi';
 import { AiAssistPanel, type AiField } from './AiAssistPanel';
@@ -194,6 +195,8 @@ export function VideoDetails({ onApprove }: { onApprove: (item: QueueItemDTO) =>
             problem={problems.description}
             hint="YouTube measures descriptions in bytes, so emoji and accents count for more than one."
           />
+
+<GameField queueId={loaded.id} value={loaded.game} />
 
           <TagInput
             label="Tags"

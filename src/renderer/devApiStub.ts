@@ -26,6 +26,7 @@ const video = (over: Partial<QueueItemDTO> & Pick<QueueItemDTO, 'id' | 'title' |
   remote_publish_at: null,
   remote_sync: null,
   remote_error: null,
+  game: null,
   ai_drafted_at: null,
   metadata_edited_at: null,
   upload_session_uri: null,
@@ -330,6 +331,11 @@ export function installDevApiStub(): void {
       }),
     actionPreview: () => ok({ key: 'upload_times' as const, value: [], label: 'New video times', before: '09:00, 13:00, 18:00, 22:00', after: '13:00, 18:00, 19:00, 22:00' }),
     actionApply: () => ok({ key: 'upload_times' as const, value: [], label: 'New video times', before: '09:00, 13:00, 18:00, 22:00', after: '13:00, 18:00, 19:00, 22:00' }),
+    videoSetGame: (id: number) => {
+      const item = SAMPLE.find((entry) => entry.id === id);
+      return item === undefined ? Promise.resolve({ ok: false as const, error: { code: 'gone', message: 'Not found' } }) : ok(item);
+    },
+    gamesKnown: () => ok(['Counter-Strike 2', 'Minecraft']),
     uploadsList: () => ok([]),
     on: (event: AppEvent, listener: (payload: unknown) => void) => {
       const set = listeners.get(event) ?? new Set();

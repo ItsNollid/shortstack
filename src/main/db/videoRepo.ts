@@ -147,3 +147,20 @@ export function queueIdForVideo(db: Database.Database, videoId: number): number 
   const row = db.prepare('SELECT id FROM queue WHERE video_id = ? ORDER BY id DESC LIMIT 1').get(videoId) as { id: number } | undefined;
   return row?.id;
 }
+
+/**
+ * Which game a video is of. Stored on the video because it does not change between postings, and
+ * trimmed to nothing rather than kept as an empty string so "unknown" has one spelling.
+ */
+export function setVideoGame(db: Database.Database, videoId: number, game: string | null): void {
+  const cleaned = game === null ? null : game.replace(/[<>]/g, '').trim().slice(0, 80);
+  db.prepare('UPDATE videos SET game = ? WHERE id = ?').run(cleaned === '' ? null : cleaned, videoId);
+}
+
+/** Every game already in use, so the field can suggest what this channel actually plays. */
+export function listKnownGames(db: Database.Database): string[] {
+  const rows = db
+    .prepare("SELECT DISTINCT game FROM videos WHERE game IS NOT NULL AND trim(game) <> '' ORDER BY game")
+    .all() as Array<{ game: string }>;
+  return rows.map((row) => row.game);
+}

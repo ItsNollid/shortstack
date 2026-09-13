@@ -17,6 +17,7 @@ import type { QueueEvent } from './domain/queueState';
 import { scanFolder } from './files/scanner';
 import type { SchedulerEngine } from './scheduler/engine';
 import { createPosting, markPublishedBefore, setRotationPaused } from './db/rotationRepo';
+import { listKnownGames, setVideoGame } from './db/videoRepo';
 import { draftFor } from './ai/draft';
 import { buildInsightPrompt, sanitizeAdvice } from './ai/insightPrompt';
 import { buildBrief } from '../shared/insights';
@@ -267,6 +268,22 @@ export function registerIpcHandlers(context: IpcContext): void {
       const saved = await saveFrames({ db, dir: context.thumbnailDir }, parsed, frames.map((frame) => Buffer.from(frame)));
       return saved.ok ? ok(null) : fail('refused', saved.reason);
     },
+
+    videoSetGame: async (queueId, game) => {
+      const parsed = asId(queueId);
+      if (parsed === null) return fail('invalid', 'That video id is not valid');
+      if (game !== null && typeof game !== 'string') return fail('invalid', 'That is not a game name');
+
+      const item = getQueueItem(db, parsed);
+      if (item === undefined) return fail('not_found', 'That video is no longer in the queue');
+
+      setVideoGame(db, item.video_id, game);
+      changed();
+      const updated = getQueueItem(db, parsed);
+      return updated === undefined ? fail('not_found', 'That video is no longer in the queue') : ok(updated);
+    },
+
+    gamesKnown: async () => ok(listKnownGames(db)),
 
     videosScan: async () => {
       const summary = await scanFolder(db);

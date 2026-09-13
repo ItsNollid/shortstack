@@ -116,6 +116,10 @@ export interface ShortStackApi {
   rotationPostAgain(ids: number[]): Promise<Result<number>>;
 
   videosScan(): Promise<Result<ScanSummary>>;
+  /** Which game a video is of. Stored on the video, so every posting of it agrees. */
+  videoSetGame(queueId: number, game: string | null): Promise<Result<QueueItemDTO>>;
+  /** Games already in use on this channel, offered as suggestions alongside the built-in list. */
+  gamesKnown(): Promise<Result<string[]>>;
 
   /** Queue ids whose video still needs decoding, one per file. */
   thumbnailsMissing(): Promise<Result<number[]>>;
@@ -201,6 +205,8 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'rotationSetPaused',
   'rotationPostAgain',
   'videosScan',
+  'videoSetGame',
+  'gamesKnown',
   'thumbnailsMissing',
   'thumbnailSave',
   'framesSave',

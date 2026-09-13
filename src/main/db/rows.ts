@@ -97,6 +97,7 @@ export function toQueueItemDTO(row: Record<string, unknown>): QueueItemDTO {
     published_before: asBool(row.published_before),
     rotation_paused: asBool(row.rotation_paused),
     postings: asInt(row.postings),
+    game: asNullableText(row.game),
     ai_drafted_at: asNullableText(row.ai_drafted_at),
     metadata_edited_at: asNullableText(row.metadata_edited_at),
     file_size: asNullableNumber(row.file_size),

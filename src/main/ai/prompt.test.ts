@@ -152,3 +152,32 @@ describe('what has worked on this channel', () => {
     expect(text.indexOf('--- What has worked')).toBeLessThan(text.indexOf('--- What to write ---'));
   });
 });
+
+describe('the game, when it is known', () => {
+  // Shown one lobby frame four times, qwen3-vl:8b answered The Last of Us, Left 4 Dead, ARK and
+  // The Forest. It cannot tell, so when the user has said, it is told rather than asked.
+  it('names it, and tells the model not to contradict it', () => {
+    const text = buildPrompt(input({ video: { ...input().video, game: 'Counter-Strike 2' }, hasFrames: true }));
+    expect(text).toContain('Game: Counter-Strike 2');
+    expect(text).toMatch(/already named above and is correct/);
+    expect(text).toMatch(/do not contradict it/);
+  });
+
+  it('still asks it to look when nobody has said', () => {
+    const text = buildPrompt(input({ hasFrames: true }));
+    expect(text).not.toContain('Game:');
+    expect(text).toMatch(/name the game, the map or mode/);
+  });
+
+  it('uses it even with no frames at all', () => {
+    const text = buildPrompt(input({ video: { ...input().video, game: 'Minecraft' }, hasFrames: false }));
+    expect(text).toContain('Game: Minecraft');
+    expect(text).toMatch(/The game above is correct/);
+  });
+
+  it('ignores a blank one rather than writing an empty line', () => {
+    for (const game of [null, '', '   ']) {
+      expect(buildPrompt(input({ video: { ...input().video, game } })), String(game)).not.toContain('Game:');
+    }
+  });
+});

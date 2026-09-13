@@ -434,7 +434,25 @@ const v5AiDrafts: Migration = {
   }
 };
 
-export const MIGRATIONS: readonly Migration[] = [v1Baseline, v2Lifecycle, v3Rotation, v4UploadsPlaylist, v5AiDrafts];
+/**
+ * Which game a video is of. On the video rather than the posting: the game does not change between
+ * one posting of a file and the next.
+ *
+ * Measured reason for storing it rather than asking the model: shown the same lobby frame four
+ * times, qwen3-vl:8b answered "The Last of Us", "Left 4 Dead", "ARK: Survival Evolved" and "The
+ * Forest". It cannot tell, and every tag built on a wrong answer is wrong.
+ */
+const VIDEO_COLUMNS_V6: ReadonlyArray<[string, string]> = [['game', 'TEXT']];
+
+const v6Game: Migration = {
+  version: 6,
+  name: 'remember which game a video is of',
+  up(db) {
+    for (const [column, type] of VIDEO_COLUMNS_V6) addColumn(db, 'videos', column, type);
+  }
+};
+
+export const MIGRATIONS: readonly Migration[] = [v1Baseline, v2Lifecycle, v3Rotation, v4UploadsPlaylist, v5AiDrafts, v6Game];
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
 
 export function migrate(db: Database.Database, options: MigrateOptions = {}): MigrateResult {

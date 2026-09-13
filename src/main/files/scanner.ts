@@ -5,6 +5,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type Database from 'better-sqlite3';
+import { detectGame } from '../../shared/games';
 import { renderTitleTemplate } from '../../shared/settings';
 import { applyQueueEvent } from '../db/queueRepo';
 import { readSettings } from '../db/settingsRepo';
@@ -15,6 +16,7 @@ import {
   listKnownVideos,
   queueIdForVideo,
   setVideoMissing,
+  setVideoGame,
   setVideoProbe,
   updateVideoStats
 } from '../db/videoRepo';
@@ -172,6 +174,9 @@ export async function scanFolder(db: Database.Database, deps: ScanDeps = {}): Pr
         ctx.now
       );
       setVideoProbe(db, videoId, await probe(filePath));
+      // A guess from the file name, which the user can correct. Better than nothing in the field,
+      // and far better than the model guessing from a frame, which it does badly.
+      setVideoGame(db, videoId, detectGame({ title: entry }));
       if (outcome.action === 'insert_flagged') {
         applyQueueEvent(db, queueId, { type: 'flag', code: 'file_changed', error: outcome.reason }, ctx);
       } else if (autoApprove) {
