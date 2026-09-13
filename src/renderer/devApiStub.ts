@@ -263,9 +263,43 @@ export function installDevApiStub(): void {
           likes: Math.round(sum((day) => day.views) * 0.04),
           subscribersGained: gained,
           subscribersLost: lost,
-          netSubscribers: gained - lost
+          netSubscribers: gained - lost,
+          comments: Math.round(sum((day) => day.views) * 0.006),
+          shares: Math.round(sum((day) => day.views) * 0.011),
+          averageViewDuration: 9.4,
+          averageViewPercentage: 61.2
         },
-        days: list
+        days: list,
+        subscriberSplit: {
+          subscribedViews: Math.round(sum((day) => day.views) * 0.18),
+          unsubscribedViews: Math.round(sum((day) => day.views) * 0.82),
+          subscribedRetention: 68.1,
+          unsubscribedRetention: 58.9
+        },
+        topVideos: [
+          { videoId: 'v1', title: 'THIS ZOMBIE ROUND BROKE ME', views: 18400, minutesWatched: 2900, averageViewPercentage: 74.2, likes: 940, subscribersGained: 61 },
+          { videoId: 'v2', title: 'PETER GRIFFIN IN CALL OF DUTY?', views: 9100, minutesWatched: 1300, averageViewPercentage: 63.5, likes: 410, subscribersGained: 22 },
+          { videoId: 'v3', title: 'I SHOULD NOT HAVE OPENED THAT DOOR', views: 3300, minutesWatched: 420, averageViewPercentage: 51.8, likes: 130, subscribersGained: 4 }
+        ],
+        trafficSources: [
+          { key: 'SHORTS', views: Math.round(sum((day) => day.views) * 0.79) },
+          { key: 'SUBSCRIBER', views: Math.round(sum((day) => day.views) * 0.12) },
+          { key: 'YT_SEARCH', views: Math.round(sum((day) => day.views) * 0.06) },
+          { key: 'RELATED_VIDEO', views: Math.round(sum((day) => day.views) * 0.03) }
+        ],
+        countries: [
+          { key: 'US', views: 5200 },
+          { key: 'GB', views: 1400 },
+          { key: 'CA', views: 900 },
+          { key: 'AU', views: 500 }
+        ],
+        demographics: [
+          { ageGroup: 'age18-24', gender: 'male', viewerPercentage: 34.1 },
+          { ageGroup: 'age25-34', gender: 'male', viewerPercentage: 27.6 },
+          { ageGroup: 'age13-17', gender: 'male', viewerPercentage: 14.2 },
+          { ageGroup: 'age18-24', gender: 'female', viewerPercentage: 9.8 },
+          { ageGroup: 'age35-44', gender: 'male', viewerPercentage: 7.3 }
+        ]
       });
     },
     uploadsList: () => ok([]),

@@ -51,3 +51,32 @@
   cursor: pointer;
 }
 .attributionLink:hover { text-decoration: underline; }
+
+/* Two cards side by side where there is room, stacked where there is not. */
+.columns { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+
+.bars { display: grid; gap: 10px; }
+.barRow { align-items: center; display: grid; gap: var(--space-2); grid-template-columns: minmax(90px, 1fr) 2fr auto; }
+.barLabel { color: var(--text-muted); font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.barTrack { background: var(--raised); border-radius: 999px; height: 8px; overflow: hidden; }
+.barFill { background: var(--scheduled); border-radius: 999px; display: block; height: 100%; min-width: 2px; }
+.barValue { color: var(--text); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+
+.footnote { color: var(--text-faint); font-size: var(--text-sm); margin-top: var(--space-3); }
+
+/* A table is the honest shape for this, and a narrow window must scroll it rather than the page. */
+.tableScroll { overflow-x: auto; }
+.table { border-collapse: collapse; width: 100%; }
+.table th { color: var(--text-faint); font-size: var(--text-sm); font-weight: 500; padding: 6px 8px; text-align: left; }
+.table td { border-top: 1px solid var(--line); padding: 8px; }
+.numeric { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.videoLink {
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-align: left;
+}
+.videoLink:hover { color: var(--scheduled); text-decoration: underline; }

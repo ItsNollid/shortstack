@@ -1,9 +1,21 @@
 // The only code that talks to the YouTube Data API. Everything goes through one interface so a
 // dry-run implementation can stand in during development and tests.
 import type { Privacy } from '../../shared/queue';
-import type { ChannelAnalytics } from '../../shared/analytics';
+import type { ChannelAnalytics, TopVideo } from '../../shared/analytics';
 import type { PastUpload, PastUploadPage } from '../../shared/pastUploads';
-import { ANALYTICS_METRICS, parseAnalyticsReport, reportRange } from './analyticsReport';
+import {
+  ANALYTICS_METRICS,
+  DEMOGRAPHIC_METRICS,
+  SOURCE_METRICS,
+  SPLIT_METRICS,
+  VIDEO_METRICS,
+  parseAnalyticsReport,
+  parseDemographics,
+  parseNamedShares,
+  parseSubscriberSplit,
+  parseTopVideos,
+  reportRange
+} from './analyticsReport';
 import { classifyFailure } from './resumableUpload';
 
 export const API_BASE = 'https://www.googleapis.com/youtube/v3';
@@ -250,32 +262,100 @@ export class HttpYouTubeGateway implements YouTubeGateway {
   }
 
   /** Analytics is a separate API on a separate host, so it does not go through request(). */
-  async fetchChannelAnalytics(days: number, now: Date = new Date()): Promise<GatewayResult<ChannelAnalytics>> {
-    const { startDate, endDate } = reportRange(now, days);
-    const query = new URLSearchParams({
-      ids: 'channel==MINE',
-      startDate,
-      endDate,
-      metrics: ANALYTICS_METRICS.join(','),
-      dimensions: 'day',
-      sort: 'day'
-    });
+  private async report(params: Record<string, string>): Promise<unknown> {
+    const query = new URLSearchParams({ ids: 'channel==MINE', ...params });
     const response = await this.doFetch(`${this.analyticsBaseUrl}/reports?${query.toString()}`, {
       headers: { Authorization: `Bearer ${await this.deps.accessToken()}` }
     });
     const body = await response.text();
-    if (!response.ok) return failure(response.status, body, 'Reading your analytics');
+    if (!response.ok) throw new Error(`${response.status} ${body.slice(0, 200)}`);
+    return JSON.parse(body);
+  }
 
+  /** Each extra section is its own request. One failing costs that section and nothing else. */
+  private async section<T>(run: () => Promise<T>): Promise<T | null> {
     try {
-      return { ok: true, value: parseAnalyticsReport(JSON.parse(body), startDate, endDate) };
+      return await run();
     } catch {
-      return {
-        ok: false,
-        reason: 'Your analytics came back in a form ShortStack could not read',
-        code: 'bad_report',
-        retryable: false
-      };
+      return null;
     }
+  }
+
+  async fetchChannelAnalytics(days: number, now: Date = new Date()): Promise<GatewayResult<ChannelAnalytics>> {
+    const { startDate, endDate } = reportRange(now, days);
+    const range = { startDate, endDate };
+
+    let summary: ChannelAnalytics;
+    try {
+      summary = parseAnalyticsReport(
+        await this.report({ ...range, metrics: ANALYTICS_METRICS.join(','), dimensions: 'day', sort: 'day' }),
+        startDate,
+        endDate
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const status = Number(message.slice(0, 3));
+      return failure(Number.isFinite(status) ? status : 500, message, 'Reading your analytics');
+    }
+
+    // Fired together: they do not depend on each other, and six round trips in sequence is a page
+    // that takes six times as long to show anything.
+    const [subscriberSplit, topVideos, trafficSources, countries, demographics] = await Promise.all([
+      this.section(async () =>
+        parseSubscriberSplit(await this.report({ ...range, metrics: SPLIT_METRICS.join(','), dimensions: 'subscribedStatus' }))
+      ),
+      this.section(async () =>
+        parseTopVideos(
+          await this.report({
+            ...range,
+            metrics: VIDEO_METRICS.join(','),
+            dimensions: 'video',
+            sort: '-views',
+            maxResults: '10'
+          })
+        )
+      ),
+      this.section(async () =>
+        parseNamedShares(
+          await this.report({
+            ...range,
+            metrics: SOURCE_METRICS.join(','),
+            dimensions: 'insightTrafficSourceType',
+            sort: '-views'
+          }),
+          'insightTrafficSourceType'
+        )
+      ),
+      this.section(async () =>
+        parseNamedShares(
+          await this.report({ ...range, metrics: SOURCE_METRICS.join(','), dimensions: 'country', sort: '-views', maxResults: '10' }),
+          'country',
+          6
+        )
+      ),
+      this.section(async () =>
+        parseDemographics(await this.report({ ...range, metrics: DEMOGRAPHIC_METRICS.join(','), dimensions: 'ageGroup,gender' }))
+      )
+    ]);
+
+    // Analytics knows video ids; the titles live on the Data API.
+    const named = topVideos === null ? null : await this.section(() => this.withTitles(topVideos));
+
+    return {
+      ok: true,
+      value: { ...summary, subscriberSplit, topVideos: named ?? topVideos, trafficSources, countries, demographics }
+    };
+  }
+
+  private async withTitles(videos: TopVideo[]): Promise<TopVideo[]> {
+    if (videos.length === 0) return videos;
+    const ids = videos.map((video) => video.videoId);
+    const response = await this.request(`/videos?part=snippet&id=${ids.map(encodeURIComponent).join(',')}`);
+    if (!response.ok) return videos;
+
+    const parsed = JSON.parse(await response.text()) as { items?: Array<{ id?: string; snippet?: { title?: string } }> };
+    const titles = new Map((parsed.items ?? []).map((item) => [item.id ?? '', item.snippet?.title ?? '']));
+    return videos.map((video) => ({ ...video, title: titles.get(video.videoId) ?? null }));
   }
 
   async listPastUploads(
