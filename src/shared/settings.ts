@@ -1,5 +1,6 @@
 // Typed app settings: defaults, decoding of stored strings, and validation of changes.
 // Shared so the renderer can validate inline with exactly the rules the main process enforces.
+import type { FormattingRules, TitleCase } from './formatting';
 import type { Privacy, UploadMethod } from './queue';
 
 export interface AppSettings {
@@ -34,6 +35,15 @@ export interface AppSettings {
   ai_host: string;
   ai_model: string;
   ai_auto_draft: boolean;
+
+  /** House style, applied to whatever ends up in a title or description. All of it optional. */
+  format_title_case: TitleCase;
+  format_title_prefix: string;
+  format_title_suffix: string;
+  format_description_footer: string;
+  format_tidy: boolean;
+  /** 0 means no limit. */
+  format_max_hashtags: number;
   close_to_tray: boolean;
   close_to_tray_notice_shown: boolean;
   start_with_windows: boolean;
@@ -219,6 +229,15 @@ export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> 
   ai_host: text('http://127.0.0.1:11434', checkHttpUrl),
   ai_model: text('', (value) => (value.length > 200 ? 'That model name is too long' : null)),
   ai_auto_draft: bool(false),
+
+  format_title_case: oneOf<TitleCase>('as_written', ['as_written', 'upper', 'title']),
+  format_title_prefix: text('', (value) => (charCount(value) > 40 ? 'A prefix that long leaves no room for a title' : null)),
+  format_title_suffix: text('', (value) => (charCount(value) > 40 ? 'A suffix that long leaves no room for a title' : null)),
+  format_description_footer: text('', (value) =>
+    utf8Bytes(value) > 2000 ? 'A footer that long leaves no room for a description' : null
+  ),
+  format_tidy: bool(false),
+  format_max_hashtags: integer(0, 0, 60),
   close_to_tray: bool(true),
   close_to_tray_notice_shown: bool(false),
   start_with_windows: bool(false)
@@ -286,4 +305,16 @@ export function validateSettingChange(current: AppSettings, key: SettingKey, val
     return 'Turn off auto-approve first';
   }
   return null;
+}
+
+/** The formatting rules as the settings currently describe them. */
+export function formattingRules(settings: AppSettings): FormattingRules {
+  return {
+    titleCase: settings.format_title_case,
+    titlePrefix: settings.format_title_prefix,
+    titleSuffix: settings.format_title_suffix,
+    descriptionFooter: settings.format_description_footer,
+    tidy: settings.format_tidy,
+    maxHashtags: settings.format_max_hashtags
+  };
 }

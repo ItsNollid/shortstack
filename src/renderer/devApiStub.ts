@@ -107,7 +107,13 @@ const SETTINGS: AppSettings = {
   shorts_folder: FOLDER,
   setup_complete: true,
   legal_accepted_version: LEGAL_VERSION,
-  last_seen_version: null
+  last_seen_version: null,
+  format_title_case: 'as_written' as const,
+  format_title_prefix: '',
+  format_title_suffix: '',
+  format_description_footer: '',
+  format_tidy: false,
+  format_max_hashtags: 0
 };
 
 const ACTIVITY = [

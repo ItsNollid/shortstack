@@ -1,9 +1,12 @@
 import type Database from 'better-sqlite3';
 import type { QueueItemDTO } from '../../shared/dto';
 import type { QueueState, UploadMethod } from '../../shared/queue';
+import { formatDescription, formatTags, formatTitle } from '../../shared/formatting';
+import { formattingRules } from '../../shared/settings';
 import { validateMetadataPatch, type QueueMetadataPatch } from '../../shared/videoMetadata';
 import { transition, type QueueEvent, type QueueStateFields } from '../domain/queueState';
 import { appendActivity } from './activityRepo';
+import { readSettings } from './settingsRepo';
 import { toDbValue, toQueueItemDTO, toStateFields } from './rows';
 
 const SELECT_ITEM = `
@@ -45,6 +48,20 @@ const METADATA_COLUMNS: readonly string[] = [
 
 /** Only ever written alongside a metadata write, never on its own. */
 const PROVENANCE_COLUMNS: readonly string[] = ['ai_drafted_at', 'metadata_edited_at'];
+
+/**
+ * House style, applied here rather than at each call site. Every write to a title or description
+ * goes through this file, so this is the one place that cannot be forgotten — and formatting that
+ * applies to typed details but not drafted ones (or the reverse) would be worse than none.
+ */
+function formatted(db: Database.Database, patch: QueueMetadataPatch): QueueMetadataPatch {
+  const rules = formattingRules(readSettings(db).settings);
+  const result = { ...patch };
+  if (typeof result.title === 'string') result.title = formatTitle(result.title, rules);
+  if (typeof result.description === 'string') result.description = formatDescription(result.description, rules);
+  if (Array.isArray(result.tags)) result.tags = formatTags(result.tags, rules);
+  return result;
+}
 
 const CONFLICT = 'This video changed while you were working on it. Try again.';
 const GONE = 'That video is no longer in the queue';
@@ -188,7 +205,7 @@ export interface DraftedMetadata {
  * arrangement falls apart if the machine can set it.
  */
 export function applyDraft(db: Database.Database, id: number, draft: DraftedMetadata, ctx: QueueContext): QueueEventResult {
-  const patch: QueueMetadataPatch = { title: draft.title, description: draft.description, tags: draft.tags };
+  const patch = formatted(db, { title: draft.title, description: draft.description, tags: draft.tags });
   const problem = validateMetadataPatch(patch);
   if (problem !== null) return { ok: false, reason: problem };
 
@@ -222,7 +239,8 @@ export function updateQueueMetadata(
   patch: QueueMetadataPatch,
   ctx: QueueContext
 ): QueueEventResult {
-  const problem = validateMetadataPatch(patch);
+  const shaped = formatted(db, patch);
+  const problem = validateMetadataPatch(shaped);
   if (problem !== null) return { ok: false, reason: problem };
 
   const run = db.transaction((): QueueEventResult => {
@@ -237,7 +255,7 @@ export function updateQueueMetadata(
     if (ctx.expectedUpdatedAt !== undefined && ctx.expectedUpdatedAt !== current) return { ok: false, reason: CONFLICT };
     // Stamped here and nowhere else: this is the one path a person's own edit comes through, and
     // it is what stops the drafting worker from overwriting it later.
-    const combined = { ...result.patch, ...patch, metadata_edited_at: ctx.now.toISOString() } as Record<string, unknown>;
+    const combined = { ...result.patch, ...shaped, metadata_edited_at: ctx.now.toISOString() } as Record<string, unknown>;
     if (!writePatch(db, id, combined, [...STATE_COLUMNS, ...METADATA_COLUMNS, ...PROVENANCE_COLUMNS], ctx.now, current)) {
       return { ok: false, reason: CONFLICT };
     }
