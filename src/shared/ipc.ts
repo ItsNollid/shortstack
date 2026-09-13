@@ -112,6 +112,8 @@ export interface ShortStackApi {
 
   aiStatus(): Promise<Result<AiStatus>>;
   aiGenerate(queueId: number): Promise<Result<MetadataSuggestionDTO>>;
+  /** Loads a model and asks it one question, so a choice can be checked before it is relied on. */
+  aiTest(model: string): Promise<Result<null>>;
 
   analyticsGet(days: number): Promise<Result<ChannelAnalytics>>;
   /** Previously published videos, so their details can be reused on a new posting. */
@@ -166,6 +168,7 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'authRefreshChannel',
   'aiStatus',
   'aiGenerate',
+  'aiTest',
   'analyticsGet',
   'pastUploadsList',
   'uploadsList',

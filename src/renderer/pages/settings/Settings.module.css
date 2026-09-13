@@ -92,3 +92,6 @@
 
 .problem { color: var(--danger); font-size: var(--text-sm); }
 .saved { color: var(--live); font-size: var(--text-sm); }
+
+/* Keeps the check button level with the field beside it rather than with its label. */
+.checkRow { align-items: end; display: flex; padding-bottom: 2px; }

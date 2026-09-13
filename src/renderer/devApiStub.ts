@@ -205,6 +205,7 @@ export function installDevApiStub(): void {
     authRefreshChannel: () =>
       Promise.resolve({ ok: false as const, error: { code: 'preview', message: 'Not available in the browser preview' } }),
     aiStatus: () => ok({ running: true, models: [{ name: 'llava:13b', vision: true }], message: 'Ready' }),
+    aiTest: () => ok(null),
     aiGenerate: () =>
       ok({
         title: 'Rain on a tent for three straight minutes',

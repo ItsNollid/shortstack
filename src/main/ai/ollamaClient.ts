@@ -3,9 +3,18 @@
 import type { PastUpload } from '../../shared/pastUploads';
 import { extractJson, sanitizeSuggestion, type MetadataSuggestion } from './metadataSuggestion';
 import { isVisionModel, visionFrom, type AiModel } from '../../shared/aiModels';
+import { classifyFailure } from './failures';
 import { buildPrompt, type VideoFacts } from './prompt';
 
-export type AiFailureCode = 'not_running' | 'no_models' | 'model_missing' | 'timeout' | 'bad_output' | 'error';
+export type AiFailureCode =
+  | 'not_running'
+  | 'no_models'
+  | 'model_missing'
+  | 'model_unsupported'
+  | 'out_of_memory'
+  | 'timeout'
+  | 'bad_output'
+  | 'error';
 
 export type AiResult<T> = { ok: true; value: T } | { ok: false; code: AiFailureCode; reason: string };
 
@@ -84,6 +93,34 @@ export async function listModels(deps: OllamaDeps): Promise<AiResult<AiModel[]>>
   }
 }
 
+/**
+ * Loads a model and asks it for one word. Enough to surface everything that goes wrong at load time
+ * — a missing model, an architecture Ollama cannot run, a machine without the memory for it — which
+ * is otherwise only discovered when someone presses Suggest on a real video and gets a number.
+ */
+export async function testModel(model: string, deps: OllamaDeps): Promise<AiResult<null>> {
+  const doFetch = deps.fetch ?? fetch;
+  try {
+    const response = await withTimeout(deps.generateTimeoutMs ?? 120_000, (signal) =>
+      doFetch(`${deps.host}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal,
+        // Loading a model off a cold disk is the slow part, not the answer, so ask for almost nothing.
+        body: JSON.stringify({ model, prompt: 'Reply with the single word: ready', stream: false, options: { num_predict: 8 } })
+      })
+    );
+    if (response === 'timeout') {
+      return { ok: false, code: 'timeout', reason: 'The model did not finish loading in time. A smaller one will start faster.' };
+    }
+
+    const body = await response.text();
+    return response.ok ? { ok: true, value: null } : { ok: false, ...classifyFailure(response.status, body, model) };
+  } catch (error) {
+    return unreachable(error);
+  }
+}
+
 export async function generateMetadata(input: GenerateInput, deps: OllamaDeps): Promise<AiResult<MetadataSuggestion>> {
   const doFetch = deps.fetch ?? fetch;
   try {
@@ -106,10 +143,7 @@ export async function generateMetadata(input: GenerateInput, deps: OllamaDeps): 
     if (response === 'timeout') return { ok: false, code: 'timeout', reason: 'The model took too long to answer' };
 
     const body = await response.text();
-    if (response.status === 404) {
-      return { ok: false, code: 'model_missing', reason: `Ollama does not have the model "${input.model}" downloaded` };
-    }
-    if (!response.ok) return { ok: false, code: 'error', reason: `Ollama replied ${response.status}` };
+    if (!response.ok) return { ok: false, ...classifyFailure(response.status, body, input.model) };
 
     const envelope = JSON.parse(body) as { response?: unknown };
     if (typeof envelope.response !== 'string') {

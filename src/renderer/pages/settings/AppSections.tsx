@@ -5,6 +5,7 @@ import { useApiQuery } from '../../hooks/useApi';
 import type { AiStatus, Result } from '../../../shared/ipc';
 import { findModel, isVisionModel, type AiModel } from '../../../shared/aiModels';
 import type { SettingsWriter } from './useSettings';
+import { ModelPicker } from './ModelPicker';
 import { CommittedText, Section } from './parts';
 import styles from './Settings.module.css';
 
@@ -38,31 +39,19 @@ export function AiSection({ writer }: { writer: SettingsWriter }): React.JSX.Ele
         <div className={styles.sectionText}>
           {canSee(models, settings.ai_model)
             ? `${settings.ai_model} can look at the video. ShortStack sends it stills from three points in the clip, so it can name the game and what is happening instead of guessing from the file name.`
-            : `${settings.ai_model} cannot look at images, so suggestions come from the file name and your past uploads alone. A model like llava, llama3.2-vision or gemma3 would see the video itself.`}
+            : `${settings.ai_model} cannot look at images, so suggestions come from the file name and your past uploads alone. A model that can see the video, such as qwen3-vl or gemma3, would do better.`}
         </div>
       )}
 
-      <div className={styles.pair}>
-        <CommittedText
-          label="Ollama address"
-          value={settings.ai_host}
-          onCommit={(value) => writer.set('ai_host', value)}
-          problem={writer.problemFor('ai_host')}
-          placeholder="http://127.0.0.1:11434"
-        />
-        <CommittedText
-          label="Model"
-          value={settings.ai_model}
-          onCommit={(value) => writer.set('ai_model', value)}
-          problem={writer.problemFor('ai_model')}
-          placeholder={models[0]?.name ?? 'llama3.2'}
-          hint={
-            models.length === 0
-              ? 'Install one with: ollama pull llama3.2-vision — a vision model can see the video itself'
-              : `Installed: ${models.map((model) => (model.vision ? `${model.name} (sees video)` : model.name)).join(', ')}`
-          }
-        />
-      </div>
+      <CommittedText
+        label="Ollama address"
+        value={settings.ai_host}
+        onCommit={(value) => writer.set('ai_host', value)}
+        problem={writer.problemFor('ai_host')}
+        placeholder="http://127.0.0.1:11434"
+      />
+
+      <ModelPicker models={models} value={settings.ai_model} onChange={(model) => writer.set('ai_model', model)} />
 
       <Switch
         label="Draft details for new videos automatically"

@@ -24,7 +24,9 @@ const VISION_FAMILIES = [
   'llama-4',
   'gemma3',
   'qwen2.5vl',
-  'qwen2-vl'
+  'qwen2-vl',
+  'qwen3-vl',
+  'gemma4'
 ];
 
 export function isVisionModel(model: string): boolean {

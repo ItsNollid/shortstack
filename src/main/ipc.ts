@@ -7,7 +7,7 @@ import * as path from 'path';
 import { findModel } from '../shared/aiModels';
 import type { AppEvent, AppInfo, AuthStatus, Result, ShortStackApi } from '../shared/ipc';
 import { parseVideoId } from '../shared/youtubeUrl';
-import { generateMetadata, listModels } from './ai/ollamaClient';
+import { generateMetadata, listModels, testModel } from './ai/ollamaClient';
 import { listActivity } from './db/activityRepo';
 import { clearChannels, readActiveChannel, upsertChannel } from './db/channelRepo';
 import { applyQueueEvent, getQueueItem, listQueueItems, updateQueueMetadata } from './db/queueRepo';
@@ -405,6 +405,12 @@ export function registerIpcHandlers(context: IpcContext): void {
       return models.ok
         ? ok({ running: true, models: models.value, message: `${models.value.length} model${models.value.length === 1 ? '' : 's'} available` })
         : ok({ running: models.code !== 'not_running', models: [], message: models.reason });
+    },
+    aiTest: async (model) => {
+      if (typeof model !== 'string' || model.trim() === '') return fail('invalid', 'Choose a model first');
+      const { settings } = readSettings(db);
+      const result = await testModel(model.trim(), { host: settings.ai_host });
+      return result.ok ? ok(null) : fail(result.code, result.reason);
     },
     aiGenerate: async (queueId) => {
       const parsed = asId(queueId);
