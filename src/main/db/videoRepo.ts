@@ -154,7 +154,22 @@ export function queueIdForVideo(db: Database.Database, videoId: number): number 
  */
 export function setVideoGame(db: Database.Database, videoId: number, game: string | null): void {
   const cleaned = game === null ? null : game.replace(/[<>]/g, '').trim().slice(0, 80);
-  db.prepare('UPDATE videos SET game = ? WHERE id = ?').run(cleaned === '' ? null : cleaned, videoId);
+  const next = cleaned === '' ? null : cleaned;
+  const previous = db.prepare('SELECT game FROM videos WHERE id = ?').get(videoId) as { game?: string | null } | undefined;
+
+  db.transaction(() => {
+    db.prepare('UPDATE videos SET game = ? WHERE id = ?').run(next, videoId);
+
+    // A draft written before the game was known was written blind: the model guessed from the frame,
+    // and the hashtags were built without the game's own. If nobody has edited it since, it is marked
+    // for the worker to write again with the right game. Anything a person typed is left alone, and so
+    // is anything already on its way to YouTube.
+    if ((previous?.game ?? null) !== next) {
+      db.prepare(
+        "UPDATE queue SET ai_drafted_at = NULL WHERE video_id = ? AND ai_drafted_at IS NOT NULL AND metadata_edited_at IS NULL AND state IN ('pending', 'approved')"
+      ).run(videoId);
+    }
+  })();
 }
 
 /** Every game already in use, so the field can suggest what this channel actually plays. */
