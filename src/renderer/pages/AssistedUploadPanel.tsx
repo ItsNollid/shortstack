@@ -63,6 +63,15 @@ export function AssistedUploadPanel({ item }: { item: QueueItemDTO }): React.JSX
           <CopyField label="Tags" value={item.tags.join(', ')} emptyText="No tags" />
         </Step>
 
+        {item.source_url !== null && (
+          <Step
+            title="Link the long video"
+            text="Where Studio offers a related video for this Short, choose the long video it was cut from, so viewers can go from the clip to the whole thing."
+          >
+            <CopyField label={item.source_title ?? 'Long video'} value={item.source_url} />
+          </Step>
+        )}
+
         <Step title="Set visibility and timing">
           <div className={styles.setting}>
             <span className={styles.settingLabel}>Visibility</span>

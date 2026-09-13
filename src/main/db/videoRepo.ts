@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3';
 import type { Platform, Privacy } from '../../shared/queue';
 import type { KnownVideo } from '../files/fileIdentity';
 import { toDbValue } from './rows';
+import type { SourceVideo } from '../../shared/sourceVideo';
 
 export interface NewVideo {
   filename: string;
@@ -178,4 +179,30 @@ export function listKnownGames(db: Database.Database): string[] {
     .prepare("SELECT DISTINCT game FROM videos WHERE game IS NOT NULL AND trim(game) <> '' ORDER BY game")
     .all() as Array<{ game: string }>;
   return rows.map((row) => row.game);
+}
+
+/** The long video this Short was cut from, already checked, or null to say it is not known. */
+export function setVideoSource(db: Database.Database, videoId: number, source: SourceVideo | null): void {
+  db.prepare('UPDATE videos SET source_title = ?, source_url = ? WHERE id = ?').run(source?.title ?? null, source?.url ?? null, videoId);
+}
+
+/**
+ * Every long video already named, once each, most recently added first: cutting Shorts from one long
+ * video happens in a batch, so the one just used is the likeliest next answer. A title typed twice with
+ * different capitals is the same video, and keeps whichever link it was given.
+ */
+export function listKnownSources(db: Database.Database): SourceVideo[] {
+  const rows = db
+    .prepare(
+      `SELECT v.source_title AS title,
+              (SELECT w.source_url FROM videos w
+                WHERE lower(trim(w.source_title)) = lower(trim(v.source_title)) AND w.source_url IS NOT NULL
+                ORDER BY w.id DESC LIMIT 1) AS url
+         FROM videos v
+        WHERE v.source_title IS NOT NULL AND trim(v.source_title) <> ''
+          AND v.id = (SELECT MAX(w.id) FROM videos w WHERE lower(trim(w.source_title)) = lower(trim(v.source_title)))
+        ORDER BY v.id DESC`
+    )
+    .all() as Array<{ title: string; url: string | null }>;
+  return rows.map((row) => ({ title: row.title, url: row.url ?? null }));
 }

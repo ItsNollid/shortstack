@@ -496,6 +496,23 @@ const v8GameGuess: Migration = {
   }
 };
 
+/**
+ * The long video a Short was cut from, by title and, when known, its YouTube link. On the video rather
+ * than the posting, like the game: which long video a clip came from does not change between postings.
+ */
+const VIDEO_COLUMNS_V9: ReadonlyArray<[string, string]> = [
+  ['source_title', 'TEXT'],
+  ['source_url', 'TEXT']
+];
+
+const v9SourceVideo: Migration = {
+  version: 9,
+  name: 'remember which long video a Short was cut from',
+  up(db) {
+    for (const [column, type] of VIDEO_COLUMNS_V9) addColumn(db, 'videos', column, type);
+  }
+};
+
 export const MIGRATIONS: readonly Migration[] = [
   v1Baseline,
   v2Lifecycle,
@@ -504,7 +521,8 @@ export const MIGRATIONS: readonly Migration[] = [
   v5AiDrafts,
   v6Game,
   v7ApiSpend,
-  v8GameGuess
+  v8GameGuess,
+  v9SourceVideo
 ];
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
 

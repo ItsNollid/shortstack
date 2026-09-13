@@ -96,6 +96,7 @@ export async function draftFor(deps: DraftDeps, queueId: number): Promise<AiResu
       video: {
         filename: item.filename,
         game: item.game,
+        sourceTitle: item.source_title,
         durationSeconds: item.duration_s,
         width: item.width,
         height: item.height,

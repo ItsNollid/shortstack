@@ -5,6 +5,7 @@ import type { UpdateStatus } from './updates';
 import type { ChannelAnalytics } from './analytics';
 import type { Pulled } from './analyticsRefresh';
 import type { RestyleChange, RestyleResult } from './restyle';
+import type { SourceVideo } from './sourceVideo';
 import type { ChannelAction, SettingChange } from './channelActions';
 import type { Brief } from './insights';
 import type { Affordable, QuotaMood, QuotaState } from './quota';
@@ -131,6 +132,9 @@ export interface ShortStackApi {
   videosScan(): Promise<Result<ScanSummary>>;
   /** Which game a video is of. Stored on the video, so every posting of it agrees. */
   videoSetGame(queueId: number, game: string | null): Promise<Result<QueueItemDTO>>;
+  /** The long video a Short was cut from: a title, and a YouTube link if there is one. Null clears it. */
+  videoSetSource(queueId: number, source: { title: string; link: string } | null): Promise<Result<QueueItemDTO>>;
+  sourcesKnown(): Promise<Result<SourceVideo[]>>;
   /** Games already in use on this channel, offered as suggestions alongside the built-in list. */
   gamesKnown(): Promise<Result<string[]>>;
 
@@ -229,6 +233,8 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'rotationPostAgain',
   'videosScan',
   'videoSetGame',
+  'videoSetSource',
+  'sourcesKnown',
   'gamesKnown',
   'thumbnailsMissing',
   'thumbnailSave',

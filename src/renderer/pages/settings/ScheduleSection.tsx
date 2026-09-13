@@ -111,6 +111,20 @@ export function ScheduleSection({
       />
 
       <Select
+        label="Shorts from the same long video in one day"
+        value={String(settings.source_daily_limit)}
+        onChange={(value) => writer.set('source_daily_limit', Number(value))}
+        options={[
+          { value: '0', label: 'No limit' },
+          { value: '1', label: 'At most 1' },
+          { value: '2', label: 'At most 2' },
+          { value: '3', label: 'At most 3' }
+        ]}
+        hint="For automatic times, and only videos with From long video filled in. With a limit, the rest move to the next day instead of going out back to back."
+        problem={writer.problemFor('source_daily_limit')}
+      />
+
+      <Select
         label="Retries after a failed upload"
         value={String(settings.auto_retry_max)}
         onChange={(value) => writer.set('auto_retry_max', Number(value))}

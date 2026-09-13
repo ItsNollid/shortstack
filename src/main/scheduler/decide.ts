@@ -3,7 +3,8 @@
 import { MIN_SCHEDULE_LEAD_MS, type UploadMethod } from '../../shared/queue';
 import { MISSABLE_STATES, PUBLISH_GRACE_MS, desiredPublishAt, isOnYouTube, type QueueStateFields } from '../domain/queueState';
 import type { PostingKind } from '../../shared/rotation';
-import { nextFreeSlot } from '../../shared/slots';
+import { dayKey, nextFreeSlot } from '../../shared/slots';
+import { sourceKey } from '../../shared/sourceVideo';
 
 export interface SchedulerItem extends QueueStateFields {
   id: number;
@@ -11,6 +12,8 @@ export interface SchedulerItem extends QueueStateFields {
   posting_kind: PostingKind;
   /** The file backing this item is gone or has changed. */
   missing: boolean;
+  /** The long video it was cut from, by title, so Shorts from one video can be kept apart. */
+  source_title?: string | null;
 }
 
 export interface SchedulerSettings {
@@ -22,6 +25,8 @@ export interface SchedulerSettings {
   /** How far ahead auto-scheduling books, so the near-term schedule stays free to change. */
   autoScheduleDays: number;
   paused: boolean;
+  /** Most Shorts from the same long video to book on one day. 0 or left out means no limit. */
+  sourceDailyLimit?: number;
 }
 
 export interface SchedulerHolds {
@@ -141,13 +146,38 @@ export function decide({ now, items, settings, holds }: SchedulerInput): Schedul
       return a.id - b.id;
     });
 
+    // Shorts from one long video, counted per day, so a limit can keep a batch from going out all at once.
+    // Five to ten come from each long video here, and without one they would fill the day back to back.
+    const limit = settings.sourceDailyLimit ?? 0;
+    const perSource = new Map<string, Map<string, number>>();
+    const book = (source: string, day: string): void => {
+      const days = perSource.get(source) ?? new Map<string, number>();
+      days.set(day, (days.get(day) ?? 0) + 1);
+      perSource.set(source, days);
+    };
+    if (limit > 0) {
+      for (const item of items) {
+        const source = sourceKey(item.source_title);
+        if (source === null || item.scheduled_for === null || item.state === 'rejected' || freed.has(item.scheduled_for)) continue;
+        book(source, dayKey(new Date(item.scheduled_for)));
+      }
+    }
+
     for (const item of ordered) {
       const uploadTimes = lane(item.posting_kind);
       if (uploadTimes.length === 0) continue;
-      const at = nextFreeSlot({ uploadTimes, taken, now, horizonDays: settings.autoScheduleDays });
+      const source = limit > 0 ? sourceKey(item.source_title) : null;
+      const blockedDays =
+        source === null
+          ? undefined
+          : new Set(
+              [...(perSource.get(source) ?? new Map<string, number>())].filter(([, booked]) => booked >= limit).map(([day]) => day)
+            );
+      const at = nextFreeSlot({ uploadTimes, taken, now, horizonDays: settings.autoScheduleDays, blockedDays });
       // One lane running out does not stop the other: they book independently.
       if (at === null) continue;
       taken.push(at);
+      if (source !== null) book(source, dayKey(new Date(at)));
       actions.push({ type: 'auto_slot', id: item.id, at });
     }
   }

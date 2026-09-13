@@ -24,6 +24,7 @@ import { AiAssistPanel, type AiField } from './AiAssistPanel';
 import { AssistedUploadPanel } from './AssistedUploadPanel';
 import styles from './VideoDetails.module.css';
 import { VideoSidePanel } from './VideoSidePanel';
+import { SourceField } from '../components/SourceField';
 
 interface Draft {
   title: string;
@@ -207,6 +208,7 @@ export function VideoDetails({ onApprove }: { onApprove: (item: QueueItemDTO) =>
           </DescriptionCheck>
 
 <GameField queueId={loaded.id} value={loaded.game} />
+          <SourceField queueId={loaded.id} title={loaded.source_title} url={loaded.source_url} />
 
           <TagInput
             label="Tags"

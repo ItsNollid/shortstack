@@ -30,6 +30,8 @@ const video = (over: Partial<QueueItemDTO> & Pick<QueueItemDTO, 'id' | 'title' |
   remote_sync: null,
   remote_error: null,
   game: null,
+  source_title: null,
+  source_url: null,
   ai_drafted_at: null,
   metadata_edited_at: null,
   upload_session_uri: null,
@@ -250,6 +252,8 @@ export function installDevApiStub(): void {
     settingsIgnored: () => ok([]),
     queueRestylePreview: () => ok([]),
     queueRestyle: () => ok({ changed: 0, skipped: 0 }),
+    videoSetSource: (id: number) => ok(SAMPLE.find((entry) => entry.id === id) ?? SAMPLE[0]!),
+    sourcesKnown: () => ok([]),
     activityList: () => ok(ACTIVITY),
     analyticsGet: (days: number) => {
       const end = new Date(Date.now() - 86_400_000);

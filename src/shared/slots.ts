@@ -11,9 +11,14 @@ export interface SlotQuery {
   now: Date;
   /** How far ahead to look before giving up. */
   horizonDays?: number;
+  /** Local days, named by dayKey, on which nothing more may be booked. */
+  blockedDays?: ReadonlySet<string>;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** A local calendar day, the same for any time within it. */
+export const dayKey = (date: Date): string => `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
 
 function parseTime(value: string): { hours: number; minutes: number } | null {
   const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
@@ -54,6 +59,7 @@ export function nextFreeSlot(query: SlotQuery): string | null {
   const horizonDays = query.horizonDays ?? 60;
   for (let offset = 0; offset <= horizonDays; offset += 1) {
     const day = new Date(query.now.getTime() + offset * DAY_MS);
+    if (query.blockedDays?.has(dayKey(day)) === true) continue;
     const slot = pickSlotForDay(day, query);
     if (slot !== null) return slot;
   }

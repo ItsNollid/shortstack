@@ -26,6 +26,7 @@ import { useAppStatus } from '../../app/status';
 import { useToast } from '../../app/toast';
 import { useApiMutation, useApiQuery } from '../../hooks/useApi';
 import styles from './Review.module.css';
+import { SourceField } from '../../components/SourceField';
 
 const readQueue = (): Promise<Result<QueueItemDTO[]>> => window.api.queueList();
 
@@ -279,6 +280,7 @@ export function Review(): React.JSX.Element {
           </DescriptionCheck>
 
 <GameField queueId={item.id} value={item.game} />
+          <SourceField queueId={item.id} title={item.source_title} url={item.source_url} />
 
           <TagInput
             label="Tags"

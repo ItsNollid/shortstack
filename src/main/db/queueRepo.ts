@@ -12,7 +12,7 @@ import { toDbValue, toQueueItemDTO, toStateFields } from './rows';
 
 const SELECT_ITEM = `
   SELECT q.*, v.filename, v.filepath, v.file_size, v.duration_s, v.width, v.height, v.missing,
-         v.published_before, v.rotation_paused, v.game,
+         v.published_before, v.rotation_paused, v.game, v.source_title, v.source_url,
          (SELECT COUNT(*) FROM queue p WHERE p.video_id = q.video_id) AS postings
   FROM queue q JOIN videos v ON v.id = q.video_id
 `;

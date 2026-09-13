@@ -33,6 +33,8 @@ export interface AppSettings {
   rotation_min_gap_days: number;
   /** How far ahead auto-scheduling books. Keeps the near-term schedule free to change. */
   auto_schedule_days: number;
+  /** Most Shorts from the same long video to book on one day. 0 means no limit. */
+  source_daily_limit: number;
   auto_approve: boolean;
   auto_approve_consented_at: string | null;
   auto_retry_max: number;
@@ -262,6 +264,7 @@ export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> 
   rotation_max_postings: integer(6, 0, 50),
   rotation_min_gap_days: integer(14, 0, 365),
   auto_schedule_days: integer(14, 1, 60),
+  source_daily_limit: integer(0, 0, 10),
   auto_approve: bool(false),
   auto_approve_consented_at: isoDateOrNull(),
   auto_retry_max: integer(3, 0, 10),

@@ -5,6 +5,8 @@ import { tagVocabulary, withoutOneOffTags, type TagVocabulary } from '../../shar
 import type { PastUpload } from '../../shared/pastUploads';
 
 export interface VideoFacts {
+  /** The long video this Short was cut from, when the person has said. */
+  sourceTitle?: string | null;
   filename: string;
   durationSeconds: number | null;
   width: number | null;
@@ -71,6 +73,10 @@ function renderVideo(video: VideoFacts, hasFrames: boolean): string[] {
   // Left 4 Dead, ARK and The Forest — so when the user has said, the model is told and not asked.
   if (video.game !== undefined && video.game !== null && video.game.trim() !== '') {
     lines.push(`Game: ${video.game.trim()}`);
+  }
+  if (video.sourceTitle !== undefined && video.sourceTitle !== null && video.sourceTitle.trim() !== '') {
+    // Context, not a title to copy: a Short has to make sense to someone who never saw the long video.
+    lines.push(`Cut from the long video: ${video.sourceTitle.trim()}`);
   }
   if (video.durationSeconds !== null) lines.push(`Length: ${Math.round(video.durationSeconds)} seconds`);
   if (video.width !== null && video.height !== null) lines.push(`Frame: ${video.width}x${video.height}`);

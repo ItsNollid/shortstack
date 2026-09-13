@@ -17,7 +17,7 @@ import type { QueueEvent } from './domain/queueState';
 import { scanFolder } from './files/scanner';
 import type { SchedulerEngine } from './scheduler/engine';
 import { createPosting, markPublishedBefore, setRotationPaused } from './db/rotationRepo';
-import { listKnownGames, setVideoGame } from './db/videoRepo';
+import { listKnownGames, listKnownSources, setVideoGame, setVideoSource } from './db/videoRepo';
 import { clearPastUploadsCache, draftFor } from './ai/draft';
 import { buildInsightPrompt, sanitizeAdvice } from './ai/insightPrompt';
 import { buildBrief } from '../shared/insights';
@@ -34,6 +34,7 @@ import type { AuthService } from './youtube/authService';
 import type { YouTubeGateway } from './youtube/gateway';
 import { awaitAuthorizationCode } from './youtube/loopbackServer';
 import { REQUIRED_SCOPES, buildAuthUrl, parseClientSecret } from './youtube/oauthFlow';
+import { checkSource } from '../shared/sourceVideo';
 
 export interface IpcContext {
   db: Database.Database;
@@ -299,6 +300,30 @@ export function registerIpcHandlers(context: IpcContext): void {
     },
 
     gamesKnown: async () => ok(listKnownGames(db)),
+
+    videoSetSource: async (queueId, source) => {
+      const parsed = asId(queueId);
+      if (parsed === null) return fail('invalid', 'That video id is not valid');
+      const item = getQueueItem(db, parsed);
+      if (item === undefined) return fail('not_found', 'That video is no longer in the queue');
+
+      if (source === null) {
+        setVideoSource(db, item.video_id, null);
+      } else {
+        if (typeof source !== 'object' || typeof source.title !== 'string' || typeof source.link !== 'string') {
+          return fail('invalid', 'That is not a long video');
+        }
+        // Checked here as well as in the window: what the renderer sends is not what decides it is valid.
+        const checked = checkSource(source);
+        if (!checked.ok) return fail('invalid', checked.problem);
+        setVideoSource(db, item.video_id, checked.source);
+      }
+      changed();
+      const updated = getQueueItem(db, parsed);
+      return updated === undefined ? fail('not_found', 'That video is no longer in the queue') : ok(updated);
+    },
+
+    sourcesKnown: async () => ok(listKnownSources(db)),
 
     videosScan: async () => {
       const summary = await scanFolder(db);

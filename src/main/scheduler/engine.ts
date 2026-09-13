@@ -151,7 +151,8 @@ export class SchedulerEngine {
         uploadTimes: settings.upload_times,
         rotationUploadTimes: settings.rotation_upload_times,
         autoScheduleDays: settings.auto_schedule_days,
-        paused: settings.scheduler_paused
+        paused: settings.scheduler_paused,
+        sourceDailyLimit: settings.source_daily_limit
       },
       holds: {
         auth: this.effects.authState(),
