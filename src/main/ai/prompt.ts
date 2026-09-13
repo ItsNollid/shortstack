@@ -1,6 +1,7 @@
 // What the model is actually told. The first version passed a filename and nothing else, so it was
 // guessing: it had never seen the video and had no idea what this channel's descriptions look like.
 // Everything here exists to replace guessing with evidence.
+import { tagVocabulary, withoutOneOffTags, type TagVocabulary } from '../../shared/channelTags';
 import type { PastUpload } from '../../shared/pastUploads';
 
 export interface VideoFacts {
@@ -30,7 +31,7 @@ const EXAMPLE_DESCRIPTION_CHARS = 600;
 const truncate = (value: string, limit: number): string =>
   value.length <= limit ? value : `${value.slice(0, limit)}…`;
 
-function renderExamples(examples: readonly PastUpload[]): string[] {
+function renderExamples(examples: readonly PastUpload[], vocabulary: TagVocabulary): string[] {
   const usable = examples.filter((example) => example.title.trim() !== '').slice(0, EXAMPLE_LIMIT);
   if (usable.length === 0) return [];
 
@@ -43,9 +44,11 @@ function renderExamples(examples: readonly PastUpload[]): string[] {
   usable.forEach((example, index) => {
     lines.push(`--- Example ${index + 1} ---`);
     lines.push(`Title: ${example.title}`);
-    if (example.description.trim() !== '') {
-      lines.push(`Description: ${truncate(example.description.trim(), EXAMPLE_DESCRIPTION_CHARS)}`);
-    }
+    // Shown with the one-video hashtags removed. Asking a model not to copy what it can see does
+    // not work: given an example ending in #round100 it put #round50 on a lobby screen, and a
+    // blunter instruction only changed which number it invented.
+    const description = withoutOneOffTags(example.description.trim(), vocabulary);
+    if (description !== '') lines.push(`Description: ${truncate(description, EXAMPLE_DESCRIPTION_CHARS)}`);
     if (example.tags.length > 0) lines.push(`Tags: ${example.tags.join(', ')}`);
     lines.push('');
   });
@@ -73,7 +76,8 @@ function renderVideo(video: VideoFacts, hasFrames: boolean): string[] {
 
 export function buildPrompt(input: PromptInput): string {
   const channel = input.channelName ?? 'this channel';
-  const examples = renderExamples(input.examples);
+  const vocabulary = tagVocabulary(input.examples.map((example) => example.description));
+  const examples = renderExamples(input.examples, vocabulary);
 
   return [
     `You write titles, descriptions and tags for YouTube Shorts on the channel "${channel}".`,
@@ -86,9 +90,14 @@ export function buildPrompt(input: PromptInput): string {
       ? 'Description: copy the shape of the example descriptions exactly, and use at least as many hashtags as they do. If they are blocks of hashtags, write a block of hashtags for this video, using the specific game, map, mode and topic rather than generic words.'
       : 'Description: a short line about the video, then a block of at least ten specific hashtags covering the game, map, mode and topic.',
     'Tags: 10 to 20 search phrases someone would actually type. Specific beats broad: name the game and the mode rather than "gaming".',
-    ...(examples.length > 0
-      ? ['The hashtags and tags in the examples belong to those videos. Reuse one only if it is also true of this video.']
-      : []),
+    ...(vocabulary.standing.length > 0
+      ? [
+          `This channel puts these on everything, so they belong here too: ${vocabulary.standing.join(' ')}`,
+          'Every other hashtag has to be something you can actually see. Do not invent a round number, a map name or a score.'
+        ]
+      : examples.length > 0
+        ? ['The hashtags in the examples belong to those videos. Reuse one only if it is also true of this one.']
+        : []),
     'Do not invent facts you cannot see. If you are unsure which game it is, describe what is happening instead of naming the wrong one.',
     '',
     'Reply with only a JSON object with the keys "title", "description" and "tags", where "tags" is an array of at least 10 strings. No other text.'

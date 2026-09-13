@@ -29,10 +29,47 @@ describe('buildPrompt', () => {
 
   it('puts the channel’s own uploads in front of the model as examples', () => {
     // Without these it is guessing at a house style it has never seen.
-    const prompt = buildPrompt(input({ examples: [example()] }));
+    const prompt = buildPrompt(input({ examples: [example(), example({ videoId: 'b', title: 'ANOTHER ONE' })] }));
     expect(prompt).toContain('THIS ZOMBIE ROUND BROKE ME');
     expect(prompt).toContain('#blackops3zombies');
     expect(prompt).toContain('blackops3zombies, codzombies');
+  });
+
+  describe('hashtags that belong to one video', () => {
+    const across = (extra: string) => example({ description: `#blackops3zombies #codzombies ${extra}` });
+
+    // Measured: shown an example ending in #round100, qwen3-vl:8b put #round50 on a lobby screen,
+    // and a blunter instruction only changed the number. It cannot be told; it has to not see them.
+    it('keeps them out of the examples entirely', () => {
+      const prompt = buildPrompt(
+        input({
+          examples: [
+            across('#round100'),
+            across('#easteregg'),
+            across('#firstgame')
+          ]
+        })
+      );
+      expect(prompt).not.toContain('#round100');
+      expect(prompt).not.toContain('#easteregg');
+      expect(prompt).not.toContain('#firstgame');
+    });
+
+    it('keeps the ones the channel puts on everything, and says they are safe', () => {
+      const prompt = buildPrompt(input({ examples: [across('#round100'), across('#easteregg')] }));
+      expect(prompt).toContain('#blackops3zombies');
+      expect(prompt).toContain('#codzombies');
+      expect(prompt).toMatch(/puts these on everything/);
+      expect(prompt).toMatch(/Do not invent a round number/);
+    });
+
+    // One upload is no evidence of a habit, so nothing is offered as safe and the older, weaker
+    // instruction is all there is.
+    it('offers nothing as standing when there is only one example', () => {
+      const prompt = buildPrompt(input({ examples: [across('#round100')] }));
+      expect(prompt).not.toMatch(/puts these on everything/);
+      expect(prompt).toMatch(/belong to those videos/);
+    });
   });
 
   it('asks for the example description shape when there are examples, and a default when there are not', () => {
