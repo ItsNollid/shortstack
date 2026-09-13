@@ -7,6 +7,7 @@ import { getDb, initDatabase } from './db/appDatabase';
 import { readSettings, writeSetting } from './db/settingsRepo';
 import { broadcast, registerIpcHandlers } from './ipc';
 import { createSchedulerEffects } from './scheduler/effects';
+import { DraftWorker } from './ai/draftWorker';
 import { SchedulerEngine } from './scheduler/engine';
 import { AuthService } from './youtube/authService';
 import { DryRunYouTubeGateway, HttpYouTubeGateway, type YouTubeGateway } from './youtube/gateway';
@@ -22,6 +23,7 @@ import { createMainWindow } from './window';
 let mainWindow: BrowserWindow | null = null;
 let tray: (Tray & { refresh?(): void }) | null = null;
 let engine: SchedulerEngine | null = null;
+let draftWorker: DraftWorker | null = null;
 let appIcon: AppIcon | null = null;
 let isQuitting = false;
 
@@ -121,6 +123,15 @@ async function start(): Promise<void> {
   });
 
   engine = new SchedulerEngine({ db, effects });
+  draftWorker = new DraftWorker({
+    db,
+    draftDeps: {
+      db,
+      thumbnailDir,
+      listPastUploads: (playlistId, options) => gateway.listPastUploads(playlistId, options)
+    },
+    onChange: () => broadcast(mainWindow, 'queue:changed')
+  });
   registerIpcHandlers({
     db,
     engine,
@@ -130,6 +141,7 @@ async function start(): Promise<void> {
     credentialsDir,
     thumbnailDir,
     onSchedulerChanged: refreshStatusBadge,
+    draftWorker,
     getWindow: () => mainWindow,
     appIcon
   });
@@ -152,6 +164,7 @@ async function start(): Promise<void> {
   mainWindow.on('session-end', () => {
     isQuitting = true;
     engine?.stop();
+    draftWorker?.stop();
   });
 
   tray = createTray({
@@ -178,6 +191,7 @@ async function start(): Promise<void> {
   applyStartWithWindows(readSettings(db).settings.start_with_windows);
 
   engine.start();
+  draftWorker.start();
   refreshStatusBadge();
   console.info(`[ShortStack] started (uploads ${runtimeProfile.uploads})`);
 }
@@ -204,6 +218,7 @@ function describeStatus(): string {
 app.on('before-quit', () => {
   isQuitting = true;
   engine?.stop();
+  draftWorker?.stop();
 });
 
 

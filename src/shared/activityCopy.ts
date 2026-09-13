@@ -31,7 +31,8 @@ export const ACTIVITY_ACTIONS = [
   'rotation_paused',
   'rotation_resumed',
   'posting_created',
-  'posting_rotated'
+  'posting_rotated',
+  'ai_drafted'
 ] as const;
 export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number];
 
@@ -53,7 +54,8 @@ const BY_SHORTSTACK: ReadonlySet<string> = new Set<ActivityAction>([
   'link_video',
   'method_changed',
   // Automatic rotation is ShortStack acting on the user's behalf; pressing Post again is not.
-  'posting_rotated'
+  'posting_rotated',
+  'ai_drafted'
 ]);
 
 const LABELS: Record<ActivityAction, string> = {
@@ -65,6 +67,7 @@ const LABELS: Record<ActivityAction, string> = {
   hold: 'Taken off the schedule',
   auto_slot: 'Given an automatic time',
   edit_metadata: 'Details edited',
+  ai_drafted: 'Details drafted by the local model',
   method_changed: 'Upload method changed',
   begin_manual_upload: 'Ready to upload in Studio',
   link_video: 'Linked to a YouTube video',

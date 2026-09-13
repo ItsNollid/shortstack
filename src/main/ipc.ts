@@ -17,6 +17,7 @@ import type { QueueEvent } from './domain/queueState';
 import { scanFolder } from './files/scanner';
 import type { SchedulerEngine } from './scheduler/engine';
 import { createPosting, markPublishedBefore, setRotationPaused } from './db/rotationRepo';
+import { draftFor } from './ai/draft';
 import { saveFrames, readFrames } from './media/frames';
 import { clearThumbnails, missingThumbnails, readThumbnail, saveThumbnail } from './media/thumbnails';
 import { applyStartWithWindows } from './startup';
@@ -36,6 +37,8 @@ export interface IpcContext {
   thumbnailDir: string;
   /** Called when the scheduler is paused or resumed, so the taskbar badge can follow. */
   onSchedulerChanged?(): void;
+  /** Nudged after a scan or a settings change, so drafting starts now rather than on the next tick. */
+  draftWorker?: { kick(): void };
   getWindow(): BrowserWindow | null;
   /** The app's icon follows the connected channel's picture. */
   appIcon: { refresh(avatarUrl: string | null): Promise<boolean>; clear(): Promise<void> };
@@ -60,7 +63,10 @@ export function broadcast(window: BrowserWindow | null, event: AppEvent, payload
 export function registerIpcHandlers(context: IpcContext): void {
   const { db, engine, auth } = context;
   const eventContext = () => ({ now: new Date(), uploadMethod: readSettings(db).settings.upload_method });
-  const changed = () => broadcast(context.getWindow(), 'queue:changed');
+  const changed = () => {
+    broadcast(context.getWindow(), 'queue:changed');
+    context.draftWorker?.kick();
+  };
 
   /** Rotation belongs to the video, but the user selects postings. */
   const videoIdsFor = (queueIds: readonly number[]): number[] => {
@@ -68,6 +74,11 @@ export function registerIpcHandlers(context: IpcContext): void {
       .prepare(`SELECT DISTINCT video_id FROM queue WHERE id IN (${queueIds.map(() => '?').join(',')})`)
       .all(...queueIds) as Array<{ video_id: number }>;
     return rows.map((row) => row.video_id);
+  };
+  const draftDeps = {
+    db,
+    thumbnailDir: context.thumbnailDir,
+    listPastUploads: (playlistId: string, options: { limit: number }) => context.gateway.listPastUploads(playlistId, options)
   };
   let signInAbort: AbortController | null = null;
 
@@ -265,6 +276,7 @@ export function registerIpcHandlers(context: IpcContext): void {
       if (!result.ok) return fail('refused', result.reason);
       // Settings that mean something to the operating system have to be told to it.
       if (key === 'start_with_windows') applyStartWithWindows(result.settings.start_with_windows);
+      if (key === 'ai_auto_draft' || key === 'ai_model' || key === 'ai_host') context.draftWorker?.kick();
       void engine.kick();
       return ok(result.settings);
     },
@@ -397,54 +409,8 @@ export function registerIpcHandlers(context: IpcContext): void {
     aiGenerate: async (queueId) => {
       const parsed = asId(queueId);
       if (parsed === null) return fail('invalid', 'That video id is not valid');
-      const item = getQueueItem(db, parsed);
-      if (item === undefined) return fail('not_found', 'That video is no longer in the queue');
 
-      const { settings } = readSettings(db);
-      // Always ask what is installed: it settles which model to use when none is configured, and
-      // tells us whether that model can actually read an image, which decides whether sending it
-      // frames is worth anything.
-      const installed = await listModels({ host: settings.ai_host });
-      if (!installed.ok && settings.ai_model === '') return fail(installed.code, installed.reason);
-
-      const available = installed.ok ? installed.value : [];
-      const chosen = findModel(available, settings.ai_model) ?? (settings.ai_model === '' ? available[0] : undefined);
-      const model = chosen?.name ?? settings.ai_model;
-      const channel = readActiveChannel(db);
-
-      // The two things that turn a guess into an answer: what this channel's own uploads look like,
-      // and what is actually on screen in the video.
-      const examples =
-        channel?.uploadsPlaylistId === undefined || channel?.uploadsPlaylistId === null
-          ? []
-          : await context.gateway
-              .listPastUploads(channel.uploadsPlaylistId, { limit: 6 })
-              .then((result) => (result.ok ? result.value.items : []))
-              .catch(() => []);
-
-      // The strip if it has been decoded, otherwise the poster, which is small but better than
-      // nothing. Either way a text-only model never receives them.
-      const strip = await readFrames({ db, dir: context.thumbnailDir }, parsed);
-      const poster = strip.length > 0 ? [] : [await readThumbnail({ db, dir: context.thumbnailDir }, parsed)];
-      const stills = (strip.length > 0 ? strip : poster).filter((image): image is Buffer => image !== null);
-      const suggestion = await generateMetadata(
-        {
-          model,
-          vision: chosen?.vision,
-          channelName: channel?.title ?? null,
-          examples,
-          frames: stills.map((image) => image.toString('base64')),
-          video: {
-            filename: item.filename,
-            durationSeconds: item.duration_s,
-            width: item.width,
-            height: item.height,
-            currentTitle: item.title,
-            currentDescription: item.description
-          }
-        },
-        { host: settings.ai_host }
-      );
+      const suggestion = await draftFor(draftDeps, parsed);
       return suggestion.ok ? ok(suggestion.value) : fail(suggestion.code, suggestion.reason);
     },
 

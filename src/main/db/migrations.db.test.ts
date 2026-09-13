@@ -259,3 +259,36 @@ describe('v3 rotation', () => {
     db.close();
   });
 });
+
+describe('v5 drafting provenance', () => {
+  const columns = (db: Database.Database, table: string): string[] =>
+    (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map((row) => row.name);
+
+  it('adds the two dates', () => {
+    const db = new Database(':memory:');
+    migrate(db, { now: () => NOW });
+    expect(columns(db, 'queue')).toContain('ai_drafted_at');
+    expect(columns(db, 'queue')).toContain('metadata_edited_at');
+    db.close();
+  });
+
+  // The safe way round. A video already in someone's queue may have details they typed, and the
+  // upgrade has no way to tell; treating it as edited means the worker leaves it alone.
+  it('treats everything that already existed as written by a person', () => {
+    const db = new Database(':memory:');
+    migrate(db, { now: () => NOW, migrations: MIGRATIONS.filter((m) => m.version <= 4) });
+    db.prepare("INSERT INTO videos (filename, filepath, status, created_at) VALUES ('old.mov', 'E:/old.mov', 'pending', ?)").run(
+      NOW.toISOString()
+    );
+    db.prepare(
+      "INSERT INTO queue (video_id, title, description, tags, category_id, privacy, created_at, updated_at) VALUES (1, 'Mine', 'Mine too', '[]', '22', 'public', ?, ?)"
+    ).run(NOW.toISOString(), NOW.toISOString());
+
+    migrate(db, { now: () => NOW });
+
+    const row = db.prepare('SELECT ai_drafted_at, metadata_edited_at FROM queue').get() as Record<string, unknown>;
+    expect(row.metadata_edited_at).toBe(NOW.toISOString());
+    expect(row.ai_drafted_at).toBeNull();
+    db.close();
+  });
+});

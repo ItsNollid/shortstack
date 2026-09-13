@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { listActivity } from './activityRepo';
-import { applyQueueEvent, countQueueByState, getQueueItem, listQueueItems, updateQueueMetadata } from './queueRepo';
+import { applyDraft, applyQueueEvent, countQueueByState, getQueueItem, listQueueItems, updateQueueMetadata } from './queueRepo';
 import { TEST_NOW, createTestDb, rawQueueRow, seedQueueItem } from './testFixtures';
 
 const ctx = { now: TEST_NOW, uploadMethod: 'assisted' as const };
@@ -139,5 +139,43 @@ describe('updateQueueMetadata', () => {
       ok: false,
       reason: expect.stringMatching(/30 minutes/)
     });
+  });
+});
+
+describe('applyDraft', () => {
+  const draft = { title: 'Drafted title', description: '#zombies #bo3', tags: ['cod zombies'] };
+
+  it('writes the details and records that the model wrote them', () => {
+    const db = createTestDb();
+    const id = seedQueueItem(db);
+
+    const result = applyDraft(db, id, draft, ctx);
+
+    expect(result.ok).toBe(true);
+    expect(getQueueItem(db, id)).toMatchObject({ title: 'Drafted title', tags: ['cod zombies'] });
+    expect(rawQueueRow(db, id).ai_drafted_at).toBe(TEST_NOW.toISOString());
+    // The distinction the whole feature rests on: this is not a person editing.
+    expect(rawQueueRow(db, id).metadata_edited_at).toBeNull();
+    expect(listActivity(db, { queueId: id }).some((entry) => entry.action === 'ai_drafted')).toBe(true);
+  });
+
+  // A draft takes seconds. Someone can type into the video while it is in flight, and what they
+  // typed has to win.
+  it('refuses once the video has been edited, even if the request was already under way', () => {
+    const db = createTestDb();
+    const id = seedQueueItem(db);
+    updateQueueMetadata(db, id, { title: 'Mine' }, ctx);
+
+    const result = applyDraft(db, id, draft, ctx);
+
+    expect(result).toEqual({ ok: false, reason: expect.stringMatching(/edited this video/) });
+    expect(getQueueItem(db, id)?.title).toBe('Mine');
+  });
+
+  it('refuses a video that is gone, and details YouTube would not take', () => {
+    const db = createTestDb();
+    const id = seedQueueItem(db);
+    expect(applyDraft(db, 9999, draft, ctx).ok).toBe(false);
+    expect(applyDraft(db, id, { ...draft, title: 'x'.repeat(101) }, ctx).ok).toBe(false);
   });
 });

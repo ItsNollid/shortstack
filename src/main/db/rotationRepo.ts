@@ -172,7 +172,8 @@ export function createPosting(
 
     const previous = db
       .prepare(
-        `SELECT title, description, tags, category_id, privacy, made_for_kids, platforms, channel_id
+        `SELECT title, description, tags, category_id, privacy, made_for_kids, platforms, channel_id,
+                ai_drafted_at, metadata_edited_at
          FROM queue WHERE video_id = ? ORDER BY id DESC LIMIT 1`
       )
       .get(videoId) as Record<string, unknown> | undefined;
@@ -185,8 +186,8 @@ export function createPosting(
         `INSERT INTO queue (
            video_id, channel_id, title, description, tags, category_id, privacy, notify_subscribers,
            made_for_kids, platforms, state, posting_kind, approved, attempts, upload_bytes_confirmed,
-           remote_tombstone, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 0, 0, 0, 0, ?, ?)`
+           remote_tombstone, ai_drafted_at, metadata_edited_at, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 0, 0, 0, 0, ?, ?, ?, ?)`
       )
       .run(
         videoId,
@@ -201,6 +202,10 @@ export function createPosting(
         previous.made_for_kids ?? 0,
         previous.platforms ?? '["youtube"]',
         kind,
+        // Carried over with the details they describe. Without this, every re-run of a video whose
+        // details someone wrote by hand would look untouched and be drafted over.
+        previous.ai_drafted_at ?? null,
+        previous.metadata_edited_at ?? null,
         nowIso,
         nowIso
       );

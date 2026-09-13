@@ -47,6 +47,10 @@ export interface QueueItemDTO {
   rotation_paused: boolean;
   /** How many postings of this video exist in total, this one included. */
   postings: number;
+  /** When the local model last wrote these details, if it ever did. */
+  ai_drafted_at: string | null;
+  /** When a person last changed them. Null means nobody has, so drafting is free to write here. */
+  metadata_edited_at: string | null;
 }
 
 export interface VideoDTO {

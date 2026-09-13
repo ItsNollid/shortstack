@@ -63,6 +63,18 @@ export function AiSection({ writer }: { writer: SettingsWriter }): React.JSX.Ele
           }
         />
       </div>
+
+      <Switch
+        label="Draft details for new videos automatically"
+        hint={
+          settings.ai_model === ''
+            ? 'Choose a model above first.'
+            : `${settings.ai_model} writes a title, description and tags for each new video shortly after it is scanned, a few at a time. It only writes where you have not: anything you have edited yourself is left exactly as it is, and nothing is uploaded without your approval either way.`
+        }
+        checked={settings.ai_auto_draft}
+        disabled={settings.ai_model === ''}
+        onChange={(value) => writer.set('ai_auto_draft', value)}
+      />
     </Section>
   );
 }

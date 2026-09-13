@@ -1,7 +1,8 @@
 import type Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { listActivity } from './activityRepo';
-import { createTestDb, seedQueueItem } from './testFixtures';
+import { updateQueueMetadata } from './queueRepo';
+import { TEST_NOW, createTestDb, rawQueueRow, seedQueueItem } from './testFixtures';
 import {
   createPosting,
   listVideoRotation,
@@ -192,5 +193,24 @@ describe('creating another posting', () => {
   it('says so for a video that does not exist', () => {
     const result = createPosting(db, 4242, defaults, NOW);
     expect(result.ok).toBe(false);
+  });
+});
+
+describe('a re-run inherits who wrote the details', () => {
+  // Without this, every rotation of a video would look untouched and be drafted over, quietly
+  // replacing details the user wrote once and expected to keep.
+  it('carries the edited and drafted dates onto the new posting', () => {
+    const db = createTestDb();
+    const first = seedQueueItem(db, { filename: 'loop.mov', state: 'published' });
+    updateQueueMetadata(db, first, { title: 'The one I wrote' }, { now: TEST_NOW, uploadMethod: 'assisted' });
+
+    const videoId = rawQueueRow(db, first).video_id as number;
+    const created = createPosting(db, videoId, { maxPostings: 10, minGapDays: 0, notifyOnNew: true, force: true }, TEST_NOW);
+
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const copy = rawQueueRow(db, created.queueId);
+    expect(copy.title).toBe('The one I wrote');
+    expect(copy.metadata_edited_at).toBe(TEST_NOW.toISOString());
   });
 });

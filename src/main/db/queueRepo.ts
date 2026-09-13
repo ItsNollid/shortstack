@@ -43,6 +43,9 @@ const METADATA_COLUMNS: readonly string[] = [
   'platforms'
 ];
 
+/** Only ever written alongside a metadata write, never on its own. */
+const PROVENANCE_COLUMNS: readonly string[] = ['ai_drafted_at', 'metadata_edited_at'];
+
 const CONFLICT = 'This video changed while you were working on it. Try again.';
 const GONE = 'That video is no longer in the queue';
 
@@ -173,6 +176,46 @@ export function recordUploadSession(db: Database.Database, id: number, sessionUr
   writePatch(db, id, { upload_session_uri: sessionUri }, STATE_COLUMNS, now, row.updated_at ?? '');
 }
 
+export interface DraftedMetadata {
+  title: string;
+  description: string;
+  tags: string[];
+}
+
+/**
+ * The background worker's write. Deliberately not updateQueueMetadata: that one stamps
+ * metadata_edited_at, which is the record of a person having written something, and the whole
+ * arrangement falls apart if the machine can set it.
+ */
+export function applyDraft(db: Database.Database, id: number, draft: DraftedMetadata, ctx: QueueContext): QueueEventResult {
+  const patch: QueueMetadataPatch = { title: draft.title, description: draft.description, tags: draft.tags };
+  const problem = validateMetadataPatch(patch);
+  if (problem !== null) return { ok: false, reason: problem };
+
+  const run = db.transaction((): QueueEventResult => {
+    const row = db.prepare(`${SELECT_ITEM} WHERE q.id = ?`).get(id) as Record<string, unknown> | undefined;
+    if (row === undefined) return { ok: false, reason: GONE };
+
+    // Checked again inside the transaction: the request took seconds, and someone may have typed
+    // into this video while it was in flight.
+    if (typeof row.metadata_edited_at === 'string' && row.metadata_edited_at !== '') {
+      return { ok: false, reason: 'You edited this video while the model was working on it, so it was left alone' };
+    }
+
+    const result = transition(toStateFields(row), { type: 'edit_metadata' }, { now: ctx.now, uploadMethod: ctx.uploadMethod });
+    if (!result.ok) return { ok: false, reason: result.reason };
+
+    const current = typeof row.updated_at === 'string' ? row.updated_at : '';
+    const combined = { ...result.patch, ...patch, ai_drafted_at: ctx.now.toISOString() } as Record<string, unknown>;
+    if (!writePatch(db, id, combined, [...STATE_COLUMNS, ...METADATA_COLUMNS, ...PROVENANCE_COLUMNS], ctx.now, current)) {
+      return { ok: false, reason: CONFLICT };
+    }
+    appendActivity(db, { queueId: id, action: 'ai_drafted', detail: `Title, description and tags written by the local model`, now: ctx.now });
+    return { ok: true, item: getQueueItem(db, id) as QueueItemDTO };
+  });
+  return run();
+}
+
 export function updateQueueMetadata(
   db: Database.Database,
   id: number,
@@ -192,8 +235,10 @@ export function updateQueueMetadata(
 
     const current = typeof row.updated_at === 'string' ? row.updated_at : '';
     if (ctx.expectedUpdatedAt !== undefined && ctx.expectedUpdatedAt !== current) return { ok: false, reason: CONFLICT };
-    const combined = { ...result.patch, ...patch } as Record<string, unknown>;
-    if (!writePatch(db, id, combined, [...STATE_COLUMNS, ...METADATA_COLUMNS], ctx.now, current)) {
+    // Stamped here and nowhere else: this is the one path a person's own edit comes through, and
+    // it is what stops the drafting worker from overwriting it later.
+    const combined = { ...result.patch, ...patch, metadata_edited_at: ctx.now.toISOString() } as Record<string, unknown>;
+    if (!writePatch(db, id, combined, [...STATE_COLUMNS, ...METADATA_COLUMNS, ...PROVENANCE_COLUMNS], ctx.now, current)) {
       return { ok: false, reason: CONFLICT };
     }
     appendActivity(db, { queueId: id, action: 'edit_metadata', detail: 'Details edited', now: ctx.now });

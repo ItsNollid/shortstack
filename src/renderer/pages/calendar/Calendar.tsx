@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CloudCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { DRAG_TYPE, dropOnDay, scheduleBlocker } from '../../../shared/calendarDnd';
 import type { QueueItemDTO } from '../../../shared/dto';
@@ -239,6 +239,13 @@ export function Calendar(): React.JSX.Element {
           </Banner>
         </div>
       )}
+
+      <div className={styles.legend}>
+        <span className={styles.legendItem}>
+          <CloudCheck size={12} /> YouTube has this one and will publish it at its time on its own
+        </span>
+        <span className={styles.legendItem}>Everything else is a plan held here, and needs ShortStack running to go out</span>
+      </div>
 
       <div className={styles.layout}>
         <div>

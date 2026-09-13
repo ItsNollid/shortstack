@@ -31,6 +31,7 @@ export interface AppSettings {
   auto_retry_max: number;
   ai_host: string;
   ai_model: string;
+  ai_auto_draft: boolean;
   close_to_tray: boolean;
   close_to_tray_notice_shown: boolean;
   start_with_windows: boolean;
@@ -214,6 +215,7 @@ export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> 
   auto_retry_max: integer(3, 0, 10),
   ai_host: text('http://127.0.0.1:11434', checkHttpUrl),
   ai_model: text('', (value) => (value.length > 200 ? 'That model name is too long' : null)),
+  ai_auto_draft: bool(false),
   close_to_tray: bool(true),
   close_to_tray_notice_shown: bool(false),
   start_with_windows: bool(false)
@@ -269,6 +271,10 @@ export function validateSettingChange(current: AppSettings, key: SettingKey, val
   }
   if (key === 'api_audit_confirmed_at' && value === null && current.upload_method === 'api') {
     return 'Switch back to assisted upload first';
+  }
+  // Drafting needs somewhere to send the request. Without a model it would fail quietly forever.
+  if (key === 'ai_auto_draft' && value === true && current.ai_model.trim() === '') {
+    return 'Choose a model first';
   }
   if (key === 'auto_approve' && value === true && current.auto_approve_consented_at === null) {
     return 'Review and accept what auto-approve does first';

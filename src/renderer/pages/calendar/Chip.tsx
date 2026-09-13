@@ -1,7 +1,8 @@
 import React from 'react';
-import { CircleAlert, Upload } from 'lucide-react';
+import { CircleAlert, CloudCheck, Upload } from 'lucide-react';
 import type { QueueItemDTO } from '../../../shared/dto';
 import { DRAG_TYPE, canDrag, scheduleBlocker } from '../../../shared/calendarDnd';
+import { explainWhereabouts, youTubeHasTheTime } from '../../../shared/onYouTube';
 import styles from './Calendar.module.css';
 
 export interface ChipProps {
@@ -24,12 +25,16 @@ const time = (iso: string | null): string =>
 export function Chip({ item, onDragStart, onDragEnd, onOpen }: ChipProps): React.JSX.Element {
   const draggable = canDrag(item);
   const blocker = scheduleBlocker(item);
+  // A time on this calendar is a plan; a time YouTube has agreed to is a promise. The badge is the
+  // difference, and it is the first thing anyone asks when they see a schedule.
+  const onYouTube = youTubeHasTheTime(item);
+  const where = explainWhereabouts(item);
 
   return (
     <div
       className={`${styles.chip} ${toneClass(item)} ${draggable ? '' : styles.fixed}`}
       draggable={draggable}
-      title={blocker === null ? item.title : `${item.title} — ${blocker}`}
+      title={blocker === null ? `${item.title} — ${where}` : `${item.title} — ${blocker}`}
       role="button"
       tabIndex={0}
       onClick={() => onOpen(item.id)}
@@ -47,6 +52,7 @@ export function Chip({ item, onDragStart, onDragEnd, onOpen }: ChipProps): React
       }}
       onDragEnd={onDragEnd}
     >
+      {onYouTube && <CloudCheck size={11} className={styles.onYouTube} aria-label="YouTube has this" />}
       {item.state === 'awaiting_manual_upload' && <Upload size={11} />}
       {(item.state === 'needs_attention' || item.state === 'failed') && <CircleAlert size={11} />}
       {item.scheduled_for !== null && <span className={styles.chipTime}>{time(item.scheduled_for)}</span>}

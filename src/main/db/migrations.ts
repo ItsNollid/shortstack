@@ -416,7 +416,25 @@ const v4UploadsPlaylist: Migration = {
     for (const [column, type] of CHANNEL_COLUMNS_V4) addColumn(db, 'channels', column, type);
   }
 };
-export const MIGRATIONS: readonly Migration[] = [v1Baseline, v2Lifecycle, v3Rotation, v4UploadsPlaylist];
+/** Two dates that between them say who last wrote a video's details, and when. */
+const QUEUE_COLUMNS_V5: ReadonlyArray<[string, string]> = [
+  ['ai_drafted_at', 'TEXT'],
+  ['metadata_edited_at', 'TEXT']
+];
+
+const v5AiDrafts: Migration = {
+  version: 5,
+  name: 'remember what the model drafted and what the user changed',
+  up(db) {
+    for (const [column, type] of QUEUE_COLUMNS_V5) addColumn(db, 'queue', column, type);
+
+    // Anything already in the queue predates auto-drafting. Treating it as edited is the safe way
+    // round: the worker leaves it alone rather than rewriting details someone may have typed.
+    db.prepare("UPDATE queue SET metadata_edited_at = created_at WHERE metadata_edited_at IS NULL").run();
+  }
+};
+
+export const MIGRATIONS: readonly Migration[] = [v1Baseline, v2Lifecycle, v3Rotation, v4UploadsPlaylist, v5AiDrafts];
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
 
 export function migrate(db: Database.Database, options: MigrateOptions = {}): MigrateResult {
