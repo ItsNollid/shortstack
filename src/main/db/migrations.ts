@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3';
 import * as path from 'path';
 import { detectGame } from '../../shared/games';
 import type { AttentionCode, QueueState, RemoteSync, ScheduleSource } from '../../shared/queue';
+import { pruneMigrationBackups } from './backups';
 
 export interface MigrationContext {
   now: Date;
@@ -524,6 +525,8 @@ export function migrate(db: Database.Database, options: MigrateOptions = {}): Mi
     const stamp = now().toISOString().replace(/[:.]/g, '-');
     backupPath = path.join(options.backupDir, `${options.baseName ?? 'shortstack.db'}.schema-v${from}.${stamp}.bak`);
     db.prepare('VACUUM INTO ?').run(backupPath);
+    // One backup per schema change, and none ever removed: the live profile held seven within a week.
+    pruneMigrationBackups(options.backupDir, options.baseName ?? 'shortstack.db');
   }
 
   for (const migration of pending) {
