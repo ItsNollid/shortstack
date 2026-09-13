@@ -21,6 +21,12 @@ export interface PromptInput {
   examples: readonly PastUpload[];
   /** True when frames are being sent alongside, so the prompt can refer to them. */
   hasFrames: boolean;
+  /**
+   * What this channel's own numbers say about titles and topics. Measured elsewhere; passed in as
+   * finished sentences so the model writing a title is told what has actually worked here, rather
+   * than being left to infer it from four examples.
+   */
+  findings?: readonly { statement: string }[];
 }
 
 
@@ -84,6 +90,16 @@ export function buildPrompt(input: PromptInput): string {
     '',
     ...examples,
     ...renderVideo(input.video, input.hasFrames),
+    // Placed after the video and before the instructions, so it reads as "and here is what works
+    // here" rather than as another example to copy from.
+    ...((input.findings ?? []).length > 0
+      ? [
+          '--- What has worked on this channel ---',
+          ...(input.findings ?? []).map((finding) => `- ${finding.statement}`),
+          'These were measured from this channel. Write in a way that fits them.',
+          ''
+        ]
+      : []),
     '--- What to write ---',
     'Title: under 100 characters. Same voice as the examples. No surrounding quotes, no "Title:" prefix.',
     examples.length > 0

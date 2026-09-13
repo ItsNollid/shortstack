@@ -45,6 +45,8 @@ export interface GenerateInput {
   thinking?: boolean;
   /** Overridable, but see METADATA_FRAMES for why more is not better here. */
   maxFrames?: number;
+  /** What this channel's numbers say about titles and topics. */
+  findings?: readonly { statement: string }[];
 }
 
 /**
@@ -67,7 +69,8 @@ export function promptFor(input: GenerateInput): string {
     video: input.video,
     channelName: input.channelName ?? null,
     examples: input.examples ?? [],
-    hasFrames: framesFor(input).length > 0
+    hasFrames: framesFor(input).length > 0,
+    findings: input.findings ?? []
   });
 }
 

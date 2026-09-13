@@ -128,3 +128,27 @@ describe('buildPrompt', () => {
     expect(buildPrompt(input({ examples: [example({ title: '   ' })] }))).toContain('No frames are available');
   });
 });
+
+describe('what has worked on this channel', () => {
+  const finding = { statement: 'Videos where the title is in capitals get a median of 2800 views against 1400 where it is not.' };
+
+  it('tells the model what the numbers say, so it writes what works here', () => {
+    const text = buildPrompt(input({ findings: [finding] }));
+    expect(text).toContain(finding.statement);
+    expect(text).toMatch(/What has worked on this channel/);
+    expect(text).toMatch(/measured from this channel/);
+  });
+
+  it('says nothing at all when there are no findings yet', () => {
+    const text = buildPrompt(input());
+    expect(text).not.toMatch(/What has worked on this channel/);
+  });
+
+  // It belongs after the video and before the instructions: read any earlier and it looks like
+  // another example to copy from.
+  it('comes after the video and before what to write', () => {
+    const text = buildPrompt(input({ findings: [finding] }));
+    expect(text.indexOf('--- The new video ---')).toBeLessThan(text.indexOf('--- What has worked'));
+    expect(text.indexOf('--- What has worked')).toBeLessThan(text.indexOf('--- What to write ---'));
+  });
+});

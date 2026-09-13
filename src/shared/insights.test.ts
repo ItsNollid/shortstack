@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   MIN_PER_GROUP,
   allFacts,
+  WRITING_FACT_IDS,
   buildBrief,
+  parseBrief,
+  writingFacts,
   cadenceFact,
   conversionFact,
   gameFact,
@@ -291,5 +294,30 @@ describe('cadenceFact', () => {
     const batch = [0, 1, 2, 3, 4, 5].map((offset) => day(offset, 1000));
     const later = [25, 35, 45, 55, 65].map((offset) => day(offset, 200));
     expect(cadenceFact([...batch, ...later]).confidence).not.toBe('insufficient');
+  });
+});
+
+describe('the cached brief', () => {
+  const brief = buildBrief([
+    ...many(10, () => video({ title: 'ROUND 100?', views: 900, publishedAt: '2026-09-01T19:00:00' })),
+    ...many(10, () => video({ title: 'a quiet clip', views: 300, publishedAt: '2026-09-02T09:00:00' }))
+  ]);
+
+  it('survives a round trip through storage', () => {
+    expect(parseBrief(JSON.stringify(brief))).toEqual(brief);
+  });
+
+  // Read while drafting a title, so anything unreadable has to be nothing rather than a throw.
+  it('reads anything that is not a brief as nothing', () => {
+    for (const raw of ['', '   ', 'not json', '{}', '[]', '{"usable":"no"}', '{"usable":[{"id":1}]}']) {
+      expect(parseBrief(raw), raw).toBeNull();
+    }
+  });
+
+  it('keeps only the findings that say something about writing', () => {
+    const ids = writingFacts(brief).map((fact) => fact.id);
+    expect(ids).not.toContain('time-of-day');
+    expect(ids).not.toContain('weekday');
+    for (const id of ids) expect(WRITING_FACT_IDS).toContain(id);
   });
 });

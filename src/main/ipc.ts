@@ -416,7 +416,11 @@ export function registerIpcHandlers(context: IpcContext): void {
       if (!Number.isFinite(window) || window < 1) return fail('invalid', 'That range is not valid');
       const stats = await context.gateway.fetchVideoPerformance(window);
       if (!stats.ok) return fail(stats.code ?? 'error', stats.reason);
-      return ok(buildBrief(stats.value));
+
+      const brief = buildBrief(stats.value);
+      // Kept so writing a title can use it without two YouTube calls per video.
+      writeSetting(db, 'insight_findings', JSON.stringify(brief).slice(0, 8000));
+      return ok(brief);
     },
 
     insightsAdvise: async (days) => {

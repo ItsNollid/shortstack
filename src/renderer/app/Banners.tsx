@@ -4,6 +4,7 @@ import type { Result } from '../../shared/ipc';
 import { scheduleCapacity } from '../../shared/capacity';
 import { useApiQuery } from '../hooks/useApi';
 import { Banner, Button } from '../components/ui';
+import { ScheduleMatchBanner } from '../components/ScheduleMatchBanner';
 import { UpdateBanner } from '../components/UpdateBanner';
 import { useAppStatus } from './status';
 
@@ -14,7 +15,7 @@ const readQueue = (): Promise<Result<QueueItemDTO[]>> => window.api.queueList();
 export function Banners(): React.JSX.Element | null {
   const { auth, scheduler, settings } = useAppStatus();
   const queue = useApiQuery(readQueue, { key: 'queue', invalidateOn: ['queue:changed'] });
-  const banners: React.JSX.Element[] = [<UpdateBanner key="update" />];
+  const banners: React.JSX.Element[] = [<UpdateBanner key="update" />, <ScheduleMatchBanner key="schedule-match" />];
 
   // Auto-scheduling stops at a fixed horizon. Without this the extra videos simply never get a
   // date, with nothing on screen to say why.

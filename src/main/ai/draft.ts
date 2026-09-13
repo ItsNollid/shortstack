@@ -3,6 +3,7 @@
 // same video, which would be baffling to anyone using both.
 import type Database from 'better-sqlite3';
 import { findModel } from '../../shared/aiModels';
+import { parseBrief, writingFacts } from '../../shared/insights';
 import type { PastUpload } from '../../shared/pastUploads';
 import { readActiveChannel } from '../db/channelRepo';
 import { getQueueItem } from '../db/queueRepo';
@@ -57,6 +58,8 @@ export async function draftFor(deps: DraftDeps, queueId: number): Promise<AiResu
       model,
       vision: chosen?.vision,
       thinking: chosen?.thinking,
+      // From the last time Analytics was opened. Free: no extra call per drafted video.
+      findings: writingFacts(parseBrief(settings.insight_findings) ?? { usable: [], missing: [], videoCount: 0, tooEarly: true }),
       channelName: channel?.title ?? null,
       examples,
       frames: stills.filter((image): image is Buffer => image !== null).map((image) => image.toString('base64')),

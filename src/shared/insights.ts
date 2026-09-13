@@ -495,3 +495,30 @@ export function buildBrief(videos: readonly VideoStat[]): Brief {
     tooEarly: usable.length === 0
   };
 }
+
+/** Findings that bear on what a title or description should look like, rather than when to post. */
+export const WRITING_FACT_IDS: readonly string[] = ['shouted-title', 'question-title', 'tags', 'game'];
+
+export const writingFacts = (brief: Brief): Fact[] =>
+  brief.usable.filter((fact) => WRITING_FACT_IDS.includes(fact.id));
+
+/** Reads a cached brief back, tolerating anything that is not one rather than throwing mid-draft. */
+export function parseBrief(raw: string): Brief | null {
+  if (raw.trim() === '') return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<Brief>;
+    const isFact = (value: unknown): value is Fact => {
+      const fact = value as Fact;
+      return fact !== null && typeof fact === 'object' && typeof fact.id === 'string' && typeof fact.statement === 'string';
+    };
+    if (!Array.isArray(parsed.usable) || !parsed.usable.every(isFact)) return null;
+    return {
+      usable: parsed.usable,
+      missing: Array.isArray(parsed.missing) && parsed.missing.every(isFact) ? parsed.missing : [],
+      videoCount: typeof parsed.videoCount === 'number' ? parsed.videoCount : 0,
+      tooEarly: parsed.tooEarly === true
+    };
+  } catch {
+    return null;
+  }
+}
