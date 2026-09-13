@@ -106,7 +106,8 @@ const SETTINGS: AppSettings = {
   ...defaultSettings(),
   shorts_folder: FOLDER,
   setup_complete: true,
-  legal_accepted_version: LEGAL_VERSION
+  legal_accepted_version: LEGAL_VERSION,
+  last_seen_version: null
 };
 
 const ACTIVITY = [
@@ -205,6 +206,11 @@ export function installDevApiStub(): void {
     authRefreshChannel: () =>
       Promise.resolve({ ok: false as const, error: { code: 'preview', message: 'Not available in the browser preview' } }),
     aiStatus: () => ok({ running: true, models: [{ name: 'llava:13b', vision: true }], message: 'Ready' }),
+    updateStatus: () => ok({ channel: 'development' as const, state: { kind: 'idle' as const } }),
+    updateCheck: () => ok({ channel: 'development' as const, state: { kind: 'idle' as const } }),
+    updateDownload: () => ok(null),
+    updateInstall: () => ok(null),
+    updateRebuild: () => ok(null),
     aiTest: () => ok(null),
     aiGenerate: () =>
       ok({

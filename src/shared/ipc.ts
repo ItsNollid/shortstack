@@ -1,6 +1,7 @@
 // The contract between the renderer and the main process. Both sides are typed from this one
 // definition, so a signature can no longer drift the way the old electron.d.ts did.
 import type { AiModel } from './aiModels';
+import type { UpdateStatus } from './updates';
 import type { ChannelAnalytics } from './analytics';
 import type { PastUploadPage } from './pastUploads';
 import type { ActivityEntryDTO, QueueItemDTO, UploadDTO } from './dto';
@@ -59,7 +60,22 @@ export interface MetadataSuggestionDTO {
   tags: string[];
 }
 
-export type AppEvent = 'queue:changed' | 'scheduler:status' | 'auth:changed' | 'upload:progress' | 'toast';
+export const APP_EVENTS = [
+  'queue:changed',
+  'scheduler:status',
+  'auth:changed',
+  'upload:progress',
+  'toast',
+  'update:changed'
+] as const;
+
+/**
+ * Derived from the list, not declared beside it. The preload checks incoming names against
+ * APP_EVENTS at runtime, so an event that exists in the type and not in the array is accepted by
+ * the compiler and throws the moment a component subscribes to it — which took down the entire
+ * renderer, not just the feature.
+ */
+export type AppEvent = (typeof APP_EVENTS)[number];
 
 export interface ShortStackApi {
   appInfo(): Promise<AppInfo>;
@@ -115,6 +131,17 @@ export interface ShortStackApi {
   /** Loads a model and asks it one question, so a choice can be checked before it is relied on. */
   aiTest(model: string): Promise<Result<null>>;
 
+  /** What the app knows about newer versions right now, without going and looking. */
+  updateStatus(): Promise<Result<UpdateStatus>>;
+  /** Goes and looks. Both channels: the release feed, and how far the source has moved. */
+  updateCheck(): Promise<Result<UpdateStatus>>;
+  /** Downloads a release the user has been told about. Never happens on its own. */
+  updateDownload(): Promise<Result<null>>;
+  /** Restarts into a downloaded release. */
+  updateInstall(): Promise<Result<null>>;
+  /** The development equivalent: hands over to the build script, which closes this app. */
+  updateRebuild(): Promise<Result<null>>;
+
   analyticsGet(days: number): Promise<Result<ChannelAnalytics>>;
   /** Previously published videos, so their details can be reused on a new posting. */
   pastUploadsList(pageToken?: string): Promise<Result<PastUploadPage>>;
@@ -169,6 +196,11 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'aiStatus',
   'aiGenerate',
   'aiTest',
+  'updateStatus',
+  'updateCheck',
+  'updateDownload',
+  'updateInstall',
+  'updateRebuild',
   'analyticsGet',
   'pastUploadsList',
   'uploadsList',
@@ -180,7 +212,6 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'clipboardWrite'
 ];
 
-export const APP_EVENTS: readonly AppEvent[] = ['queue:changed', 'scheduler:status', 'auth:changed', 'upload:progress', 'toast'];
 
 // Compile-time guard: every method on the interface must appear in IPC_METHODS, otherwise the
 // preload would silently not expose it and the renderer would call undefined.

@@ -1,6 +1,7 @@
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import { execSync } from 'child_process'
+import { readFileSync } from 'fs'
 import { resolve } from 'path'
 
 // Baked in at build time so a running app can say which build it is. Without this the only way to
@@ -22,9 +23,11 @@ function buildStamp() {
       return false
     }
   })()
+  const version = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')).version
   return {
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
-    __BUILD_COMMIT__: JSON.stringify(dirty ? `${commit}+` : commit)
+    __BUILD_COMMIT__: JSON.stringify(dirty ? `${commit}+` : commit),
+    __APP_VERSION__: JSON.stringify(version)
   }
 }
 

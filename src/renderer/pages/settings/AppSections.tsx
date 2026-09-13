@@ -1,16 +1,19 @@
 import React from 'react';
-import { Switch } from '../../components/ui';
+import { Button, Switch } from '../../components/ui';
 import { useAppStatus } from '../../app/status';
-import { useApiQuery } from '../../hooks/useApi';
+import { useApiMutation, useApiQuery } from '../../hooks/useApi';
 import type { AiStatus, Result } from '../../../shared/ipc';
 import { findModel, isVisionModel, type AiModel } from '../../../shared/aiModels';
 import { buildInfo, describeBuild } from '../../../shared/buildInfo';
+import { CHANGELOG, sortedChangelog } from '../../../shared/changelog';
+import { describeUpdate, type UpdateStatus } from '../../../shared/updates';
 import type { SettingsWriter } from './useSettings';
 import { ModelPicker } from './ModelPicker';
 import { CommittedText, Section } from './parts';
 import styles from './Settings.module.css';
 
 const readAi = (): Promise<Result<AiStatus>> => window.api.aiStatus();
+const readUpdates = (): Promise<Result<UpdateStatus>> => window.api.updateStatus();
 
 /**
  * Whether the chosen model will actually be shown the video. Ollama's own answer where we have it,
@@ -87,10 +90,65 @@ export function AppSection({ writer }: { writer: SettingsWriter }): React.JSX.El
         onChange={(value) => writer.set('start_with_windows', value)}
       />
 
+    </Section>
+  );
+}
+
+export function UpdatesSection(): React.JSX.Element {
+  const updates = useApiQuery(readUpdates, { key: 'updates-settings', invalidateOn: ['update:changed'] });
+  const check = useApiMutation(() => window.api.updateCheck());
+  const [showAll, setShowAll] = React.useState(false);
+
+  const status = updates.data;
+  const releases = sortedChangelog(CHANGELOG);
+  const shown = showAll ? releases : releases.slice(0, 1);
+
+  return (
+    <Section
+      title="Updates"
+      text={
+        status?.channel === 'development'
+          ? 'This copy was built from source on this computer, so its updates are rebuilds rather than downloads.'
+          : 'ShortStack checks for a newer release when it starts, and every few hours after that. Nothing downloads until you ask it to.'
+      }
+      actions={
+        <Button onClick={() => void check.run()} disabled={check.pending}>
+          {check.pending ? 'Checking…' : 'Check now'}
+        </Button>
+      }
+    >
       <div className={styles.sectionText}>
-        This build: {describeBuild(buildInfo())}. Run <strong>Build and run ShortStack.bat</strong> to rebuild from the
-        current code — opening the exe in dist directly runs whatever was built last.
+        {status === null || status === undefined ? 'Checking…' : describeUpdate(status)}
+        {status?.commitsBehind !== undefined && status.commitsBehind > 0 && (
+          <> · your source is {status.commitsBehind} commit{status.commitsBehind === 1 ? '' : 's'} ahead of this build</>
+        )}
       </div>
+
+      <div className={styles.sectionText}>This build: {describeBuild(buildInfo())}</div>
+
+      {shown.map((release) => (
+        <div key={release.version} className={styles.release}>
+          <div className={styles.releaseHead}>
+            {release.version} — {release.headline}
+          </div>
+          <ul className={styles.releaseChanges}>
+            {release.changes.map((change) => (
+              <li key={change}>{change}</li>
+            ))}
+          </ul>
+          {release.legal !== undefined && release.legal.length > 0 && (
+            <div className={styles.releaseLegal}>
+              {release.legal.map((note) => (
+                <div key={note}>{note}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {releases.length > 1 && (
+        <Button onClick={() => setShowAll(!showAll)}>{showAll ? 'Show only the latest' : `Show all ${releases.length} releases`}</Button>
+      )}
     </Section>
   );
 }

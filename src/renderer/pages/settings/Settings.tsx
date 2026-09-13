@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { PageHeader } from '../../components/PageHeader';
-import { AiSection, AppSection, PlatformsSection, VersionNote } from './AppSections';
+import { AiSection, AppSection, PlatformsSection, UpdatesSection, VersionNote } from './AppSections';
 import { ApiModeDialog, AutoApproveDialog, DisconnectDialog } from './Confirmations';
 import { ChannelSection, FolderSection } from './ConnectionSections';
 import { LegalSection } from './LegalSection';
@@ -33,6 +33,7 @@ export function SettingsPage(): React.JSX.Element {
         <RotationSection writer={writer} />
         <AiSection writer={writer} />
         <AppSection writer={writer} />
+        <UpdatesSection />
         <PlatformsSection />
         <LegalSection onDisconnect={() => setDialog('disconnect')} />
         <VersionNote />

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { describeBuild } from './buildInfo';
 
-const at = (iso: string) => ({ builtAt: iso, commit: 'd44a4ec' });
+const at = (iso: string) => ({ builtAt: iso, commit: 'd44a4ec', version: '1.1.0' });
 
 describe('describeBuild', () => {
   it('names the commit and when it was built', () => {
@@ -21,6 +21,6 @@ describe('describeBuild', () => {
   });
 
   it('falls back to the commit when the time makes no sense', () => {
-    expect(describeBuild({ builtAt: 'not a date', commit: 'abc1234' })).toBe('abc1234');
+    expect(describeBuild({ builtAt: 'not a date', commit: 'abc1234', version: '1.1.0' })).toBe('abc1234');
   });
 });

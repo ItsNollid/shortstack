@@ -1,6 +1,7 @@
 import './bootstrap/profile';
 import { BrowserWindow, Notification, Tray, app, dialog, safeStorage } from 'electron';
 import * as fs from 'fs/promises';
+import { readFileSync } from 'fs';
 import * as path from 'path';
 import { runtimeProfile } from './bootstrap/profile';
 import { getDb, initDatabase } from './db/appDatabase';
@@ -8,6 +9,8 @@ import { readSettings, writeSetting } from './db/settingsRepo';
 import { broadcast, registerIpcHandlers } from './ipc';
 import { createSchedulerEffects } from './scheduler/effects';
 import { DraftWorker } from './ai/draftWorker';
+import { UpdateService } from './updates/updateService';
+import { buildInfo } from '../shared/buildInfo';
 import { SchedulerEngine } from './scheduler/engine';
 import { AuthService } from './youtube/authService';
 import { DryRunYouTubeGateway, HttpYouTubeGateway, type YouTubeGateway } from './youtube/gateway';
@@ -24,6 +27,8 @@ let mainWindow: BrowserWindow | null = null;
 let tray: (Tray & { refresh?(): void }) | null = null;
 let engine: SchedulerEngine | null = null;
 let draftWorker: DraftWorker | null = null;
+let updates: UpdateService | null = null;
+let updateTimer: ReturnType<typeof setInterval> | null = null;
 let appIcon: AppIcon | null = null;
 let isQuitting = false;
 
@@ -132,6 +137,38 @@ async function start(): Promise<void> {
     },
     onChange: () => broadcast(mainWindow, 'queue:changed')
   });
+  // Only loaded in a packaged build that has somewhere to look. Pointing electron-updater at a
+  // repository nobody has created yet would have it fetching releases from whatever does sit at
+  // that address, which is a worse outcome than having no updater at all.
+  const publishTarget = (() => {
+    try {
+      const pkg = JSON.parse(readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf-8')) as {
+        build?: { publish?: unknown };
+      };
+      const publish = pkg.build?.publish;
+      return Array.isArray(publish) ? publish.length > 0 : publish != null;
+    } catch {
+      return false;
+    }
+  })();
+
+  const autoUpdater =
+    app.isPackaged && publishTarget
+      ? (require('electron-updater') as { autoUpdater: import('./updates/updateService').AutoUpdater }).autoUpdater
+      : undefined;
+
+  updates = new UpdateService({
+    channel: app.isPackaged ? 'release' : 'development',
+    buildCommit: buildInfo().commit,
+    // Where the source is, which only means anything on the machine it was built on.
+    dev: { projectDir: app.isPackaged ? path.resolve(app.getAppPath(), '..', '..', '..') : app.getAppPath() },
+    updater: autoUpdater,
+    withoutUpdater: app.isPackaged
+      ? 'This copy has no update source configured, so it cannot update itself.'
+      : 'This build updates by rebuilding from source',
+    onChange: (status) => broadcast(mainWindow, 'update:changed', status)
+  });
+
   registerIpcHandlers({
     db,
     engine,
@@ -142,6 +179,7 @@ async function start(): Promise<void> {
     thumbnailDir,
     onSchedulerChanged: refreshStatusBadge,
     draftWorker,
+    updates,
     getWindow: () => mainWindow,
     appIcon
   });
@@ -192,6 +230,12 @@ async function start(): Promise<void> {
 
   engine.start();
   draftWorker.start();
+
+  // Once at startup and then rarely. Nothing downloads by itself, so this only ever changes what a
+  // banner says.
+  void updates.check();
+  updateTimer = setInterval(() => void updates?.check(), 6 * 60 * 60_000);
+  if (typeof updateTimer.unref === 'function') updateTimer.unref();
   refreshStatusBadge();
   console.info(`[ShortStack] started (uploads ${runtimeProfile.uploads})`);
 }
@@ -219,6 +263,7 @@ app.on('before-quit', () => {
   isQuitting = true;
   engine?.stop();
   draftWorker?.stop();
+  if (updateTimer !== null) clearInterval(updateTimer);
 });
 
 

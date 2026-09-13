@@ -18,6 +18,7 @@ import { scanFolder } from './files/scanner';
 import type { SchedulerEngine } from './scheduler/engine';
 import { createPosting, markPublishedBefore, setRotationPaused } from './db/rotationRepo';
 import { draftFor } from './ai/draft';
+import type { UpdateService } from './updates/updateService';
 import { saveFrames, readFrames } from './media/frames';
 import { clearThumbnails, missingThumbnails, readThumbnail, saveThumbnail } from './media/thumbnails';
 import { applyStartWithWindows } from './startup';
@@ -39,6 +40,7 @@ export interface IpcContext {
   onSchedulerChanged?(): void;
   /** Nudged after a scan or a settings change, so drafting starts now rather than on the next tick. */
   draftWorker?: { kick(): void };
+  updates: UpdateService;
   getWindow(): BrowserWindow | null;
   /** The app's icon follows the connected channel's picture. */
   appIcon: { refresh(avatarUrl: string | null): Promise<boolean>; clear(): Promise<void> };
@@ -406,6 +408,21 @@ export function registerIpcHandlers(context: IpcContext): void {
         ? ok({ running: true, models: models.value, message: `${models.value.length} model${models.value.length === 1 ? '' : 's'} available` })
         : ok({ running: models.code !== 'not_running', models: [], message: models.reason });
     },
+    updateStatus: async () => ok(context.updates.status()),
+    updateCheck: async () => ok(await context.updates.check()),
+    updateDownload: async () => {
+      const result = await context.updates.download();
+      return result.ok ? ok(null) : fail('refused', result.reason ?? 'Could not download that update');
+    },
+    updateInstall: async () => {
+      const result = context.updates.install();
+      return result.ok ? ok(null) : fail('refused', result.reason ?? 'Could not install that update');
+    },
+    updateRebuild: async () => {
+      const result = context.updates.rebuild();
+      return result.ok ? ok(null) : fail('refused', result.reason ?? 'Could not start a rebuild');
+    },
+
     aiTest: async (model) => {
       if (typeof model !== 'string' || model.trim() === '') return fail('invalid', 'Choose a model first');
       const { settings } = readSettings(db);

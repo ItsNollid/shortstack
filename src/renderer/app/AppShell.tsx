@@ -8,6 +8,7 @@ import { Queue } from '../pages/Queue';
 import { Review } from '../pages/review/Review';
 import { SettingsPage } from '../pages/settings/Settings';
 import { FirstRun } from '../pages/setup/FirstRun';
+import { WhatsNew } from '../components/WhatsNew';
 import { VideoDetails } from '../pages/VideoDetails';
 import { Banners } from './Banners';
 import { Sidebar } from './Sidebar';
@@ -47,6 +48,8 @@ export function AppShell(): React.JSX.Element {
         <ApprovalProvider>
           {/* Covers everything until the policies are accepted and setup is done. */}
           <FirstRun />
+          {/* After it, so an update notice never appears on top of a gate that has to be dealt with. */}
+          <WhatsNew />
           {/* Hash routing: a packaged app loads from file://, where path routing has no server. */}
           <HashRouter>
             <div className={styles.shell}>

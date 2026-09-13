@@ -10,11 +10,17 @@ import styles from './FirstRun.module.css';
 export function LegalGate({
   onAccept,
   pending,
-  problem
+  problem,
+  changes,
+  returning
 }: {
   onAccept: (version: string) => void;
   pending: boolean;
   problem: string | null;
+  /** What changed in the policies since the version this person agreed to. */
+  changes: readonly string[];
+  /** True when they have agreed before, so this is a re-agreement rather than a first meeting. */
+  returning: boolean;
 }): React.JSX.Element {
   const [reading, setReading] = useState<LegalDocument | null>(null);
   const [agreed, setAgreed] = useState(false);
@@ -28,9 +34,20 @@ export function LegalGate({
         </div>
 
         <p className={styles.lead}>
-          ShortStack helps you queue, approve and schedule short videos for a YouTube channel you
-          control. Before anything else, here is what that involves.
+          {returning
+            ? 'ShortStack’s privacy policy and terms of use have changed since you last agreed to them. Nothing about how the app works has changed until you agree again.'
+            : 'ShortStack helps you queue, approve and schedule short videos for a YouTube channel you control. Before anything else, here is what that involves.'}
         </p>
+
+        {returning && changes.length > 0 && (
+          <Banner kind="info" title="What changed">
+            <ul className={styles.points}>
+              {changes.map((change) => (
+                <li key={change}>{change}</li>
+              ))}
+            </ul>
+          </Banner>
+        )}
 
         <ul className={styles.points}>
           <li>Everything is kept on this computer. There is no ShortStack server and nothing is sent to the developer.</li>
@@ -80,7 +97,7 @@ export function LegalGate({
 
         <div className={styles.actions}>
           <Button variant="primary" disabled={!agreed || pending} onClick={() => onAccept(LEGAL_VERSION)}>
-            {pending ? 'Saving…' : 'Agree and continue'}
+            {pending ? 'Saving…' : returning ? 'Agree to the updated policies' : 'Agree and continue'}
           </Button>
         </div>
       </div>

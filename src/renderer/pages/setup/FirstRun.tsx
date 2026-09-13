@@ -1,6 +1,8 @@
 import React from 'react';
 import { firstRunStage } from '../../../shared/firstRun';
+import { buildInfo } from '../../../shared/buildInfo';
 import { LEGAL_VERSION } from '../../../shared/legal';
+import { legalChangesSince } from '../../../shared/whatsNew';
 import { useAppStatus } from '../../app/status';
 import { useApiMutation } from '../../hooks/useApi';
 import { LegalGate } from './LegalGate';
@@ -22,6 +24,8 @@ export function FirstRun(): React.JSX.Element | null {
       <LegalGate
         pending={write.pending}
         problem={write.error}
+        returning={settings?.legal_accepted_version != null}
+        changes={legalChangesSince(settings?.last_seen_version ?? null, buildInfo().version)}
         onAccept={(version) => void write.run('legal_accepted_version', version)}
       />
     );

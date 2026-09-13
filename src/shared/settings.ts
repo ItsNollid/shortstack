@@ -5,6 +5,8 @@ import type { Privacy, UploadMethod } from './queue';
 export interface AppSettings {
   setup_complete: boolean;
   legal_accepted_version: string | null;
+  /** The app version whose changes have been read. Null on a fresh install. */
+  last_seen_version: string | null;
   defaults_reviewed: boolean;
   shorts_folder: string;
   scheduler_paused: boolean;
@@ -193,6 +195,7 @@ function checkHttpUrl(value: string): string | null {
 export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> } = {
   setup_complete: bool(false),
   legal_accepted_version: nullableText(32),
+  last_seen_version: nullableText(32),
   defaults_reviewed: bool(false),
   shorts_folder: text('', (value) => (value.length > 1024 ? 'That folder path is too long' : null)),
   scheduler_paused: bool(false),

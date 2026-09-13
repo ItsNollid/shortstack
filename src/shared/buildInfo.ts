@@ -2,18 +2,22 @@
 // fallbacks are what a dev server sees, where the question does not arise.
 declare const __BUILD_TIME__: string;
 declare const __BUILD_COMMIT__: string;
+declare const __APP_VERSION__: string;
 
 export interface BuildInfo {
   /** ISO timestamp of when this build was produced. */
   builtAt: string;
   /** Short git commit, with a trailing + when the tree had uncommitted changes. */
   commit: string;
+  /** The package version, which is what a release is named after and what updates compare against. */
+  version: string;
 }
 
 export function buildInfo(): BuildInfo {
   return {
     builtAt: typeof __BUILD_TIME__ === 'string' ? __BUILD_TIME__ : new Date().toISOString(),
-    commit: typeof __BUILD_COMMIT__ === 'string' ? __BUILD_COMMIT__ : 'dev'
+    commit: typeof __BUILD_COMMIT__ === 'string' ? __BUILD_COMMIT__ : 'dev',
+    version: typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0'
   };
 }
 
@@ -31,5 +35,5 @@ export function describeBuild(info: BuildInfo, now: Date = new Date()): string {
   });
   const ageDays = Math.floor((now.getTime() - built.getTime()) / 86_400_000);
   const age = ageDays >= 1 ? ` · ${ageDays} day${ageDays === 1 ? '' : 's'} old` : '';
-  return `${when} · ${info.commit}${age}`;
+  return `${info.version} · ${when} · ${info.commit}${age}`;
 }
