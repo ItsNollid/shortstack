@@ -75,11 +75,22 @@
     ],
     "asarUnpack": [
       "**/better-sqlite3/**"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "ItsNollid",
+        "repo": "shortstack"
+      }
     ]
   },
   "allowScripts": {
     "better-sqlite3@13.0.3": true,
     "esbuild@0.25.12": true,
     "electron@44.3.0": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ItsNollid/shortstack.git"
   }
 }

@@ -16,23 +16,15 @@ Nothing is downloaded and no GitHub repository is involved.
 ShortStack checks GitHub Releases on startup and every six hours, tells the user when there is
 something newer, and downloads only when they ask. It installs only when they ask.
 
-### Before the first release
+### The setup, already done
 
-The updater is switched off until there is somewhere for it to look, so these are the steps that
-turn it on.
+The repository is https://github.com/ItsNollid/shortstack, public, and `package.json` points the
+updater at it. Public matters: a private repository needs a token embedded in the app for the
+updater to read releases, and an app carrying a token that can read your private repositories is
+not something to hand to friends.
 
-1. Create a **public** GitHub repository and push this project to it. Public matters: a private
-   repository needs a token embedded in the app for the updater to read releases, and an app that
-   carries a token that can read your private repositories is not something to hand to friends.
-2. Add the publish target to `package.json`, inside `build`:
-
-   ```json
-   "publish": [{ "provider": "github", "owner": "YOUR-GITHUB-USERNAME", "repo": "shortstack" }]
-   ```
-
-   Until this exists the app says it has no update source rather than pretending to check.
-3. Create a personal access token with `repo` scope and set it as `GH_TOKEN` in the shell you
-   release from. It is only used to upload the release; it is never built into the app.
+Releasing needs a GitHub token with `repo` scope in `GH_TOKEN`. It uploads the release and is never
+built into the app.
 
 ### Cutting a release
 
