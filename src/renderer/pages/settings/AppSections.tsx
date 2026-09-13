@@ -1,11 +1,12 @@
 import React from 'react';
-import { Button, Switch } from '../../components/ui';
+import { Button, Select, Switch, TextArea } from '../../components/ui';
 import { useAppStatus } from '../../app/status';
 import { useApiMutation, useApiQuery } from '../../hooks/useApi';
 import type { AiStatus, Result } from '../../../shared/ipc';
 import { findModel, isVisionModel, type AiModel } from '../../../shared/aiModels';
 import { buildInfo, describeBuild } from '../../../shared/buildInfo';
 import { CHANGELOG, sortedChangelog } from '../../../shared/changelog';
+import { GOAL_LABELS, type InsightGoal } from '../../../shared/insightGoal';
 import { describeUpdate, type UpdateStatus } from '../../../shared/updates';
 import type { SettingsWriter } from './useSettings';
 import { ModelPicker } from './ModelPicker';
@@ -90,6 +91,36 @@ export function AppSection({ writer }: { writer: SettingsWriter }): React.JSX.El
         onChange={(value) => writer.set('start_with_windows', value)}
       />
 
+    </Section>
+  );
+}
+
+export function InsightsSection({ writer }: { writer: SettingsWriter }): React.JSX.Element {
+  const { settings } = writer;
+  if (settings === null) return <Section title="What to aim for">Loading…</Section>;
+
+  return (
+    <Section
+      title="What to aim for"
+      text="Used when Analytics works out what your videos have in common, and when the model suggests what to do about it. It decides what counts as better."
+    >
+      <Select
+        label="What you want more of"
+        value={settings.insight_goal}
+        onChange={(value) => writer.set('insight_goal', value)}
+        options={(Object.keys(GOAL_LABELS) as InsightGoal[]).map((goal) => ({ value: goal, label: GOAL_LABELS[goal] }))}
+        hint="Reach and subscribers often pull in different directions, which is why they can be asked for together."
+      />
+
+      <TextArea
+        label="How you work"
+        value={settings.insight_context}
+        onChange={(value) => writer.set('insight_context', value)}
+        problem={writer.problemFor('insight_context')}
+        rows={3}
+        placeholder="I make 5 to 10 Shorts out of each long-form video. Mostly CS2, Minecraft and games with friends."
+        hint="A couple of sentences. Advice is useless if it asks for something you cannot do, and this is how it knows."
+      />
     </Section>
   );
 }

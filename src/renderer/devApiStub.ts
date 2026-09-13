@@ -322,12 +322,14 @@ export function installDevApiStub(): void {
       ok({
         headline: 'Your reach and your subscribers are coming from different games.',
         recommendations: [
-          { action: 'Keep recording CS2 for reach, but cut more Shorts out of the Minecraft sessions.', because: 'CS2 gets four times the views, while Minecraft earns three times the subscribers per view.' },
-          { action: 'Move your 9am slot to the evening.', because: 'Evening posts get 191% more views across 11 and 9 videos.' },
-          { action: 'Cut the first three seconds harder on the weaker half.', because: 'The videos people watch furthest through get six times the views of the ones they drop out of.' },
-          { action: 'Post on a different day of the week for a few weeks.', because: 'No day yet has enough videos to compare, so there is nothing to act on.' }
+          { action: 'Keep recording CS2 for reach, but cut more Shorts out of the Minecraft sessions.', basedOn: 'game' },
+          { action: 'Move the morning slot into the evening.', basedOn: 'time-of-day', change: { kind: 'set_upload_time' as const, lane: 'new' as const, from: '09:00', to: '19:00' } },
+          { action: 'Shout the titles.', basedOn: 'shouted-title', change: { kind: 'set_title_case' as const, value: 'upper' as const } },
+          { action: 'Cut the first three seconds harder on the weaker half.', basedOn: 'retention' }
         ]
       }),
+    actionPreview: () => ok({ key: 'upload_times' as const, value: [], label: 'New video times', before: '09:00, 13:00, 18:00, 22:00', after: '13:00, 18:00, 19:00, 22:00' }),
+    actionApply: () => ok({ key: 'upload_times' as const, value: [], label: 'New video times', before: '09:00, 13:00, 18:00, 22:00', after: '13:00, 18:00, 19:00, 22:00' }),
     uploadsList: () => ok([]),
     on: (event: AppEvent, listener: (payload: unknown) => void) => {
       const set = listeners.get(event) ?? new Set();

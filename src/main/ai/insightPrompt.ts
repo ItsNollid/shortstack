@@ -8,6 +8,7 @@
 // So its job is narrow: take findings it cannot check and turn them into things to do. The
 // instructions are mostly about what it may not do — invent a number, add a fact, or pad the answer
 // when the findings are thin.
+import { parseAction, type ChannelAction } from '../../shared/channelActions';
 import { GOAL_WORDS, type InsightGoal } from '../../shared/insightGoal';
 import type { Brief } from '../../shared/insights';
 
@@ -18,6 +19,8 @@ export interface InsightPromptInput {
   goal: InsightGoal;
   /** How they post, so advice is about what they can actually change. */
   context?: string;
+  /** What the schedule is now, so a move can name a time that is actually there. */
+  currentTimes?: { newLane: readonly string[]; rotationLane: readonly string[] };
 }
 
 
@@ -35,13 +38,17 @@ export function buildInsightPrompt(input: InsightPromptInput): string {
   } else {
     for (const fact of input.brief.usable) {
       const strength = fact.confidence === 'weak' ? ' (based on few videos, so treat it as a hint)' : '';
-      lines.push(`- ${fact.statement}${strength}`);
+      lines.push(`[${fact.id}] ${fact.statement}${strength}`);
     }
   }
 
   if (input.brief.missing.length > 0) {
     lines.push('', 'These could not be measured yet:');
     for (const fact of input.brief.missing) lines.push(`- ${fact.statement}`);
+  }
+
+  if (input.currentTimes !== undefined) {
+    lines.push('', `Current posting times — new videos: ${input.currentTimes.newLane.join(', ') || 'none'}; re-runs: ${input.currentTimes.rotationLane.join(', ') || 'none'}.`);
   }
 
   if (input.context !== undefined && input.context.trim() !== '') {
@@ -53,13 +60,28 @@ export function buildInsightPrompt(input: InsightPromptInput): string {
     `Based on ${input.brief.videoCount} videos.`,
     '',
     '--- What to write ---',
-    'Write at most four recommendations. Each one is a thing to do differently, in one or two sentences, and each must point back to one of the findings above.',
+    'Write at most four recommendations. Each one is a thing to do differently, in one or two sentences.',
+    'Each carries "basedOn", the label in square brackets of the finding it comes from. Do not restate the finding or repeat its numbers — ShortStack shows the finding itself underneath, word for word, so anything you write about it can only introduce a mistake.',
     'Where a finding is missing, the recommendation is how to find it out — usually by deliberately varying one thing for a few weeks so there is something to compare.',
-    'Do not invent numbers. Do not state any fact that is not above. If a finding says something makes little difference, do not recommend doing it.',
+    'Do not put numbers in your recommendation at all. If a finding says something makes little difference, do not recommend doing it.',
     'Do not give generic YouTube advice. "Post consistently" and "make good thumbnails" are true of every channel and help nobody.',
     'If there is too little to go on, say so in one sentence and recommend only what would produce the missing evidence.',
     '',
-    'Reply with only a JSON object: {"headline": string, "recommendations": [{"action": string, "because": string}]}. "headline" is one sentence summing up where this channel stands. No other text.'
+    '',
+    '--- Changes you may ask for ---',
+    'A recommendation may carry a "change", which ShortStack will offer as a button. It has to be one of these exactly, and nothing else is accepted:',
+    '{"kind":"set_upload_time","lane":"new"|"rotation","from":"HH:MM","to":"HH:MM"} — move one daily posting time. "from" has to be one of the times listed above and "to" has to be one that is not, or there is nothing to change.',
+    '{"kind":"add_upload_time","lane":"new"|"rotation","at":"HH:MM"} — add one',
+    '{"kind":"remove_upload_time","lane":"new"|"rotation","at":"HH:MM"} — remove one',
+    '{"kind":"set_title_case","value":"upper"|"title"|"as_written"} — how every title is capitalised',
+    '{"kind":"set_title_suffix","value":"..."} — text added to the end of every title',
+    '{"kind":"set_description_footer","value":"..."} — text added under every description',
+    '{"kind":"set_max_hashtags","value":0-60} — 0 means no limit',
+    '{"kind":"enable_auto_draft"} — draft details for new videos automatically',
+    'The "new" lane is first postings; "rotation" is videos posted again. Their current times are above.',
+    'Leave "change" out entirely when a recommendation is not one of these. Most good advice is not — "record more of the game that converts" is a real recommendation with no change attached, and inventing one to fill the field is worse than leaving it empty.',
+    '',
+    'Reply with only a JSON object: {"headline": string, "recommendations": [{"action": string, "basedOn": string, "change": object or omitted}]}. "headline" is one sentence summing up where this channel stands, with no numbers in it. No other text.'
   );
 
   return lines.join('\n');
@@ -67,7 +89,12 @@ export function buildInsightPrompt(input: InsightPromptInput): string {
 
 export interface Recommendation {
   action: string;
-  because: string;
+  /** The id of the finding this came from. The reason shown to the user is that finding's own
+   *  wording, not the model's: asked to restate a finding, it produced one percentage and put it on
+   *  three unrelated recommendations, two of which it did not describe. */
+  basedOn: string;
+  /** Only ever one of the listed kinds, validated here. Absent for advice software cannot act on. */
+  change?: ChannelAction;
 }
 
 export interface ChannelAdvice {
@@ -82,7 +109,7 @@ const asText = (value: unknown, limit: number): string =>
  * The model is asked for a shape; whether it returns one is a separate question. Anything that is
  * not a recommendation with both halves is dropped rather than shown half-empty.
  */
-export function sanitizeAdvice(raw: unknown): ChannelAdvice | null {
+export function sanitizeAdvice(raw: unknown, knownFactIds: readonly string[] = []): ChannelAdvice | null {
   if (raw === null || typeof raw !== 'object') return null;
   const record = raw as { headline?: unknown; recommendations?: unknown };
 
@@ -90,10 +117,22 @@ export function sanitizeAdvice(raw: unknown): ChannelAdvice | null {
   const list = Array.isArray(record.recommendations) ? record.recommendations : [];
   const recommendations = list
     .map((entry) => {
-      const item = (entry ?? {}) as { action?: unknown; because?: unknown };
-      return { action: asText(item.action, 400), because: asText(item.because, 400) };
+      const item = (entry ?? {}) as { action?: unknown; basedOn?: unknown; change?: unknown };
+      // Anything that is not one of the listed actions with sound parameters becomes no action at
+      // all, rather than a button that does something nobody asked for.
+      const change = parseAction(item.change);
+      // The findings are labelled "[time-of-day]" and the model hands the label back with its
+      // brackets still on. Refusing that would be punishing it for copying the formatting it was
+      // shown, which is the one thing it did right.
+      const basedOn = asText(item.basedOn, 60).replace(/^\[+|\]+$/g, '').trim();
+      return {
+        action: asText(item.action, 400),
+        // A label that names no finding is no better than one the model made up.
+        basedOn: knownFactIds.length === 0 || knownFactIds.includes(basedOn) ? basedOn : '',
+        ...(change === null ? {} : { change })
+      };
     })
-    .filter((entry) => entry.action !== '' && entry.because !== '')
+    .filter((entry) => entry.action !== '' && entry.basedOn !== '')
     .slice(0, 4);
 
   if (headline === '' && recommendations.length === 0) return null;

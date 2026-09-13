@@ -20,6 +20,7 @@ import { createPosting, markPublishedBefore, setRotationPaused } from './db/rota
 import { draftFor } from './ai/draft';
 import { buildInsightPrompt, sanitizeAdvice } from './ai/insightPrompt';
 import { buildBrief } from '../shared/insights';
+import { changeFor, parseAction } from '../shared/channelActions';
 import { adviseWith } from './ai/advise';
 import type { UpdateService } from './updates/updateService';
 import { saveFrames, readFrames } from './media/frames';
@@ -431,17 +432,44 @@ export function registerIpcHandlers(context: IpcContext): void {
 
       const { settings } = readSettings(db);
       const channel = readActiveChannel(db);
+      const brief = buildBrief(stats.value);
       const prompt = buildInsightPrompt({
-        brief: buildBrief(stats.value),
+        brief,
         channelName: channel?.title ?? null,
         goal: settings.insight_goal,
-        context: settings.insight_context
+        context: settings.insight_context,
+        currentTimes: { newLane: settings.upload_times, rotationLane: settings.rotation_upload_times }
       });
 
       const answer = await adviseWith({ db, prompt });
       if (!answer.ok) return fail(answer.code, answer.reason);
-      const advice = sanitizeAdvice(answer.value);
+
+      const advice = sanitizeAdvice(answer.value, brief.usable.map((fact) => fact.id));
       return advice === null ? fail('bad_output', 'The model did not answer in a usable shape') : ok(advice);
+    },
+
+    actionPreview: async (action) => {
+      // Parsed again on this side. What the renderer sends is not what decides an action is allowed.
+      const parsed = parseAction(action);
+      if (parsed === null) return fail('invalid', 'That is not a change ShortStack can make');
+      return ok(changeFor(parsed, readSettings(db).settings));
+    },
+
+    actionApply: async (action) => {
+      const parsed = parseAction(action);
+      if (parsed === null) return fail('invalid', 'That is not a change ShortStack can make');
+
+      const change = changeFor(parsed, readSettings(db).settings);
+      if (change === null) return fail('refused', 'That would not change anything');
+
+      const written = writeSetting(db, change.key, change.value);
+      if (!written.ok) return fail('refused', written.reason);
+
+      // Times feed the scheduler and the drafting worker; both should notice straight away.
+      context.draftWorker?.kick();
+      void engine.kick();
+      changed();
+      return ok(change);
     },
 
     updateStatus: async () => ok(context.updates.status()),
