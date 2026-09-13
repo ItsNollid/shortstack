@@ -170,6 +170,20 @@ export function formatDescription(raw: string, rules: FormattingRules): string {
     body = limitHashtags(body, rules.maxHashtags, false).trim();
   }
 
+  // Past 60 hashtags YouTube ignores every hashtag on the video, and the footer used to be added after
+  // every other limit had been applied, so a long enough footer quietly switched them all off. The
+  // footer is the person's own words and is kept exactly as written, so the body gives way — its later
+  // hashtags, so the ones that lead, the game and #shorts, are what survive.
+  const YOUTUBE_HASHTAG_LIMIT = 60;
+  const allowed = Math.max(0, YOUTUBE_HASHTAG_LIMIT - hashtagsIn(footer).length);
+  if (hashtagsIn(body).length > allowed) {
+    body = (
+      allowed === 0
+        ? body.replace(HASHTAG, (_match, space: string) => (space.includes('\n') ? space : ''))
+        : limitHashtags(body, allowed, false)
+    ).trim();
+  }
+
   if (footer === '') return body;
 
   const room = DESCRIPTION_MAX_BYTES - utf8Bytes(footer) - 2;

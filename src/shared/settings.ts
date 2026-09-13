@@ -250,9 +250,15 @@ export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> 
   format_title_case: oneOf<TitleCase>('as_written', ['as_written', 'upper', 'title']),
   format_title_prefix: text('', (value) => (charCount(value) > 40 ? 'A prefix that long leaves no room for a title' : null)),
   format_title_suffix: text('', (value) => (charCount(value) > 40 ? 'A suffix that long leaves no room for a title' : null)),
-  format_description_footer: text('', (value) =>
-    utf8Bytes(value) > 2000 ? 'A footer that long leaves no room for a description' : null
-  ),
+  format_description_footer: text('', (value) => {
+    if (utf8Bytes(value) > 2000) return 'A footer that long leaves no room for a description';
+    // The footer goes under every description, and past 60 hashtags on a video YouTube ignores all of
+    // them. Forty leaves room for the ones each video is built with.
+    if ((value.match(/#[\p{L}\p{N}_]+/gu) ?? []).length > 40) {
+      return 'Keep the footer to 40 hashtags or fewer — past 60 on a video, YouTube ignores every one of them';
+    }
+    return null;
+  }),
   format_tidy: bool(false),
   format_max_hashtags: integer(0, 0, 60),
   close_to_tray: bool(true),

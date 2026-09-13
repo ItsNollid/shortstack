@@ -208,6 +208,32 @@ describe('what the preview showed was wrong', () => {
     expect(result).toBe('Round 87.\n\n#round100\n\nSubscribe\n\n#blackops3zombies #codzombies');
   });
 
+  // Past 60, YouTube ignores every hashtag on the video. The footer used to be added after every other
+  // limit, so a long enough one switched them all off without a word.
+  it('never lets the whole description pass sixty hashtags, and gives way in the body', () => {
+    const body = Array.from({ length: 50 }, (_, index) => `#body${index}x`).join(' ');
+    const footer = Array.from({ length: 20 }, (_, index) => `#foot${index}x`).join(' ');
+    const result = formatDescription(body, rules({ descriptionFooter: footer }));
+
+    expect((result.match(/#[\p{L}\p{N}_]+/gu) ?? []).length).toBeLessThanOrEqual(60);
+    expect(result.endsWith(footer)).toBe(true);
+    // The leading hashtags — the game and #shorts, in a built description — are the ones kept.
+    expect(result).toContain('#body0x');
+    expect(result).not.toContain('#body49x');
+  });
+
+  it('caps a description with no footer as well', () => {
+    const body = Array.from({ length: 80 }, (_, index) => `#t${index}x`).join(' ');
+    expect((formatDescription(body, NO_FORMATTING).match(/#[\p{L}\p{N}_]+/gu) ?? []).length).toBe(60);
+  });
+
+  it('is still idempotent once it has capped', () => {
+    const body = Array.from({ length: 70 }, (_, index) => `#t${index}x`).join(' ');
+    const applied = rules({ descriptionFooter: '#footer' });
+    const once = formatDescription(body, applied);
+    expect(formatDescription(once, applied)).toBe(once);
+  });
+
   it('still only adds that footer once, however many times it runs', () => {
     const applied = rules({ tidy: true, descriptionFooter: 'Subscribe\n\n#blackops3zombies' });
     const once = formatDescription('Round 87. #blackops3zombies', applied);
