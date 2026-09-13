@@ -29,6 +29,8 @@ export interface PromptInput {
    * than being left to infer it from four examples.
    */
   findings?: readonly { statement: string }[];
+  /** Names never to use, given so the model avoids them in the first place. They are removed afterwards either way. */
+  blockedNames?: readonly string[];
 }
 
 
@@ -121,6 +123,9 @@ export function buildPrompt(input: PromptInput): string {
     // Measured: shown a lobby with a player list, the model offered the channel's own name and a
     // friend's gamertag as topics and tags. Visible, yes; searched for, never; and not ours to use.
     'Never use a name read off the screen — player names, gamertags, usernames, channel names, or anything typed in chat. They are visible, but nobody searches for them, and they belong to other people. This applies to topics and tags alike.',
+    ...((input.blockedNames ?? []).length > 0
+      ? [`In particular, never use any of these names, in the title, the topics or the tags: ${(input.blockedNames ?? []).join(', ')}.`]
+      : []),
     'Tags: 10 to 20 search phrases someone would actually type. Specific beats broad: name the game and the mode rather than "gaming".',
     'Do not invent facts you cannot see: no round numbers, scores or map names unless they are on screen. If you are unsure which game it is, describe what is happening instead of naming the wrong one.',
     '',

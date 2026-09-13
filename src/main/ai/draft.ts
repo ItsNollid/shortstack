@@ -11,6 +11,7 @@ import { readSettings } from '../db/settingsRepo';
 import { readFrames } from '../media/frames';
 import { readThumbnail } from '../media/thumbnails';
 import { tagVocabulary } from '../../shared/channelTags';
+import { hashtagNames, mentionedIn } from '../../shared/blockedNames';
 import { buildHashtagBlock, hashtagDescription } from '../../shared/hashtags';
 import type { MetadataSuggestion } from './metadataSuggestion';
 import { generateMetadata, listModels, type AiResult } from './ollamaClient';
@@ -88,6 +89,7 @@ export async function draftFor(deps: DraftDeps, queueId: number): Promise<AiResu
       // From the last time Analytics was opened. Free: no extra call per drafted video.
       findings: writingFacts(parseBrief(settings.insight_findings) ?? { usable: [], missing: [], videoCount: 0, tooEarly: true }),
       channelName: channel?.title ?? null,
+      blockedNames: settings.ai_blocked_names,
       examples,
       frames: stills.filter((image): image is Buffer => image !== null).map((image) => image.toString('base64')),
       video: {
@@ -110,13 +112,19 @@ export async function draftFor(deps: DraftDeps, queueId: number): Promise<AiResu
   const standing = tagVocabulary(examples.map((example) => example.description)).standing;
 
   // Measured: shown a lobby with a player list, the model offered the channel's own name and a
-  // friend's gamertag as topics and as tags. The channel's own name is the one that can be removed
-  // with certainty, so it is — from the hashtags and from the tags. Anyone else's rests on the prompt.
-  const ownNames = [channel?.title ?? ''].filter((name) => name.trim() !== '');
-  const squash = (value: string): string => value.replace(/[^\p{L}\p{N}]+/gu, '').toLowerCase();
-  const isOwnName = (phrase: string): boolean => ownNames.some((name) => squash(name) === squash(phrase));
-
-  const block = buildHashtagBlock({ game: item.game, topics: suggestion.value.topics ?? [], standing, exclude: ownNames });
-  const tags = suggestion.value.tags.filter((tag) => !isOwnName(tag));
-  return { ok: true, value: { ...suggestion.value, tags, description: hashtagDescription(block) } };
+  // friend's gamertag as topics and as tags, though told not to. So the names that must never appear —
+  // the channel's own, and the person's list — are taken out after it answers, wherever they turn up.
+  const names = [channel?.title ?? '', ...settings.ai_blocked_names].filter((name) => name.trim() !== '');
+  const topics = (suggestion.value.topics ?? []).filter((topic) => !mentionedIn(topic, names) && !hashtagNames(topic, names));
+  const block = buildHashtagBlock({
+    game: item.game,
+    topics,
+    standing: standing.filter((tag) => !hashtagNames(tag, names)),
+    exclude: names
+  });
+  const tags = suggestion.value.tags.filter((tag) => !mentionedIn(tag, names) && !hashtagNames(tag, names));
+  // A title is a sentence, and cutting a name out of one leaves it broken, so a title that names
+  // someone is not used at all: the video keeps the title it already had.
+  const title = mentionedIn(suggestion.value.title, names) ? item.title : suggestion.value.title;
+  return { ok: true, value: { ...suggestion.value, title, topics, tags, description: hashtagDescription(block) } };
 }

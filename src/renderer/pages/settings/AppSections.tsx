@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Select, Switch, TextArea } from '../../components/ui';
+import { Button, Select, Switch, TagInput, TextArea } from '../../components/ui';
 import { useAppStatus } from '../../app/status';
 import { useApiMutation, useApiQuery } from '../../hooks/useApi';
 import type { AiStatus, Result } from '../../../shared/ipc';
@@ -98,6 +98,14 @@ export function AiSection({ writer }: { writer: SettingsWriter }): React.JSX.Ele
           </div>
         </fieldset>
       )}
+
+      <TagInput
+        label="Names never to use"
+        value={settings.ai_blocked_names}
+        onChange={(names) => writer.set('ai_blocked_names', names)}
+        problem={writer.problemFor('ai_blocked_names')}
+        hint="Friends' gamertags, and anyone else's name the model might read off the screen. They are kept out of drafted titles, hashtags and tags. Your channel's name always is."
+      />
     </Section>
   );
 }

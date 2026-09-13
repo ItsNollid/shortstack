@@ -1,6 +1,7 @@
 // Typed app settings: defaults, decoding of stored strings, and validation of changes.
 // Shared so the renderer can validate inline with exactly the rules the main process enforces.
 import { ANALYTICS_REFRESH_MODES, DEFAULT_REFRESH_MINUTES, MAX_REFRESH_MINUTES, MIN_REFRESH_MINUTES, type AnalyticsRefresh } from './analyticsRefresh';
+import { checkBlockedNames } from './blockedNames';
 import { DRAFT_FIELDS, checkDraftFields, type DraftField } from './draftFields';
 import type { FormattingRules, TitleCase } from './formatting';
 import type { InsightGoal } from './insightGoal';
@@ -40,6 +41,8 @@ export interface AppSettings {
   ai_auto_draft: boolean;
   /** Which details automatic drafting writes. At least one. */
   ai_auto_draft_fields: DraftField[];
+  /** Names drafting must never use: friends' gamertags, mostly. The channel's own name is always kept out. */
+  ai_blocked_names: string[];
 
   /** What the channel is being grown for, which decides what "better" means in any comparison. */
   insight_goal: InsightGoal;
@@ -267,6 +270,7 @@ export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> 
   ai_auto_draft: bool(false),
   // All three by default, which is what drafting did before there was a choice.
   ai_auto_draft_fields: stringList([...DRAFT_FIELDS], checkDraftFields) as unknown as SettingCodec<DraftField[]>,
+  ai_blocked_names: stringList([], checkBlockedNames),
 
   insight_goal: oneOf<InsightGoal>('reach_and_subscribers', ['reach_and_subscribers', 'views', 'subscribers', 'watch_time']),
   insight_context: text('', (value) => (value.length > 600 ? 'Keep this to a couple of sentences' : null)),

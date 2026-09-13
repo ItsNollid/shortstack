@@ -32,6 +32,8 @@ export interface OllamaDeps {
 }
 
 export interface GenerateInput {
+  /** Names never to use, passed on to the prompt. */
+  blockedNames?: readonly string[];
   model: string;
   video: VideoFacts;
   channelName?: string | null;
@@ -70,7 +72,8 @@ export function promptFor(input: GenerateInput): string {
     channelName: input.channelName ?? null,
     examples: input.examples ?? [],
     hasFrames: framesFor(input).length > 0,
-    findings: input.findings ?? []
+    findings: input.findings ?? [],
+    blockedNames: input.blockedNames ?? []
   });
 }
 
