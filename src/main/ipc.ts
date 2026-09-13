@@ -4,6 +4,7 @@ import type Database from 'better-sqlite3';
 import { BrowserWindow, app, clipboard, dialog, ipcMain, shell } from 'electron';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { findModel } from '../shared/aiModels';
 import type { AppEvent, AppInfo, AuthStatus, Result, ShortStackApi } from '../shared/ipc';
 import { parseVideoId } from '../shared/youtubeUrl';
 import { generateMetadata, listModels } from './ai/ollamaClient';
@@ -400,12 +401,15 @@ export function registerIpcHandlers(context: IpcContext): void {
       if (item === undefined) return fail('not_found', 'That video is no longer in the queue');
 
       const { settings } = readSettings(db);
-      let model = settings.ai_model;
-      if (model === '') {
-        const models = await listModels({ host: settings.ai_host });
-        if (!models.ok) return fail(models.code, models.reason);
-        model = models.value[0];
-      }
+      // Always ask what is installed: it settles which model to use when none is configured, and
+      // tells us whether that model can actually read an image, which decides whether sending it
+      // frames is worth anything.
+      const installed = await listModels({ host: settings.ai_host });
+      if (!installed.ok && settings.ai_model === '') return fail(installed.code, installed.reason);
+
+      const available = installed.ok ? installed.value : [];
+      const chosen = findModel(available, settings.ai_model) ?? (settings.ai_model === '' ? available[0] : undefined);
+      const model = chosen?.name ?? settings.ai_model;
       const channel = readActiveChannel(db);
 
       // The two things that turn a guess into an answer: what this channel's own uploads look like,
@@ -426,6 +430,7 @@ export function registerIpcHandlers(context: IpcContext): void {
       const suggestion = await generateMetadata(
         {
           model,
+          vision: chosen?.vision,
           channelName: channel?.title ?? null,
           examples,
           frames: stills.map((image) => image.toString('base64')),

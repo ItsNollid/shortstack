@@ -1,5 +1,6 @@
 // The contract between the renderer and the main process. Both sides are typed from this one
 // definition, so a signature can no longer drift the way the old electron.d.ts did.
+import type { AiModel } from './aiModels';
 import type { ChannelAnalytics } from './analytics';
 import type { PastUploadPage } from './pastUploads';
 import type { ActivityEntryDTO, QueueItemDTO, UploadDTO } from './dto';
@@ -48,7 +49,7 @@ export interface ScanSummary {
 
 export interface AiStatus {
   running: boolean;
-  models: string[];
+  models: AiModel[];
   message: string;
 }
 

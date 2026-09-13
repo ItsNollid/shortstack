@@ -3,17 +3,28 @@ import { Switch } from '../../components/ui';
 import { useAppStatus } from '../../app/status';
 import { useApiQuery } from '../../hooks/useApi';
 import type { AiStatus, Result } from '../../../shared/ipc';
-import { isVisionModel } from '../../../shared/aiModels';
+import { findModel, isVisionModel, type AiModel } from '../../../shared/aiModels';
 import type { SettingsWriter } from './useSettings';
 import { CommittedText, Section } from './parts';
 import styles from './Settings.module.css';
 
 const readAi = (): Promise<Result<AiStatus>> => window.api.aiStatus();
 
+/**
+ * Whether the chosen model will actually be shown the video. Ollama's own answer where we have it,
+ * because a name is only a guess, and this is the difference between suggestions written from the
+ * video and suggestions written from a file name.
+ */
+function canSee(models: readonly AiModel[], name: string): boolean {
+  return findModel(models, name)?.vision ?? isVisionModel(name);
+}
+
 export function AiSection({ writer }: { writer: SettingsWriter }): React.JSX.Element {
   const ai = useApiQuery(readAi, { key: 'ai-settings' });
   const { settings } = writer;
   if (settings === null) return <Section title="Suggestions">Loading…</Section>;
+
+  const models = ai.data?.models ?? [];
 
   return (
     <Section
@@ -25,9 +36,9 @@ export function AiSection({ writer }: { writer: SettingsWriter }): React.JSX.Ele
     >
       {settings.ai_model !== '' && (
         <div className={styles.sectionText}>
-          {isVisionModel(settings.ai_model)
-            ? `${settings.ai_model} can look at the video. ShortStack sends it a frame, so it can name the game and what is happening rather than guessing from the file name.`
-            : `${settings.ai_model} cannot look at images, so suggestions are written from the file name and your past uploads alone. A model like llava, llama3.2-vision or gemma3 would see the video itself.`}
+          {canSee(models, settings.ai_model)
+            ? `${settings.ai_model} can look at the video. ShortStack sends it stills from three points in the clip, so it can name the game and what is happening instead of guessing from the file name.`
+            : `${settings.ai_model} cannot look at images, so suggestions come from the file name and your past uploads alone. A model like llava, llama3.2-vision or gemma3 would see the video itself.`}
         </div>
       )}
 
@@ -44,11 +55,11 @@ export function AiSection({ writer }: { writer: SettingsWriter }): React.JSX.Ele
           value={settings.ai_model}
           onCommit={(value) => writer.set('ai_model', value)}
           problem={writer.problemFor('ai_model')}
-          placeholder={ai.data?.models[0] ?? 'llama3.2'}
+          placeholder={models[0]?.name ?? 'llama3.2'}
           hint={
-            ai.data === null || ai.data.models.length === 0
+            models.length === 0
               ? 'Install one with: ollama pull llama3.2-vision — a vision model can see the video itself'
-              : `Installed: ${ai.data.models.join(', ')}`
+              : `Installed: ${models.map((model) => (model.vision ? `${model.name} (sees video)` : model.name)).join(', ')}`
           }
         />
       </div>

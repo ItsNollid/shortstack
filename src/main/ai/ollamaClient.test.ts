@@ -36,9 +36,35 @@ afterEach(async () => {
 });
 
 describe('listModels', () => {
-  it('lists what is installed', async () => {
-    const host = await startOllama(() => ({ status: 200, body: { models: [{ name: 'llama3.2:latest' }, { name: 'qwen2.5' }] } }));
-    await expect(listModels({ host })).resolves.toEqual({ ok: true, value: ['llama3.2:latest', 'qwen2.5'] });
+  it('lists what is installed, and whether each one can see', async () => {
+    const host = await startOllama(() => ({
+      status: 200,
+      body: {
+        models: [
+          { name: 'llama3.2:latest', capabilities: ['completion', 'tools'] },
+          { name: 'llava:13b', capabilities: ['completion', 'vision'] }
+        ]
+      }
+    }));
+    await expect(listModels({ host })).resolves.toEqual({
+      ok: true,
+      value: [
+        { name: 'llama3.2:latest', vision: false },
+        { name: 'llava:13b', vision: true }
+      ]
+    });
+  });
+
+  // Older daemons answer without the field. Guessing from the name beats deciding nothing can see.
+  it('falls back to the model name when capabilities are not reported', async () => {
+    const host = await startOllama(() => ({ status: 200, body: { models: [{ name: 'llava:13b' }, { name: 'mistral' }] } }));
+    await expect(listModels({ host })).resolves.toEqual({
+      ok: true,
+      value: [
+        { name: 'llava:13b', vision: true },
+        { name: 'mistral', vision: false }
+      ]
+    });
   });
 
   it('separates "no models downloaded" from "not running"', async () => {
@@ -74,6 +100,22 @@ describe('generateMetadata', () => {
       ok: true,
       value: { title: 'Peter in CoD', description: 'A clip', tags: ['gaming'] }
     });
+  });
+
+  it('sends frames only to a model that Ollama says can read them', async () => {
+    const bodies: string[] = [];
+    const host = await startOllama((req) => {
+      bodies.push(req.body);
+      return { status: 200, body: { response: '{"title":"t"}' } };
+    });
+    const frames = ['ZmFrZQ=='];
+
+    // The name says text-only; Ollama says otherwise, and Ollama is the one that has to read them.
+    await generateMetadata({ ...input, frames, vision: true }, { host });
+    await generateMetadata({ ...input, frames, vision: false }, { host });
+    await generateMetadata({ ...input, frames }, { host });
+
+    expect(bodies.map((body) => JSON.parse(body).images)).toEqual([frames, [], []]);
   });
 
   it('sends the request Ollama expects', async () => {

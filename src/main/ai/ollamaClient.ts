@@ -2,7 +2,7 @@
 // (start Ollama, pull a model, try again) instead of failing silently the way the old build did.
 import type { PastUpload } from '../../shared/pastUploads';
 import { extractJson, sanitizeSuggestion, type MetadataSuggestion } from './metadataSuggestion';
-import { isVisionModel } from '../../shared/aiModels';
+import { isVisionModel, visionFrom, type AiModel } from '../../shared/aiModels';
 import { buildPrompt, type VideoFacts } from './prompt';
 
 export type AiFailureCode = 'not_running' | 'no_models' | 'model_missing' | 'timeout' | 'bad_output' | 'error';
@@ -22,13 +22,16 @@ export interface GenerateInput {
   channelName?: string | null;
   /** Published videos from the same channel, used as examples. */
   examples?: readonly PastUpload[];
-  /** Base64 PNG frames. Only sent to a model that can read them. */
+  /** Base64 image frames. Only sent to a model that can read them. */
   frames?: readonly string[];
+  /** What Ollama said about this model. Falls back to the name when the caller does not know. */
+  vision?: boolean;
 }
 
 /** Frames are only worth sending to a model that can read them; the rest ignore or choke on them. */
 export function framesFor(input: GenerateInput): string[] {
-  return isVisionModel(input.model) ? [...(input.frames ?? [])] : [];
+  const canSee = input.vision ?? isVisionModel(input.model);
+  return canSee ? [...(input.frames ?? [])] : [];
 }
 
 export function promptFor(input: GenerateInput): string {
@@ -60,7 +63,7 @@ const unreachable = (error: unknown): AiResult<never> => ({
 });
 
 /** Lists installed models, which is also how the app tells whether Ollama is running at all. */
-export async function listModels(deps: OllamaDeps): Promise<AiResult<string[]>> {
+export async function listModels(deps: OllamaDeps): Promise<AiResult<AiModel[]>> {
   const doFetch = deps.fetch ?? fetch;
   try {
     const response = await withTimeout(deps.statusTimeoutMs ?? 2000, (signal) =>
@@ -69,8 +72,10 @@ export async function listModels(deps: OllamaDeps): Promise<AiResult<string[]>> 
     if (response === 'timeout') return { ok: false, code: 'not_running', reason: 'Ollama did not answer in time' };
     if (!response.ok) return { ok: false, code: 'error', reason: `Ollama replied ${response.status}` };
 
-    const parsed = JSON.parse(await response.text()) as { models?: Array<{ name?: string }> };
-    const models = (parsed.models ?? []).map((model) => model.name).filter((name): name is string => typeof name === 'string');
+    const parsed = JSON.parse(await response.text()) as { models?: Array<{ name?: unknown; capabilities?: unknown }> };
+    const models = (parsed.models ?? [])
+      .filter((model): model is { name: string; capabilities?: unknown } => typeof model.name === 'string')
+      .map((model) => ({ name: model.name, vision: visionFrom(model.capabilities, model.name) }));
     return models.length === 0
       ? { ok: false, code: 'no_models', reason: 'Ollama is running but has no models downloaded yet' }
       : { ok: true, value: models };

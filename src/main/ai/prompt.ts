@@ -83,11 +83,14 @@ export function buildPrompt(input: PromptInput): string {
     '--- What to write ---',
     'Title: under 100 characters. Same voice as the examples. No surrounding quotes, no "Title:" prefix.',
     examples.length > 0
-      ? 'Description: copy the shape of the example descriptions exactly. If they are blocks of hashtags, write a block of hashtags for this video, using the specific game, map, mode and topic rather than generic words.'
-      : 'Description: a short line about the video, then a block of specific hashtags covering the game, map, mode and topic.',
+      ? 'Description: copy the shape of the example descriptions exactly, and use at least as many hashtags as they do. If they are blocks of hashtags, write a block of hashtags for this video, using the specific game, map, mode and topic rather than generic words.'
+      : 'Description: a short line about the video, then a block of at least ten specific hashtags covering the game, map, mode and topic.',
     'Tags: 10 to 20 search phrases someone would actually type. Specific beats broad: name the game and the mode rather than "gaming".',
+    ...(examples.length > 0
+      ? ['The hashtags and tags in the examples belong to those videos. Reuse one only if it is also true of this video.']
+      : []),
     'Do not invent facts you cannot see. If you are unsure which game it is, describe what is happening instead of naming the wrong one.',
     '',
-    'Reply with only a JSON object with the keys "title", "description" and "tags" (an array of strings). No other text.'
+    'Reply with only a JSON object with the keys "title", "description" and "tags", where "tags" is an array of at least 10 strings. No other text.'
   ].join('\n');
 }
