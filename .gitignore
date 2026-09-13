@@ -31,3 +31,7 @@ playwright-report/
 
 # One person's folder of real videos, for the end-to-end tests. See e2e/fixtures.ts.
 e2e/sample-dir.txt
+
+# TypeScript's incremental build cache. Rewritten on every typecheck, so tracking it only ever
+# made the working tree look changed.
+*.tsbuildinfo
