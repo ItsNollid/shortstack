@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import * as path from 'path';
+import { detectGame } from '../../shared/games';
 import type { AttentionCode, QueueState, RemoteSync, ScheduleSource } from '../../shared/queue';
 
 export interface MigrationContext {
@@ -473,6 +474,27 @@ const v7ApiSpend: Migration = {
   }
 };
 
+/**
+ * Videos imported before the Game field existed never got the guess a new file gets at intake, so on
+ * this channel one of the four had no game at all — and a video with no game loses every game hashtag
+ * from its description. This makes the same guess once, for those. It runs as a migration rather than
+ * on every scan, so a game someone deliberately clears is not guessed back in afterwards.
+ */
+const v8GameGuess: Migration = {
+  version: 8,
+  name: 'guess the game for videos imported before the field existed',
+  up(db) {
+    const rows = db
+      .prepare("SELECT id, filename FROM videos WHERE game IS NULL OR trim(game) = ''")
+      .all() as Array<{ id: number; filename: string }>;
+    const update = db.prepare('UPDATE videos SET game = ? WHERE id = ?');
+    for (const row of rows) {
+      const guess = detectGame({ title: row.filename });
+      if (guess !== null) update.run(guess, row.id);
+    }
+  }
+};
+
 export const MIGRATIONS: readonly Migration[] = [
   v1Baseline,
   v2Lifecycle,
@@ -480,7 +502,8 @@ export const MIGRATIONS: readonly Migration[] = [
   v4UploadsPlaylist,
   v5AiDrafts,
   v6Game,
-  v7ApiSpend
+  v7ApiSpend,
+  v8GameGuess
 ];
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
 

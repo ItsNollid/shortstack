@@ -292,3 +292,43 @@ describe('v5 drafting provenance', () => {
     db.close();
   });
 });
+
+describe('v8 guessing the game for older videos', () => {
+  const insertVideo = (db: Database.Database, filename: string): void => {
+    db.prepare("INSERT INTO videos (filename, filepath, status, created_at) VALUES (?, ?, 'pending', ?)").run(
+      filename,
+      'E:/' + filename,
+      NOW.toISOString()
+    );
+  };
+
+  // One of this channel's four videos predated the Game field, so it had none, and so its description
+  // lost every game hashtag.
+  it('fills in a guess from the file name where the game is missing, and leaves unknowns unknown', () => {
+    const db = new Database(':memory:');
+    migrate(db, { now: () => NOW, migrations: MIGRATIONS.filter((m) => m.version <= 7) });
+    insertVideo(db, 'INSANE CS2 CLUTCH.mov');
+    insertVideo(db, 'ALRIGHT GUYS IM GOING TO BED.mov');
+
+    migrate(db, { now: () => NOW });
+
+    const games = db.prepare('SELECT filename, game FROM videos ORDER BY id').all();
+    expect(games).toEqual([
+      { filename: 'INSANE CS2 CLUTCH.mov', game: 'Counter-Strike 2' },
+      { filename: 'ALRIGHT GUYS IM GOING TO BED.mov', game: null }
+    ]);
+    db.close();
+  });
+
+  it('never replaces a game that was already set', () => {
+    const db = new Database(':memory:');
+    migrate(db, { now: () => NOW, migrations: MIGRATIONS.filter((m) => m.version <= 7) });
+    insertVideo(db, 'INSANE CS2 CLUTCH.mov');
+    db.prepare("UPDATE videos SET game = 'Minecraft'").run();
+
+    migrate(db, { now: () => NOW });
+
+    expect((db.prepare('SELECT game FROM videos').get() as { game: string }).game).toBe('Minecraft');
+    db.close();
+  });
+});
