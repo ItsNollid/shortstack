@@ -1,8 +1,16 @@
+/*
+ * Height first, width derived. Sizing from the width and capping the height made the box stop being
+ * 9:16, and a percentage height on the video then resolved against the uncapped height — so the
+ * element came out 459px tall inside a 329px box and the bottom third, controls included, was
+ * clipped away.
+ */
 .frame {
   position: relative;
+  /* 462px is a 9:16 box at the full width of its column, so it fills without overflowing it. */
+  height: min(46vh, 462px);
   aspect-ratio: 9 / 16;
-  width: 100%;
-  max-height: 40vh;
+  width: auto;
+  max-width: 100%;
   margin: 0 auto;
   border-radius: var(--radius);
   border: 1px solid var(--line);
@@ -12,7 +20,16 @@
   place-items: center;
 }
 
-.video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
+/* Absolute so it fills the box that is actually rendered, whatever clamps that box. */
+.video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  background: #000;
+}
 
 .fallback {
   display: flex;
@@ -25,10 +42,11 @@
   font-size: var(--text-sm);
 }
 
+/* Top corner, because the bottom one belongs to the player's own control bar. */
 .badge {
   position: absolute;
   right: 6px;
-  bottom: 6px;
+  top: 6px;
   border-radius: 4px;
   padding: 1px 5px;
   background: rgba(0, 0, 0, 0.78);
