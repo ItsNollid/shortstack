@@ -26,3 +26,5 @@ Thumbs.db
 dist-dev/
 dist-installer/
 dist-release/
+test-results/
+playwright-report/

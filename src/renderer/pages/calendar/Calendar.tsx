@@ -73,6 +73,17 @@ export function Calendar(): React.JSX.Element {
 
   const days = useMemo(() => gridDays(cursor.getFullYear(), cursor.getMonth()), [cursor]);
 
+  // Why anything in the tray cannot be dragged. A chip that simply will not lift, with nothing
+  // said, is indistinguishable from drag and drop being broken.
+  const blockedReasons = useMemo(() => {
+    const reasons = new Map<string, number>();
+    for (const item of undated) {
+      const reason = scheduleBlocker(item);
+      if (reason !== null) reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
+    }
+    return [...reasons].map(([reason, count]) => (count === 1 ? reason : `${count} videos: ${reason}`));
+  }, [undated]);
+
   const verdictFor = (day: Date): ReturnType<typeof dropOnDay> | null =>
     dragging === null ? null : dropOnDay({ item: dragging, day, uploadTimes, taken: items, now });
 
@@ -249,6 +260,7 @@ export function Calendar(): React.JSX.Element {
               return (
                 <div
                   key={key}
+                  data-day={key}
                   className={[
                     styles.day,
                     outside ? styles.outside : '',
@@ -313,8 +325,12 @@ export function Calendar(): React.JSX.Element {
               ))
             )}
           </div>
-          {dragging !== null && scheduleBlocker(dragging) !== null && (
-            <div className={styles.trayText}>{scheduleBlocker(dragging)}</div>
+          {blockedReasons.length > 0 && (
+            <div className={styles.trayNote}>
+              {blockedReasons.map((reason) => (
+                <div key={reason}>{reason}</div>
+              ))}
+            </div>
           )}
         </aside>
       </div>

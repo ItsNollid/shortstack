@@ -20,7 +20,14 @@ const decision = resolveProfile({
   bakedBuildProfile: readBakedBuildProfile()
 });
 
-const userDataDir = path.join(app.getPath('appData'), decision.userDataFolder);
+// An end-to-end test needs its own profile directory, or it would work against whatever is in the
+// developer's. Only ever read from the environment of whoever launched the app, and only honoured
+// for a dev profile, so it cannot be used to redirect a live one.
+const override = process.env.SHORTSTACK_USER_DATA;
+const userDataDir =
+  override !== undefined && override !== '' && decision.profile === 'dev'
+    ? override
+    : path.join(app.getPath('appData'), decision.userDataFolder);
 app.setPath('userData', userDataDir);
 
 console.info(`[ShortStack] profile=${decision.profile} uploads=${decision.uploads} userData=${userDataDir} (${decision.reason})`);

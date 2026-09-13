@@ -1,7 +1,7 @@
 import React from 'react';
 import { CircleAlert, Upload } from 'lucide-react';
 import type { QueueItemDTO } from '../../../shared/dto';
-import { DRAG_TYPE, canDrag } from '../../../shared/calendarDnd';
+import { DRAG_TYPE, canDrag, scheduleBlocker } from '../../../shared/calendarDnd';
 import styles from './Calendar.module.css';
 
 export interface ChipProps {
@@ -23,12 +23,13 @@ const time = (iso: string | null): string =>
 
 export function Chip({ item, onDragStart, onDragEnd, onOpen }: ChipProps): React.JSX.Element {
   const draggable = canDrag(item);
+  const blocker = scheduleBlocker(item);
 
   return (
     <div
       className={`${styles.chip} ${toneClass(item)} ${draggable ? '' : styles.fixed}`}
       draggable={draggable}
-      title={item.title}
+      title={blocker === null ? item.title : `${item.title} — ${blocker}`}
       role="button"
       tabIndex={0}
       onClick={() => onOpen(item.id)}
