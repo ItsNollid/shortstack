@@ -5,6 +5,7 @@ import { formatDescription, formatTitle, formattingIsActive, type TitleCase } fr
 import { FOOTER_MAX_HASHTAGS, formattingRules, type IgnoredSetting } from '../../../shared/settings';
 import type { SettingsWriter } from './useSettings';
 import { CommittedText, Section } from './parts';
+import { RestyleWaiting } from './RestyleWaiting';
 import styles from './Settings.module.css';
 
 /** Something recognisable to format, so the preview shows the rules doing their work. */
@@ -118,6 +119,8 @@ export function FormattingSection({
         <div className={styles.previewTitle}>{formatTitle(SAMPLE_TITLE, rules)}</div>
         <div className={styles.previewBody}>{formatDescription(SAMPLE_DESCRIPTION, rules)}</div>
       </div>
+
+      <RestyleWaiting rulesKey={JSON.stringify(rules)} />
     </Section>
   );
 }

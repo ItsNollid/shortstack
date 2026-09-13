@@ -32,7 +32,8 @@ export const ACTIVITY_ACTIONS = [
   'rotation_resumed',
   'posting_created',
   'posting_rotated',
-  'ai_drafted'
+  'ai_drafted',
+  'house_style'
 ] as const;
 export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number];
 
@@ -68,6 +69,7 @@ const LABELS: Record<ActivityAction, string> = {
   auto_slot: 'Given an automatic time',
   edit_metadata: 'Details edited',
   ai_drafted: 'Details drafted by the local model',
+  house_style: 'House style applied',
   method_changed: 'Upload method changed',
   begin_manual_upload: 'Ready to upload in Studio',
   link_video: 'Linked to a YouTube video',

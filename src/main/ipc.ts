@@ -10,7 +10,7 @@ import { parseVideoId } from '../shared/youtubeUrl';
 import { generateMetadata, listModels, testModel } from './ai/ollamaClient';
 import { listActivity } from './db/activityRepo';
 import { clearChannels, readActiveChannel, upsertChannel } from './db/channelRepo';
-import { applyQueueEvent, getQueueItem, listQueueItems, updateQueueMetadata } from './db/queueRepo';
+import { applyQueueEvent, getQueueItem, listQueueItems, updateQueueMetadata, applyRestyle, previewRestyle } from './db/queueRepo';
 import { readSettings, writeSetting } from './db/settingsRepo';
 import { listUploads } from './db/uploadRepo';
 import type { QueueEvent } from './domain/queueState';
@@ -174,6 +174,14 @@ export function registerIpcHandlers(context: IpcContext): void {
       if (parsed === null) return fail('invalid', 'That video id is not valid');
       const item = getQueueItem(db, parsed);
       return item === undefined ? fail('not_found', 'That video is no longer in the queue') : ok(item);
+    },
+    queueRestylePreview: async () => ok(previewRestyle(db)),
+    queueRestyle: async (ids) => {
+      const parsed = asIds(ids);
+      if (parsed === null) return fail('invalid', 'No videos selected');
+      const result = applyRestyle(db, parsed, eventContext());
+      if (result.changed > 0) changed();
+      return ok(result);
     },
     queueUpdateMetadata: async (id, patch, expectedUpdatedAt) => {
       const parsed = asId(id);

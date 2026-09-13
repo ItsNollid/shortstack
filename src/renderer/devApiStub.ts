@@ -248,6 +248,8 @@ export function installDevApiStub(): void {
       return ok(item);
     },
     settingsIgnored: () => ok([]),
+    queueRestylePreview: () => ok([]),
+    queueRestyle: () => ok({ changed: 0, skipped: 0 }),
     activityList: () => ok(ACTIVITY),
     analyticsGet: (days: number) => {
       const end = new Date(Date.now() - 86_400_000);

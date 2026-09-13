@@ -4,6 +4,7 @@ import type { AiModel } from './aiModels';
 import type { UpdateStatus } from './updates';
 import type { ChannelAnalytics } from './analytics';
 import type { Pulled } from './analyticsRefresh';
+import type { RestyleChange, RestyleResult } from './restyle';
 import type { ChannelAction, SettingChange } from './channelActions';
 import type { Brief } from './insights';
 import type { Affordable, QuotaMood, QuotaState } from './quota';
@@ -106,6 +107,9 @@ export interface ShortStackApi {
   queueList(): Promise<Result<QueueItemDTO[]>>;
   queueGet(id: number): Promise<Result<QueueItemDTO>>;
   queueUpdateMetadata(id: number, patch: QueueMetadataPatch, expectedUpdatedAt?: string): Promise<Result<QueueItemDTO>>;
+  /** What applying the current house style would change on waiting videos. Writes nothing. */
+  queueRestylePreview(): Promise<Result<RestyleChange[]>>;
+  queueRestyle(ids: number[]): Promise<Result<RestyleResult>>;
   queueApprove(ids: number[]): Promise<Result<QueueItemDTO[]>>;
   queueUnapprove(ids: number[]): Promise<Result<QueueItemDTO[]>>;
   queueReject(ids: number[]): Promise<Result<QueueItemDTO[]>>;
@@ -208,6 +212,8 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'queueList',
   'queueGet',
   'queueUpdateMetadata',
+  'queueRestylePreview',
+  'queueRestyle',
   'queueApprove',
   'queueUnapprove',
   'queueReject',

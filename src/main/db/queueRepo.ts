@@ -7,6 +7,7 @@ import { validateMetadataPatch, type QueueMetadataPatch } from '../../shared/vid
 import { transition, type QueueEvent, type QueueStateFields } from '../domain/queueState';
 import { appendActivity } from './activityRepo';
 import { readSettings } from './settingsRepo';
+import type { RestyleChange, RestyleResult } from '../../shared/restyle';
 import { toDbValue, toQueueItemDTO, toStateFields } from './rows';
 
 const SELECT_ITEM = `
@@ -279,4 +280,79 @@ export function updateQueueMetadata(
     return { ok: true, item: getQueueItem(db, id) as QueueItemDTO };
   });
   return run();
+}
+
+/** Waiting: not on YouTube, not uploading, not rejected. A video already up is changed in Studio, not from here. */
+const restylable = (item: QueueItemDTO): boolean =>
+  item.youtube_video_id === null && !item.remote_tombstone && item.state !== 'uploading' && item.state !== 'rejected';
+
+interface Restyled {
+  patch: QueueMetadataPatch;
+  change: RestyleChange;
+}
+
+function restyled(db: Database.Database, item: QueueItemDTO): Restyled | null {
+  const shaped = formatted(db, { title: item.title, description: item.description, tags: item.tags });
+  const patch: QueueMetadataPatch = {};
+  if (shaped.title !== undefined && shaped.title !== item.title) patch.title = shaped.title;
+  if (shaped.description !== undefined && shaped.description !== item.description) patch.description = shaped.description;
+  if (shaped.tags !== undefined && JSON.stringify(shaped.tags) !== JSON.stringify(item.tags)) patch.tags = shaped.tags;
+  if (Object.keys(patch).length === 0) return null;
+  return {
+    patch,
+    change: {
+      id: item.id,
+      title: patch.title === undefined ? null : { before: item.title, after: patch.title },
+      description: patch.description === undefined ? null : { before: item.description, after: patch.description },
+      tagsChanged: patch.tags !== undefined
+    }
+  };
+}
+
+/**
+ * What the current house style would change on every waiting video. House style is applied when details
+ * are saved, so videos written before a rule changed keep the old style until they are brought into line.
+ * Nothing is written here: this is what the person is shown before agreeing to it.
+ */
+export function previewRestyle(db: Database.Database): RestyleChange[] {
+  return listQueueItems(db)
+    .filter(restylable)
+    .map((item) => restyled(db, item))
+    .filter((entry): entry is Restyled => entry !== null && validateMetadataPatch(entry.patch) === null)
+    .map((entry) => entry.change);
+}
+
+/**
+ * Applies the current house style to the waiting videos given. It reformats rather than writes, so it does
+ * not mark the details as the person's own: a video nobody has written for is still drafted.
+ */
+export function applyRestyle(db: Database.Database, ids: readonly number[], ctx: QueueContext): RestyleResult {
+  let changed = 0;
+  let skipped = 0;
+  db.transaction(() => {
+    for (const id of ids) {
+      const item = getQueueItem(db, id);
+      if (item === undefined || !restylable(item)) {
+        skipped += 1;
+        continue;
+      }
+      const entry = restyled(db, item);
+      if (entry === null) continue;
+      const written =
+        validateMetadataPatch(entry.patch) === null &&
+        writePatch(db, id, { ...entry.patch }, METADATA_COLUMNS, ctx.now, item.updated_at);
+      if (!written) {
+        skipped += 1;
+        continue;
+      }
+      const fields = [
+        entry.change.title !== null ? 'title' : null,
+        entry.change.description !== null ? 'description' : null,
+        entry.change.tagsChanged ? 'tags' : null
+      ].filter((field): field is string => field !== null);
+      appendActivity(db, { queueId: id, action: 'house_style', detail: `House style applied to the ${fields.join(', ')}`, now: ctx.now });
+      changed += 1;
+    }
+  })();
+  return { changed, skipped };
 }

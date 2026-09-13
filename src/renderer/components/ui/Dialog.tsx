@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { X } from 'lucide-react';
 import styles from './Dialog.module.css';
 
@@ -14,6 +14,8 @@ export interface DialogProps {
  *  without reimplementing any of them. */
 export function Dialog({ open, title, onClose, children, footer }: DialogProps): React.JSX.Element {
   const ref = useRef<HTMLDialogElement>(null);
+  // Named by its heading, so a screen reader announces what the dialog is for, and it can be found by name.
+  const titleId = useId();
 
   useEffect(() => {
     const element = ref.current;
@@ -26,6 +28,7 @@ export function Dialog({ open, title, onClose, children, footer }: DialogProps):
     <dialog
       ref={ref}
       className={styles.dialog}
+      aria-labelledby={titleId}
       onCancel={(event) => {
         event.preventDefault();
         onClose();
@@ -37,7 +40,7 @@ export function Dialog({ open, title, onClose, children, footer }: DialogProps):
     >
       <div className={styles.inner}>
         <div className={styles.head}>
-          <h2 className={styles.title}>{title}</h2>
+          <h2 id={titleId} className={styles.title}>{title}</h2>
           <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
             <X size={16} />
           </button>
