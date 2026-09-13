@@ -25,6 +25,8 @@ export interface UploaderDeps {
   onSession?(sessionUri: string): void | Promise<void>;
   onProgress?(bytesConfirmed: number): void;
   sleep?(ms: number): Promise<void>;
+  /** Told what the call cost, so the quota meter counts it. Only a new session is an insert. */
+  onSpend?(method: string, units: number): void;
   chunkSize?: number;
   attemptsPerChunk?: number;
   endpoint?: string;
@@ -97,6 +99,8 @@ async function createSession(request: UploadRequest, deps: UploaderDeps, doFetch
     return { status: 'failed', error: `Could not start the upload (${response.status})`, ...classifyFailure(response.status, body) };
   }
   const sessionUri = response.headers.get('location');
+  // YouTube bills the insert when it accepts the session, whether or not the bytes ever arrive.
+  deps.onSpend?.('videos.insert', 1600);
   return sessionUri ?? { status: 'failed', retryable: true, error: 'YouTube did not return an upload session', code: null };
 }
 

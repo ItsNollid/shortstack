@@ -3,6 +3,7 @@
 import type { Privacy } from '../../shared/queue';
 import type { ChannelAnalytics, TopVideo } from '../../shared/analytics';
 import type { VideoStat } from '../../shared/insights';
+import { costOf, methodFor } from '../../shared/quota';
 import type { PastUpload, PastUploadPage } from '../../shared/pastUploads';
 import {
   ANALYTICS_METRICS,
@@ -76,6 +77,8 @@ export interface GatewayDeps {
   fetch?: typeof fetch;
   baseUrl?: string;
   analyticsBaseUrl?: string;
+  /** Told what each Data API call cost. Analytics is a separate allowance and is not reported here. */
+  onSpend?(method: string, units: number): void;
 }
 
 const SCHEDULE_REFUSAL_CODES = new Set(['invalidPublishAt', 'forbiddenPrivacySetting', 'forbidden', 'insufficientPermissions']);
@@ -105,7 +108,7 @@ export class HttpYouTubeGateway implements YouTubeGateway {
   }
 
   private async request(path: string, init: RequestInit = {}): Promise<Response> {
-    return this.doFetch(`${this.baseUrl}${path}`, {
+    const response = await this.doFetch(`${this.baseUrl}${path}`, {
       ...init,
       headers: {
         ...(init.headers ?? {}),
@@ -113,6 +116,9 @@ export class HttpYouTubeGateway implements YouTubeGateway {
         'Content-Type': 'application/json'
       }
     });
+    const method = methodFor(path, init.method ?? 'GET');
+    this.deps.onSpend?.(method, costOf(method));
+    return response;
   }
 
   async fetchChannelProfile(): Promise<GatewayResult<ChannelProfile>> {

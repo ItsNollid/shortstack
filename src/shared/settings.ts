@@ -43,6 +43,8 @@ export interface AppSettings {
   insight_context: string;
   /** The findings from the last time Analytics was opened, as JSON. Read when writing a title. */
   insight_findings: string;
+  /** The daily YouTube Data API allowance the quota meter measures against. */
+  quota_daily_units: number;
 
   /** House style, applied to whatever ends up in a title or description. All of it optional. */
   format_title_case: TitleCase;
@@ -241,6 +243,9 @@ export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> 
   insight_goal: oneOf<InsightGoal>('reach_and_subscribers', ['reach_and_subscribers', 'views', 'subscribers', 'watch_time']),
   insight_context: text('', (value) => (value.length > 600 ? 'Keep this to a couple of sentences' : null)),
   insight_findings: text('', (value) => (value.length > 8000 ? 'Too large to keep' : null)),
+  // Ten thousand is the default a new Cloud project gets. A project that passed the audit, or asked
+  // for an increase, has more — and a meter measured against the wrong ceiling is worse than none.
+  quota_daily_units: integer(10_000, 1, 10_000_000),
 
   format_title_case: oneOf<TitleCase>('as_written', ['as_written', 'upper', 'title']),
   format_title_prefix: text('', (value) => (charCount(value) > 40 ? 'A prefix that long leaves no room for a title' : null)),

@@ -336,6 +336,26 @@ export function installDevApiStub(): void {
       return item === undefined ? Promise.resolve({ ok: false as const, error: { code: 'gone', message: 'Not found' } }) : ok(item);
     },
     gamesKnown: () => ok(['Counter-Strike 2', 'Minecraft']),
+    quotaGet: () =>
+      ok({
+        used: 6_732,
+        limit: 10_000,
+        remaining: 3_268,
+        percentUsed: 67.32,
+        resetsAt: new Date(Date.now() + 7 * 3_600_000).toISOString(),
+        mood: 'plenty' as const,
+        counting: true,
+        affordable: [
+          { what: 'more uploads through the API', count: 2 },
+          { what: 'schedule or detail changes', count: 65 },
+          { what: 'checks on what is on your channel', count: 3_268 }
+        ],
+        breakdown: [
+          { method: 'videos.insert', units: 6_400, calls: 4 },
+          { method: 'videos.update', units: 300, calls: 6 },
+          { method: 'videos.list', units: 32, calls: 32 }
+        ]
+      }),
     uploadsList: () => ok([]),
     on: (event: AppEvent, listener: (payload: unknown) => void) => {
       const set = listeners.get(event) ?? new Set();

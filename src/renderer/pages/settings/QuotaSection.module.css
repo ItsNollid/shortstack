@@ -1,0 +1,19 @@
+.head { align-items: baseline; display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: space-between; }
+.mood { font-weight: 600; }
+.numbers { color: var(--text-muted); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+
+.track { background: var(--raised); border-radius: 999px; height: 10px; overflow: hidden; }
+.fill { border-radius: 999px; display: block; height: 100%; min-width: 2px; transition: width 200ms ease; }
+
+/* One colour per state, carried by both the words and the bar so neither has to be read alone. */
+.plenty { background: var(--live); color: var(--live); }
+.watch { background: var(--pending); color: var(--pending); }
+.nearly_out { background: var(--danger); color: var(--danger); }
+.out { background: var(--danger); color: var(--danger); }
+.mood.plenty, .mood.watch, .mood.nearly_out, .mood.out { background: none; }
+
+.block { display: grid; gap: 6px; }
+.label { color: var(--text); font-size: var(--text-sm); font-weight: 500; }
+.list { color: var(--text-muted); display: grid; font-size: var(--text-sm); gap: 4px; margin: 0; padding-left: 1.1rem; }
+.list strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.muted { color: var(--text-faint); font-size: var(--text-sm); }

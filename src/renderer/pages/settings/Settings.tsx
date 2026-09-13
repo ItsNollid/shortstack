@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { PageHeader } from '../../components/PageHeader';
 import { FormattingSection } from './FormattingSection';
+import { QuotaSection } from './QuotaSection';
 import { AiSection, InsightsSection, AppSection, PlatformsSection, UpdatesSection, VersionNote } from './AppSections';
 import { ApiModeDialog, AutoApproveDialog, DisconnectDialog } from './Confirmations';
 import { ChannelSection, FolderSection } from './ConnectionSections';
@@ -27,6 +28,7 @@ export function SettingsPage(): React.JSX.Element {
       <PageHeader title="Settings" />
       <div className={styles.page}>
         <ChannelSection onDisconnect={() => setDialog('disconnect')} />
+        <QuotaSection writer={writer} />
         <FolderSection writer={writer} />
         <UploadMethodSection writer={writer} onRequestApiMode={() => setDialog('api-mode')} />
         <DefaultsSection writer={writer} />

@@ -15,6 +15,7 @@ import { SchedulerEngine } from './scheduler/engine';
 import { AuthService } from './youtube/authService';
 import { DryRunYouTubeGateway, HttpYouTubeGateway, type YouTubeGateway } from './youtube/gateway';
 import { uploadVideoResumable, type UploadOutcome } from './youtube/resumableUpload';
+import { recordSpend } from './db/spendRepo';
 import { TokenStore, type SecretStorage } from './youtube/tokenStore';
 import { AppIcon } from './icons/appIcon';
 import { handleMediaRequests, registerMediaScheme } from './media/mediaProtocol';
@@ -79,7 +80,7 @@ async function start(): Promise<void> {
 
   const uploadsAreLive = runtimeProfile.uploads === 'live';
   const gateway: YouTubeGateway = uploadsAreLive
-    ? new HttpYouTubeGateway({ accessToken: () => auth.accessToken() })
+    ? new HttpYouTubeGateway({ accessToken: () => auth.accessToken(), onSpend: (method, units) => recordSpend(db, method, units) })
     : new DryRunYouTubeGateway();
 
   const refuseUpload = async (): Promise<UploadOutcome> => ({
@@ -92,7 +93,9 @@ async function start(): Promise<void> {
   const effects = createSchedulerEffects({
     db,
     gateway,
-    uploadVideo: uploadsAreLive ? uploadVideoResumable : refuseUpload,
+    uploadVideo: uploadsAreLive
+      ? (request, deps) => uploadVideoResumable(request, { ...deps, onSpend: (method, units) => recordSpend(db, method, units) })
+      : refuseUpload,
     accessToken: () => auth.accessToken(),
     authState: () => auth.state(),
     uploadMethod: () => readSettings(db).settings.upload_method,

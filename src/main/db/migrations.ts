@@ -452,7 +452,36 @@ const v6Game: Migration = {
   }
 };
 
-export const MIGRATIONS: readonly Migration[] = [v1Baseline, v2Lifecycle, v3Rotation, v4UploadsPlaylist, v5AiDrafts, v6Game];
+/**
+ * What ShortStack has spent of the daily YouTube allowance. There is no API that reports usage — the
+ * real figure exists only in the Cloud console — so the only way to show it in the app is to count
+ * each call as it is made, at its published price.
+ */
+const v7ApiSpend: Migration = {
+  version: 7,
+  name: 'count what the YouTube API allowance is spent on',
+  up(db) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS api_spend (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        method TEXT NOT NULL,
+        units INTEGER NOT NULL,
+        at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_api_spend_at ON api_spend(at);
+    `);
+  }
+};
+
+export const MIGRATIONS: readonly Migration[] = [
+  v1Baseline,
+  v2Lifecycle,
+  v3Rotation,
+  v4UploadsPlaylist,
+  v5AiDrafts,
+  v6Game,
+  v7ApiSpend
+];
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
 
 export function migrate(db: Database.Database, options: MigrateOptions = {}): MigrateResult {

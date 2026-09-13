@@ -5,6 +5,7 @@ import type { UpdateStatus } from './updates';
 import type { ChannelAnalytics } from './analytics';
 import type { ChannelAction, SettingChange } from './channelActions';
 import type { Brief } from './insights';
+import type { Affordable, QuotaMood, QuotaState } from './quota';
 import type { PastUploadPage } from './pastUploads';
 import type { ActivityEntryDTO, QueueItemDTO, UploadDTO } from './dto';
 import type { AppSettings } from './settings';
@@ -54,6 +55,13 @@ export interface AiStatus {
   running: boolean;
   models: AiModel[];
   message: string;
+}
+
+export interface QuotaView extends QuotaState {
+  mood: QuotaMood;
+  affordable: Affordable[];
+  /** False in a dry-run build, where nothing real is called and the meter can only read zero. */
+  counting: boolean;
 }
 
 export interface AdviceItemDTO {
@@ -165,6 +173,8 @@ export interface ShortStackApi {
   insightsGet(days: number): Promise<Result<Brief>>;
   /** Turns those findings into things to do. Asked for explicitly, because it takes seconds. */
   insightsAdvise(days: number): Promise<Result<ChannelAdvice>>;
+  /** What ShortStack has spent of today's YouTube allowance, and what the rest will still buy. */
+  quotaGet(): Promise<Result<QuotaView>>;
   /** What a proposed change would do, against the settings as they are now. Null if nothing. */
   actionPreview(action: ChannelAction): Promise<Result<SettingChange | null>>;
   /** Makes it. Validated again here: the renderer is not what decides an action is allowed. */
@@ -232,6 +242,7 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'analyticsGet',
   'insightsGet',
   'insightsAdvise',
+  'quotaGet',
   'actionPreview',
   'actionApply',
   'pastUploadsList',

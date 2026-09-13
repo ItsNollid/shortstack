@@ -21,6 +21,8 @@ import { listKnownGames, setVideoGame } from './db/videoRepo';
 import { draftFor } from './ai/draft';
 import { buildInsightPrompt, sanitizeAdvice } from './ai/insightPrompt';
 import { buildBrief } from '../shared/insights';
+import { moodFor, quotaState, whatIsLeft } from '../shared/quota';
+import { listSpendSince, pruneSpend } from './db/spendRepo';
 import { changeFor, parseAction } from '../shared/channelActions';
 import { adviseWith } from './ai/advise';
 import type { UpdateService } from './updates/updateService';
@@ -487,6 +489,20 @@ export function registerIpcHandlers(context: IpcContext): void {
       void engine.kick();
       changed();
       return ok(change);
+    },
+
+    quotaGet: async () => {
+      const now = new Date();
+      pruneSpend(db, now);
+      // Two days back covers any Pacific "today" wherever this computer is.
+      const spend = listSpendSince(db, new Date(now.getTime() - 2 * 86_400_000));
+      const state = quotaState(spend, readSettings(db).settings.quota_daily_units, now);
+      return ok({
+        ...state,
+        mood: moodFor(state),
+        affordable: whatIsLeft(state.remaining),
+        counting: context.profile.uploads === 'live'
+      });
     },
 
     updateStatus: async () => ok(context.updates.status()),
