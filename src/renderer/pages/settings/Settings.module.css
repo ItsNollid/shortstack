@@ -116,3 +116,18 @@
 .previewLabel { color: var(--text-faint); font-size: var(--text-sm); margin-bottom: var(--space-2); }
 .previewTitle { color: var(--text); font-weight: 600; }
 .previewBody { color: var(--text-muted); font-size: var(--text-sm); margin-top: 6px; white-space: pre-wrap; }
+
+/* Which details automatic drafting writes. A plain row of checkboxes, because it is a multiple choice. */
+.draftFields {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+}
+.draftFieldsLegend { color: var(--text); font-size: var(--text-sm); font-weight: 500; padding: 0 6px; }
+.draftFieldsRow { display: flex; flex-wrap: wrap; gap: var(--space-4, 16px); }
+.draftField { align-items: center; color: var(--text); cursor: pointer; display: inline-flex; gap: 8px; }
+.draftField input { accent-color: var(--scheduled); cursor: pointer; height: 16px; width: 16px; }
+.draftField input:disabled { cursor: not-allowed; }

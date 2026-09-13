@@ -4,6 +4,7 @@ import { useAppStatus } from '../../app/status';
 import { useApiMutation, useApiQuery } from '../../hooks/useApi';
 import type { AiStatus, Result } from '../../../shared/ipc';
 import { findModel, isVisionModel, type AiModel } from '../../../shared/aiModels';
+import { DRAFT_FIELDS, describeDraftFields, toggleDraftField } from '../../../shared/draftFields';
 import { buildInfo, describeBuild } from '../../../shared/buildInfo';
 import { CHANGELOG, sortedChangelog } from '../../../shared/changelog';
 import { GOAL_LABELS, type InsightGoal } from '../../../shared/insightGoal';
@@ -63,12 +64,40 @@ export function AiSection({ writer }: { writer: SettingsWriter }): React.JSX.Ele
         hint={
           settings.ai_model === ''
             ? 'Choose a model above first.'
-            : `${settings.ai_model} writes a title, description and tags for each new video shortly after it is scanned, a few at a time. It only writes where you have not: anything you have edited yourself is left exactly as it is, and nothing is uploaded without your approval either way.`
+            : `${settings.ai_model} writes ${describeDraftFields(settings.ai_auto_draft_fields)} for each new video shortly after it is scanned, a few at a time. It only writes where you have not: anything you have edited yourself is left exactly as it is, and nothing is uploaded without your approval either way.`
         }
         checked={settings.ai_auto_draft}
         disabled={settings.ai_model === ''}
         onChange={(value) => writer.set('ai_auto_draft', value)}
       />
+
+      {settings.ai_auto_draft && (
+        <fieldset className={styles.draftFields}>
+          <legend className={styles.draftFieldsLegend}>Which details to write</legend>
+          <div className={styles.draftFieldsRow}>
+            {DRAFT_FIELDS.map((field) => {
+              const selected = settings.ai_auto_draft_fields.includes(field);
+              // The last one stays ticked: drafting nothing at all is what the switch above is for.
+              const onlyOne = selected && settings.ai_auto_draft_fields.length === 1;
+              return (
+                <label key={field} className={styles.draftField}>
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    disabled={onlyOne}
+                    onChange={() => writer.set('ai_auto_draft_fields', toggleDraftField(settings.ai_auto_draft_fields, field))}
+                  />
+                  {field === 'title' ? 'Title' : field === 'description' ? 'Description' : 'Tags'}
+                </label>
+              );
+            })}
+          </div>
+          <div className={styles.sectionText}>
+            {writer.problemFor('ai_auto_draft_fields') ??
+              'Applies to videos drafted from now on. Anything left unticked keeps whatever it already had — your default, or what you typed.'}
+          </div>
+        </fieldset>
+      )}
     </Section>
   );
 }

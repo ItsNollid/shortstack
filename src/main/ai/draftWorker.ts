@@ -77,11 +77,20 @@ export class DraftWorker {
           // the whole tick matters: without it this would fail once per video, every tick, forever.
           return drafted;
         }
+        // Only the details the person chose. The model answered for all three in one request, so
+        // choosing fewer costs nothing — it only writes less. Read again here rather than at the start
+        // of the tick, because the request took seconds and the choice may have changed meanwhile.
+        const { settings: current } = readSettings(this.db);
+        const chosen = new Set(current.ai_auto_draft_fields);
         const written = applyDraft(
           this.db,
           item.id,
-          { title: suggestion.value.title, description: suggestion.value.description, tags: suggestion.value.tags },
-          { now: this.now(), uploadMethod: readSettings(this.db).settings.upload_method }
+          {
+            ...(chosen.has('title') ? { title: suggestion.value.title } : {}),
+            ...(chosen.has('description') ? { description: suggestion.value.description } : {}),
+            ...(chosen.has('tags') ? { tags: suggestion.value.tags } : {})
+          },
+          { now: this.now(), uploadMethod: current.upload_method }
         );
         if (written.ok) drafted += 1;
       }

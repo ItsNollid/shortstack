@@ -109,3 +109,28 @@ describe('the drafting worker', () => {
     expect(changes).toBe(1);
   });
 });
+
+describe('choosing which details are drafted', () => {
+  it('writes only the chosen details and leaves the rest alone', async () => {
+    const queueId = seedQueueItem(db, { filename: 'a.mov' });
+    const before = getQueueItem(db, queueId);
+    writeSetting(db, 'ai_auto_draft_fields', ['description']);
+
+    expect(await worker(async () => suggestion('Not wanted')).runTick()).toBe(1);
+
+    const after = getQueueItem(db, queueId);
+    expect(after?.description).toBe('#zombies #bo3');
+    expect(after?.title).toBe(before?.title);
+    expect(after?.tags).toEqual(before?.tags);
+  });
+
+  it('writes all three when all three are chosen, which is the default', async () => {
+    const queueId = seedQueueItem(db, { filename: 'a.mov' });
+    await worker(async () => suggestion('All of it')).runTick();
+    expect(getQueueItem(db, queueId)).toMatchObject({ title: 'All of it', description: '#zombies #bo3', tags: ['cod zombies'] });
+  });
+
+  it('refuses to be left with nothing chosen', () => {
+    expect(writeSetting(db, 'ai_auto_draft_fields', []).ok).toBe(false);
+  });
+});

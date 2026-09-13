@@ -193,19 +193,33 @@ export function recordUploadSession(db: Database.Database, id: number, sessionUr
   writePatch(db, id, { upload_session_uri: sessionUri }, STATE_COLUMNS, now, row.updated_at ?? '');
 }
 
-export interface DraftedMetadata {
-  title: string;
-  description: string;
-  tags: string[];
+/** Any of the three: which details the worker may write is the person's choice, not all or nothing. */
+export type DraftedMetadata = Partial<{ title: string; description: string; tags: string[] }>;
+
+/** "Title and tags", "Description" — for the activity record, in the order the fields appear. */
+function draftedWords(fields: readonly string[]): string {
+  const joined = fields.length <= 1 ? fields.join('') : `${fields.slice(0, -1).join(', ')} and ${fields[fields.length - 1]}`;
+  return joined.charAt(0).toUpperCase() + joined.slice(1);
 }
 
 /**
  * The background worker's write. Deliberately not updateQueueMetadata: that one stamps
  * metadata_edited_at, which is the record of a person having written something, and the whole
  * arrangement falls apart if the machine can set it.
+ *
+ * Only the fields it is given are written. The rest of the video's details are not touched, so an
+ * unticked title keeps whatever it had — the default, or what the person typed.
  */
 export function applyDraft(db: Database.Database, id: number, draft: DraftedMetadata, ctx: QueueContext): QueueEventResult {
-  const patch = formatted(db, { title: draft.title, description: draft.description, tags: draft.tags });
+  const chosen: QueueMetadataPatch = {};
+  if (draft.title !== undefined) chosen.title = draft.title;
+  if (draft.description !== undefined) chosen.description = draft.description;
+  if (draft.tags !== undefined) chosen.tags = draft.tags;
+  const fields = Object.keys(chosen);
+  // Marking a video drafted when nothing was written would stop the worker ever coming back to it.
+  if (fields.length === 0) return { ok: false, reason: 'Nothing was chosen for the model to write' };
+
+  const patch = formatted(db, chosen);
   const problem = validateMetadataPatch(patch);
   if (problem !== null) return { ok: false, reason: problem };
 
@@ -227,7 +241,9 @@ export function applyDraft(db: Database.Database, id: number, draft: DraftedMeta
     if (!writePatch(db, id, combined, [...STATE_COLUMNS, ...METADATA_COLUMNS, ...PROVENANCE_COLUMNS], ctx.now, current)) {
       return { ok: false, reason: CONFLICT };
     }
-    appendActivity(db, { queueId: id, action: 'ai_drafted', detail: `Title, description and tags written by the local model`, now: ctx.now });
+    // Names what was actually written, so History does not claim a title was drafted when only the
+    // description was chosen.
+    appendActivity(db, { queueId: id, action: 'ai_drafted', detail: `${draftedWords(fields)} written by the local model`, now: ctx.now });
     return { ok: true, item: getQueueItem(db, id) as QueueItemDTO };
   });
   return run();

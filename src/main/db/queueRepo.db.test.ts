@@ -179,3 +179,35 @@ describe('applyDraft', () => {
     expect(applyDraft(db, id, { ...draft, title: 'x'.repeat(101) }, ctx).ok).toBe(false);
   });
 });
+
+describe('applyDraft writes only what it is given', () => {
+  it('writes a chosen field and leaves the others as they were', () => {
+    const db = createTestDb();
+    const id = seedQueueItem(db);
+    const before = getQueueItem(db, id);
+
+    const result = applyDraft(db, id, { description: '#minecraft #shorts' }, ctx);
+
+    expect(result.ok).toBe(true);
+    const after = getQueueItem(db, id);
+    expect(after?.description).toBe('#minecraft #shorts');
+    expect(after?.title).toBe(before?.title);
+    expect(after?.tags).toEqual(before?.tags);
+  });
+
+  it('says in the record exactly which details it wrote', () => {
+    const db = createTestDb();
+    const id = seedQueueItem(db);
+    applyDraft(db, id, { title: 'Drafted', tags: ['clip'] }, ctx);
+    const entry = listActivity(db, { queueId: id }).find((each) => each.action === 'ai_drafted');
+    expect(entry?.detail).toBe('Title and tags written by the local model');
+  });
+
+  // Marking a video drafted when nothing was written would stop the worker ever coming back to it.
+  it('refuses a draft with nothing in it, rather than marking the video drafted', () => {
+    const db = createTestDb();
+    const id = seedQueueItem(db);
+    expect(applyDraft(db, id, {}, ctx).ok).toBe(false);
+    expect(rawQueueRow(db, id).ai_drafted_at).toBeNull();
+  });
+});

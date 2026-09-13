@@ -1,5 +1,6 @@
 // Typed app settings: defaults, decoding of stored strings, and validation of changes.
 // Shared so the renderer can validate inline with exactly the rules the main process enforces.
+import { DRAFT_FIELDS, checkDraftFields, type DraftField } from './draftFields';
 import type { FormattingRules, TitleCase } from './formatting';
 import type { InsightGoal } from './insightGoal';
 import type { Privacy, UploadMethod } from './queue';
@@ -36,6 +37,8 @@ export interface AppSettings {
   ai_host: string;
   ai_model: string;
   ai_auto_draft: boolean;
+  /** Which details automatic drafting writes. At least one. */
+  ai_auto_draft_fields: DraftField[];
 
   /** What the channel is being grown for, which decides what "better" means in any comparison. */
   insight_goal: InsightGoal;
@@ -239,6 +242,8 @@ export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> 
   ai_host: text('http://127.0.0.1:11434', checkHttpUrl),
   ai_model: text('', (value) => (value.length > 200 ? 'That model name is too long' : null)),
   ai_auto_draft: bool(false),
+  // All three by default, which is what drafting did before there was a choice.
+  ai_auto_draft_fields: stringList([...DRAFT_FIELDS], checkDraftFields) as unknown as SettingCodec<DraftField[]>,
 
   insight_goal: oneOf<InsightGoal>('reach_and_subscribers', ['reach_and_subscribers', 'views', 'subscribers', 'watch_time']),
   insight_context: text('', (value) => (value.length > 600 ? 'Keep this to a couple of sentences' : null)),
