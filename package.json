@@ -18,7 +18,9 @@
     "verify": "bash verify.sh",
     "icons": "tsx scripts/writeBrandIcons.ts",
     "package:dev": "electron-vite build && electron-builder --win --dir --config.extraMetadata.shortstackBuildProfile=dev --config.directories.output=dist-dev",
-    "test:e2e": "electron-vite build && playwright test"
+    "test:e2e": "electron-vite build && playwright test",
+    "docs:changelog": "tsx scripts/writeChangelog.ts",
+    "release": "npm run verify && npm run docs:changelog && electron-vite build && electron-builder --win --publish always"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
