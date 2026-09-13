@@ -277,6 +277,18 @@ export function registerIpcHandlers(context: IpcContext): void {
       if (!result.ok) return fail(result.code ?? 'analytics_failed', result.reason);
       return ok(result.value);
     },
+    pastUploadsList: async (pageToken) => {
+      const channel = readActiveChannel(db);
+      if (channel === null) return fail('not_connected', 'Connect a channel first');
+      if (channel.uploadsPlaylistId === null) {
+        return fail('no_playlist', 'ShortStack does not know where your uploads live yet. Reconnect to pick it up.');
+      }
+      if (pageToken !== undefined && typeof pageToken !== 'string') return fail('invalid', 'Bad page token');
+
+      const result = await context.gateway.listPastUploads(channel.uploadsPlaylistId, { pageToken });
+      return result.ok ? ok(result.value) : fail(result.code ?? 'uploads_failed', result.reason);
+    },
+
     uploadsList: async () => ok(listUploads(db)),
     activityList: async (queueId) => {
       if (queueId === undefined) return ok(listActivity(db));

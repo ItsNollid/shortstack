@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, CircleSlash, FolderOpen, Repeat, RotateCw, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, CircleSlash, FolderOpen, History, Repeat, RotateCw, X } from 'lucide-react';
 import type { QueueItemDTO } from '../../../shared/dto';
 import type { Result } from '../../../shared/ipc';
 import { VIDEO_CATEGORIES } from '../../../shared/categories';
@@ -16,6 +16,7 @@ import {
   utf8Bytes
 } from '../../../shared/settings';
 import { nextFreeSlot } from '../../../shared/slots';
+import { PastUploadPicker } from '../../components/PastUploadPicker';
 import { VideoPreview } from '../../components/VideoPreview';
 import { Banner, Button, EmptyState, Select, StatusPill, TagInput, TextArea, TextField } from '../../components/ui';
 import { useRequestApproval } from '../../app/approval';
@@ -50,6 +51,7 @@ export function Review(): React.JSX.Element {
   const [index, setIndex] = useState(0);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [justSaved, setJustSaved] = useState(false);
+  const [pickingPast, setPickingPast] = useState(false);
   const startedWith = useRef<number | null>(null);
 
   const pending = useMemo(() => (queue.data ?? []).filter((item) => needsReview(item.state)), [queue.data]);
@@ -313,9 +315,40 @@ export function Review(): React.JSX.Element {
               Show in folder
               <span className={styles.key}>F</span>
             </Button>
+            <Button
+              size="small"
+              icon={<History size={14} />}
+              onClick={() => setPickingPast(true)}
+              title="Copy the title, description and tags from something already on your channel"
+            >
+              Reuse past details
+            </Button>
           </div>
         </div>
       </div>
+
+      <PastUploadPicker
+        open={pickingPast}
+        onClose={() => setPickingPast(false)}
+        onPick={(details, from) => {
+          // Written into the draft, not saved: the user still reviews and saves it like anything else.
+          const next = {
+            ...draft,
+            title: details.title,
+            description: details.description,
+            tags: details.tags,
+            category_id: details.categoryId ?? draft.category_id
+          };
+          setDraft(next);
+          commit({
+            title: next.title,
+            description: next.description,
+            tags: next.tags,
+            category_id: next.category_id
+          });
+          toast({ text: `Details copied from "${from.title}"` });
+        }}
+      />
 
       <div className={styles.decide}>
         <div className={styles.outcome}>

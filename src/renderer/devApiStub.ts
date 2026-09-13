@@ -167,6 +167,22 @@ export function installDevApiStub(): void {
         missingScopes: [],
         channel: { id: 'UC_sample', title: 'Sample Channel', handle: '@samplechannel', avatarUrl: null, subscriberCount: 12400 }
       }),
+    pastUploadsList: () =>
+      ok({
+        items: [
+          {
+            videoId: 'past1',
+            title: 'Zombie map guide, round 100',
+            description: 'The strategy I use every time.',
+            tags: ['blackops3', 'zombies'],
+            categoryId: '20',
+            thumbnailUrl: null,
+            publishedAt: iso(-720),
+            privacy: 'public' as const
+          }
+        ],
+        nextPageToken: null
+      }),
     thumbnailsMissing: () => ok([] as number[]),
     thumbnailSave: () => ok(null),
     rotationMarkPublishedBefore: (ids: number[], publishedBefore: boolean) => {

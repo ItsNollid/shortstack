@@ -2,6 +2,7 @@
 // dry-run implementation can stand in during development and tests.
 import type { Privacy } from '../../shared/queue';
 import type { ChannelAnalytics } from '../../shared/analytics';
+import type { PastUpload, PastUploadPage } from '../../shared/pastUploads';
 import { ANALYTICS_METRICS, parseAnalyticsReport, reportRange } from './analyticsReport';
 import { classifyFailure } from './resumableUpload';
 
@@ -51,6 +52,8 @@ export interface YouTubeGateway {
   setPublishPlan(videoId: string, plan: { privacyStatus: Privacy; publishAt: string | null }): Promise<GatewayResult<VideoStatusSnapshot>>;
   listRecentUploads(playlistId: string, limit?: number): Promise<GatewayResult<RecentUpload[]>>;
   fetchChannelAnalytics(days: number, now?: Date): Promise<GatewayResult<ChannelAnalytics>>;
+  /** Previously published videos, with the details a new posting might reuse. */
+  listPastUploads(playlistId: string, options?: { limit?: number; pageToken?: string }): Promise<GatewayResult<PastUploadPage>>;
 }
 
 export interface GatewayDeps {
@@ -274,6 +277,67 @@ export class HttpYouTubeGateway implements YouTubeGateway {
       };
     }
   }
+
+  async listPastUploads(
+    playlistId: string,
+    options: { limit?: number; pageToken?: string } = {}
+  ): Promise<GatewayResult<PastUploadPage>> {
+    const limit = Math.min(50, Math.max(1, options.limit ?? 25));
+    const page = options.pageToken === undefined ? '' : `&pageToken=${encodeURIComponent(options.pageToken)}`;
+    const playlist = await this.request(
+      `/playlistItems?part=contentDetails&maxResults=${limit}&playlistId=${encodeURIComponent(playlistId)}${page}`
+    );
+    const playlistBody = await playlist.text();
+    if (!playlist.ok) return failure(playlist.status, playlistBody, 'Listing your uploads');
+
+    const parsedPlaylist = JSON.parse(playlistBody) as {
+      nextPageToken?: string;
+      items?: Array<{ contentDetails?: { videoId?: string } }>;
+    };
+    const ids = (parsedPlaylist.items ?? [])
+      .map((item) => item.contentDetails?.videoId)
+      .filter((id): id is string => typeof id === 'string');
+    const nextPageToken = parsedPlaylist.nextPageToken ?? null;
+    if (ids.length === 0) return { ok: true, value: { items: [], nextPageToken } };
+
+    const details = await this.request(`/videos?part=snippet,status&id=${ids.map(encodeURIComponent).join(',')}`);
+    const detailsBody = await details.text();
+    if (!details.ok) return failure(details.status, detailsBody, 'Reading your uploads');
+
+    const parsed = JSON.parse(detailsBody) as {
+      items?: Array<{
+        id?: string;
+        snippet?: {
+          title?: string;
+          description?: string;
+          tags?: string[];
+          categoryId?: string;
+          publishedAt?: string;
+          thumbnails?: Record<string, { url?: string }>;
+        };
+        status?: { privacyStatus?: string };
+      }>;
+    };
+
+    const items: PastUpload[] = (parsed.items ?? [])
+      .filter((item) => typeof item.id === 'string')
+      .map((item) => {
+        const thumbnails = item.snippet?.thumbnails ?? {};
+        return {
+          videoId: item.id as string,
+          title: item.snippet?.title ?? '',
+          description: item.snippet?.description ?? '',
+          tags: Array.isArray(item.snippet?.tags) ? item.snippet.tags.filter((tag) => typeof tag === 'string') : [],
+          categoryId: typeof item.snippet?.categoryId === 'string' ? item.snippet.categoryId : null,
+          thumbnailUrl:
+            thumbnails.medium?.url ?? thumbnails.default?.url ?? thumbnails.high?.url ?? null,
+          publishedAt: item.snippet?.publishedAt ?? null,
+          privacy: asPrivacy(item.status?.privacyStatus)
+        };
+      });
+
+    return { ok: true, value: { items, nextPageToken } };
+  }
 }
 
 /** Used whenever uploads are in dry-run: reads are refused rather than silently faked. */
@@ -302,6 +366,10 @@ export class DryRunYouTubeGateway implements YouTubeGateway {
   }
 
   async fetchChannelAnalytics(): Promise<GatewayResult<ChannelAnalytics>> {
+    return this.refusal;
+  }
+
+  async listPastUploads(): Promise<GatewayResult<PastUploadPage>> {
     return this.refusal;
   }
 }

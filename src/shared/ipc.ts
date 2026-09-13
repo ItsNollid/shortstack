@@ -1,6 +1,7 @@
 // The contract between the renderer and the main process. Both sides are typed from this one
 // definition, so a signature can no longer drift the way the old electron.d.ts did.
 import type { ChannelAnalytics } from './analytics';
+import type { PastUploadPage } from './pastUploads';
 import type { ActivityEntryDTO, QueueItemDTO, UploadDTO } from './dto';
 import type { AppSettings } from './settings';
 import type { QueueMetadataPatch } from './videoMetadata';
@@ -110,6 +111,8 @@ export interface ShortStackApi {
   aiGenerate(queueId: number): Promise<Result<MetadataSuggestionDTO>>;
 
   analyticsGet(days: number): Promise<Result<ChannelAnalytics>>;
+  /** Previously published videos, so their details can be reused on a new posting. */
+  pastUploadsList(pageToken?: string): Promise<Result<PastUploadPage>>;
   uploadsList(): Promise<Result<UploadDTO[]>>;
   activityList(queueId?: number): Promise<Result<ActivityEntryDTO[]>>;
 
@@ -160,6 +163,7 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'aiStatus',
   'aiGenerate',
   'analyticsGet',
+  'pastUploadsList',
   'uploadsList',
   'activityList',
   'selectFolder',

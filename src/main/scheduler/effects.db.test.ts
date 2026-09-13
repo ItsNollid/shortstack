@@ -18,6 +18,7 @@ export const gatewayStub = (overrides: Partial<YouTubeGateway> = {}): YouTubeGat
   setPublishPlan: async () => ({ ok: false, reason: 'not used', code: null, retryable: false }),
   listRecentUploads: async () => ({ ok: true, value: [] }),
   fetchChannelAnalytics: async () => ({ ok: false, reason: 'not used', code: null, retryable: false }),
+  listPastUploads: async () => ({ ok: false, reason: 'not used', code: null, retryable: false }),
   ...overrides
 });
 

@@ -60,7 +60,8 @@ function stubGateway(state: StubState): YouTubeGateway {
       return { ok: true, value: state.status };
     },
     listRecentUploads: async (): Promise<GatewayResult<RecentUpload[]>> => ({ ok: true, value: state.uploads }),
-    fetchChannelAnalytics: async () => REFUSED
+    fetchChannelAnalytics: async () => REFUSED,
+    listPastUploads: async () => REFUSED
   };
 }
 
