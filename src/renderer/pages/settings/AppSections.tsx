@@ -3,6 +3,7 @@ import { Switch } from '../../components/ui';
 import { useAppStatus } from '../../app/status';
 import { useApiQuery } from '../../hooks/useApi';
 import type { AiStatus, Result } from '../../../shared/ipc';
+import { isVisionModel } from '../../../shared/aiModels';
 import type { SettingsWriter } from './useSettings';
 import { CommittedText, Section } from './parts';
 import styles from './Settings.module.css';
@@ -22,6 +23,14 @@ export function AiSection({ writer }: { writer: SettingsWriter }): React.JSX.Ele
         <span className={styles.sectionText}>{ai.data === null ? 'Checking…' : ai.data.message}</span>
       }
     >
+      {settings.ai_model !== '' && (
+        <div className={styles.sectionText}>
+          {isVisionModel(settings.ai_model)
+            ? `${settings.ai_model} can look at the video. ShortStack sends it a frame, so it can name the game and what is happening rather than guessing from the file name.`
+            : `${settings.ai_model} cannot look at images, so suggestions are written from the file name and your past uploads alone. A model like llava, llama3.2-vision or gemma3 would see the video itself.`}
+        </div>
+      )}
+
       <div className={styles.pair}>
         <CommittedText
           label="Ollama address"
@@ -38,7 +47,7 @@ export function AiSection({ writer }: { writer: SettingsWriter }): React.JSX.Ele
           placeholder={ai.data?.models[0] ?? 'llama3.2'}
           hint={
             ai.data === null || ai.data.models.length === 0
-              ? 'Install a model with: ollama pull llama3.2'
+              ? 'Install one with: ollama pull llama3.2-vision — a vision model can see the video itself'
               : `Installed: ${ai.data.models.join(', ')}`
           }
         />

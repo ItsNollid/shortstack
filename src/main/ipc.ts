@@ -16,7 +16,7 @@ import type { QueueEvent } from './domain/queueState';
 import { scanFolder } from './files/scanner';
 import type { SchedulerEngine } from './scheduler/engine';
 import { createPosting, markPublishedBefore, setRotationPaused } from './db/rotationRepo';
-import { clearThumbnails, missingThumbnails, saveThumbnail } from './media/thumbnails';
+import { clearThumbnails, missingThumbnails, readThumbnail, saveThumbnail } from './media/thumbnails';
 import { applyStartWithWindows } from './startup';
 import type { AuthService } from './youtube/authService';
 import type { YouTubeGateway } from './youtube/gateway';
@@ -396,8 +396,33 @@ export function registerIpcHandlers(context: IpcContext): void {
         model = models.value[0];
       }
       const channel = readActiveChannel(db);
+
+      // The two things that turn a guess into an answer: what this channel's own uploads look like,
+      // and what is actually on screen in the video.
+      const examples =
+        channel?.uploadsPlaylistId === undefined || channel?.uploadsPlaylistId === null
+          ? []
+          : await context.gateway
+              .listPastUploads(channel.uploadsPlaylistId, { limit: 6 })
+              .then((result) => (result.ok ? result.value.items : []))
+              .catch(() => []);
+
+      const frame = await readThumbnail({ db, dir: context.thumbnailDir }, parsed);
       const suggestion = await generateMetadata(
-        { filename: item.filename, model, channelName: channel?.title ?? null, defaultTags: settings.default_tags },
+        {
+          model,
+          channelName: channel?.title ?? null,
+          examples,
+          frames: frame === null ? [] : [frame.toString('base64')],
+          video: {
+            filename: item.filename,
+            durationSeconds: item.duration_s,
+            width: item.width,
+            height: item.height,
+            currentTitle: item.title,
+            currentDescription: item.description
+          }
+        },
         { host: settings.ai_host }
       );
       return suggestion.ok ? ok(suggestion.value) : fail(suggestion.code, suggestion.reason);

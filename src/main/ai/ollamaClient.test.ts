@@ -1,6 +1,6 @@
 import * as http from 'http';
 import { afterEach, describe, expect, it } from 'vitest';
-import { buildPrompt, generateMetadata, listModels } from './ollamaClient';
+import { promptFor, generateMetadata, listModels } from './ollamaClient';
 
 type Route = (req: { method: string; path: string; body: string }) => { status: number; body: unknown; delayMs?: number };
 
@@ -56,10 +56,10 @@ describe('listModels', () => {
 });
 
 describe('generateMetadata', () => {
-  const input = { filename: 'PETER GRIFFIN IN CALL OF DUTY.mov', model: 'llama3.2' };
+  const input = { model: 'llama3.2', video: { filename: 'PETER GRIFFIN IN CALL OF DUTY.mov', durationSeconds: null, width: null, height: null } };
 
   it('asks for the filename and strict JSON', () => {
-    const prompt = buildPrompt({ ...input, channelName: "Peter's Clips", defaultTags: ['shorts'] });
+    const prompt = promptFor({ ...input, channelName: "Peter's Clips" });
     expect(prompt).toContain('PETER GRIFFIN IN CALL OF DUTY.mov');
     expect(prompt).toContain("Peter's Clips");
     expect(prompt).toContain('JSON');

@@ -1,6 +1,9 @@
 // Talks to a local Ollama daemon. Every failure has its own code so the UI can say what to do
 // (start Ollama, pull a model, try again) instead of failing silently the way the old build did.
+import type { PastUpload } from '../../shared/pastUploads';
 import { extractJson, sanitizeSuggestion, type MetadataSuggestion } from './metadataSuggestion';
+import { isVisionModel } from '../../shared/aiModels';
+import { buildPrompt, type VideoFacts } from './prompt';
 
 export type AiFailureCode = 'not_running' | 'no_models' | 'model_missing' | 'timeout' | 'bad_output' | 'error';
 
@@ -14,24 +17,27 @@ export interface OllamaDeps {
 }
 
 export interface GenerateInput {
-  filename: string;
   model: string;
+  video: VideoFacts;
   channelName?: string | null;
-  defaultTags?: readonly string[];
+  /** Published videos from the same channel, used as examples. */
+  examples?: readonly PastUpload[];
+  /** Base64 PNG frames. Only sent to a model that can read them. */
+  frames?: readonly string[];
 }
 
-const REQUEST_JSON =
-  'Reply with only a JSON object containing "title" (under 100 characters), "description" and "tags" (an array of short strings). No other text.';
+/** Frames are only worth sending to a model that can read them; the rest ignore or choke on them. */
+export function framesFor(input: GenerateInput): string[] {
+  return isVisionModel(input.model) ? [...(input.frames ?? [])] : [];
+}
 
-export function buildPrompt(input: GenerateInput): string {
-  const context = [
-    `The video file is named "${input.filename}".`,
-    input.channelName ? `It will be posted on the YouTube channel "${input.channelName}".` : null,
-    input.defaultTags && input.defaultTags.length > 0 ? `Tags usually used on this channel: ${input.defaultTags.join(', ')}.` : null,
-    'Write metadata for it as a YouTube Short.',
-    REQUEST_JSON
-  ].filter((line): line is string => line !== null);
-  return context.join(' ');
+export function promptFor(input: GenerateInput): string {
+  return buildPrompt({
+    video: input.video,
+    channelName: input.channelName ?? null,
+    examples: input.examples ?? [],
+    hasFrames: framesFor(input).length > 0
+  });
 }
 
 async function withTimeout<T>(timeoutMs: number, run: (signal: AbortSignal) => Promise<T>): Promise<T | 'timeout'> {
@@ -81,7 +87,15 @@ export async function generateMetadata(input: GenerateInput, deps: OllamaDeps): 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal,
-        body: JSON.stringify({ model: input.model, prompt: buildPrompt(input), stream: false, format: 'json' })
+        body: JSON.stringify({
+          model: input.model,
+          prompt: promptFor(input),
+          images: framesFor(input),
+          stream: false,
+          format: 'json',
+          // Low enough to stay on the evidence, not so low it writes the same title every time.
+          options: { temperature: 0.4 }
+        })
       })
     );
     if (response === 'timeout') return { ok: false, code: 'timeout', reason: 'The model took too long to answer' };
