@@ -13,7 +13,7 @@ finished. It was not. What follows is meant to be accurate, including about what
 ```bash
 npm install
 npm run dev            # the app, dev profile, dry-run
-npm test               # 366 tests
+npm test               # 548 tests
 npm run typecheck      # main + renderer
 npm run build          # electron-vite build
 npm run preview:ui     # the interface in a browser, with stubbed data, for design work
@@ -169,6 +169,24 @@ there, and the corner badge now carries what the icon cannot: paused, or needing
 Answered since: **Chromium does play H.264 with LPCM audio in a QuickTime container.** Measured
 rather than assumed — readyState 4, 1080x1920, 17.7s, no error. Videos play in the app through the
 `ss-media://` scheme, and poster frames are drawn from them.
+
+### Suggestions from the local model
+
+The first version sent one sentence containing the file name, which is why its suggestions were
+worthless. The prompt now carries the channel's own recent uploads as examples, the video's facts,
+and up to three 512px JPEG stills taken from three points in the clip — drawn in the same decode
+pass as the list poster, because decoding is the expensive part. `e2e/frames.spec.ts` runs that
+against a real file: three stills at about 43KB each.
+
+Frames are only sent to a model that can read them. Ollama reports each model's capabilities, so
+that is the answer used; the name check in `shared/aiModels.ts` is the fallback for daemons that do
+not report the field, and Settings tells the user which case they are in.
+
+The prompt text was tuned against the installed llama3.2 rather than guessed at. Two things it
+fixed: the model was copying hashtags out of an example onto a video they did not describe, and it
+returned five tags when asked for ten to twenty until the count was restated in the final line. A
+3B text-only model is still the limit here — the frames only start earning their keep with a vision
+model installed.
 
 ---
 
