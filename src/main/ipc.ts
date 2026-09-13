@@ -18,6 +18,9 @@ import { scanFolder } from './files/scanner';
 import type { SchedulerEngine } from './scheduler/engine';
 import { createPosting, markPublishedBefore, setRotationPaused } from './db/rotationRepo';
 import { draftFor } from './ai/draft';
+import { buildInsightPrompt, sanitizeAdvice } from './ai/insightPrompt';
+import { buildBrief } from '../shared/insights';
+import { adviseWith } from './ai/advise';
 import type { UpdateService } from './updates/updateService';
 import { saveFrames, readFrames } from './media/frames';
 import { clearThumbnails, missingThumbnails, readThumbnail, saveThumbnail } from './media/thumbnails';
@@ -408,6 +411,35 @@ export function registerIpcHandlers(context: IpcContext): void {
         ? ok({ running: true, models: models.value, message: `${models.value.length} model${models.value.length === 1 ? '' : 's'} available` })
         : ok({ running: models.code !== 'not_running', models: [], message: models.reason });
     },
+    insightsGet: async (days) => {
+      const window = Number(days);
+      if (!Number.isFinite(window) || window < 1) return fail('invalid', 'That range is not valid');
+      const stats = await context.gateway.fetchVideoPerformance(window);
+      if (!stats.ok) return fail(stats.code ?? 'error', stats.reason);
+      return ok(buildBrief(stats.value));
+    },
+
+    insightsAdvise: async (days) => {
+      const window = Number(days);
+      if (!Number.isFinite(window) || window < 1) return fail('invalid', 'That range is not valid');
+      const stats = await context.gateway.fetchVideoPerformance(window);
+      if (!stats.ok) return fail(stats.code ?? 'error', stats.reason);
+
+      const { settings } = readSettings(db);
+      const channel = readActiveChannel(db);
+      const prompt = buildInsightPrompt({
+        brief: buildBrief(stats.value),
+        channelName: channel?.title ?? null,
+        goal: settings.insight_goal,
+        context: settings.insight_context
+      });
+
+      const answer = await adviseWith({ db, prompt });
+      if (!answer.ok) return fail(answer.code, answer.reason);
+      const advice = sanitizeAdvice(answer.value);
+      return advice === null ? fail('bad_output', 'The model did not answer in a usable shape') : ok(advice);
+    },
+
     updateStatus: async () => ok(context.updates.status()),
     updateCheck: async () => ok(await context.updates.check()),
     updateDownload: async () => {

@@ -2,6 +2,7 @@
 // dry-run implementation can stand in during development and tests.
 import type { Privacy } from '../../shared/queue';
 import type { ChannelAnalytics, TopVideo } from '../../shared/analytics';
+import type { VideoStat } from '../../shared/insights';
 import type { PastUpload, PastUploadPage } from '../../shared/pastUploads';
 import {
   ANALYTICS_METRICS,
@@ -64,6 +65,8 @@ export interface YouTubeGateway {
   setPublishPlan(videoId: string, plan: { privacyStatus: Privacy; publishAt: string | null }): Promise<GatewayResult<VideoStatusSnapshot>>;
   listRecentUploads(playlistId: string, limit?: number): Promise<GatewayResult<RecentUpload[]>>;
   fetchChannelAnalytics(days: number, now?: Date): Promise<GatewayResult<ChannelAnalytics>>;
+  /** Every video with views in the window, with what is needed to look for patterns across them. */
+  fetchVideoPerformance(days: number, now?: Date): Promise<GatewayResult<VideoStat[]>>;
   /** Previously published videos, with the details a new posting might reuse. */
   listPastUploads(playlistId: string, options?: { limit?: number; pageToken?: string }): Promise<GatewayResult<PastUploadPage>>;
 }
@@ -347,6 +350,75 @@ export class HttpYouTubeGateway implements YouTubeGateway {
     };
   }
 
+  /**
+   * Every video with views in the window, with the details needed to look for patterns. Two calls:
+   * analytics knows performance and ids, the Data API knows what the videos are. Capped at what
+   * analytics will return in one report, which is far more than a channel this size will have.
+   */
+  async fetchVideoPerformance(days: number, now: Date = new Date()): Promise<GatewayResult<VideoStat[]>> {
+    const { startDate, endDate } = reportRange(now, days);
+    let rows: TopVideo[];
+    try {
+      rows = parseTopVideos(
+        await this.report({
+          startDate,
+          endDate,
+          metrics: VIDEO_METRICS.join(','),
+          dimensions: 'video',
+          sort: '-views',
+          maxResults: '200'
+        })
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return failure(Number(message.slice(0, 3)) || 500, message, 'Reading how your videos did');
+    }
+    if (rows.length === 0) return { ok: true, value: [] };
+
+    // The Data API takes 50 ids at a time.
+    const details = new Map<string, { title: string; description: string; tags: string[]; publishedAt: string }>();
+    for (let from = 0; from < rows.length; from += 50) {
+      const ids = rows.slice(from, from + 50).map((row) => row.videoId);
+      const response = await this.request(`/videos?part=snippet&id=${ids.map(encodeURIComponent).join(',')}`);
+      if (!response.ok) continue;
+      const parsed = JSON.parse(await response.text()) as {
+        items?: Array<{ id?: string; snippet?: { title?: string; description?: string; tags?: string[]; publishedAt?: string } }>;
+      };
+      for (const item of parsed.items ?? []) {
+        if (typeof item.id !== 'string') continue;
+        details.set(item.id, {
+          title: item.snippet?.title ?? '',
+          description: item.snippet?.description ?? '',
+          tags: item.snippet?.tags ?? [],
+          publishedAt: item.snippet?.publishedAt ?? ''
+        });
+      }
+    }
+
+    return {
+      ok: true,
+      value: rows
+        .map((row): VideoStat | null => {
+          const detail = details.get(row.videoId);
+          if (detail === undefined || detail.publishedAt === '') return null;
+          return {
+            videoId: row.videoId,
+            title: detail.title,
+            description: detail.description,
+            tags: detail.tags,
+            publishedAt: detail.publishedAt,
+            views: row.views,
+            averageViewPercentage: row.averageViewPercentage,
+            likes: row.likes,
+            subscribersGained: row.subscribersGained
+          };
+        })
+        // A video analytics knows about but the Data API will not describe cannot be grouped by
+        // anything, so it is left out rather than counted as an unknown game at an unknown hour.
+        .filter((video): video is VideoStat => video !== null)
+    };
+  }
+
   private async withTitles(videos: TopVideo[]): Promise<TopVideo[]> {
     if (videos.length === 0) return videos;
     const ids = videos.map((video) => video.videoId);
@@ -446,6 +518,10 @@ export class DryRunYouTubeGateway implements YouTubeGateway {
   }
 
   async fetchChannelAnalytics(): Promise<GatewayResult<ChannelAnalytics>> {
+    return this.refusal;
+  }
+
+  async fetchVideoPerformance(): Promise<GatewayResult<VideoStat[]>> {
     return this.refusal;
   }
 

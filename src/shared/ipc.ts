@@ -3,6 +3,7 @@
 import type { AiModel } from './aiModels';
 import type { UpdateStatus } from './updates';
 import type { ChannelAnalytics } from './analytics';
+import type { Brief } from './insights';
 import type { PastUploadPage } from './pastUploads';
 import type { ActivityEntryDTO, QueueItemDTO, UploadDTO } from './dto';
 import type { AppSettings } from './settings';
@@ -52,6 +53,16 @@ export interface AiStatus {
   running: boolean;
   models: AiModel[];
   message: string;
+}
+
+export interface AdviceItemDTO {
+  action: string;
+  because: string;
+}
+
+export interface ChannelAdvice {
+  headline: string;
+  recommendations: AdviceItemDTO[];
 }
 
 export interface MetadataSuggestionDTO {
@@ -143,6 +154,10 @@ export interface ShortStackApi {
   updateRebuild(): Promise<Result<null>>;
 
   analyticsGet(days: number): Promise<Result<ChannelAnalytics>>;
+  /** What the channel's own numbers say, measured in code. No model involved. */
+  insightsGet(days: number): Promise<Result<Brief>>;
+  /** Turns those findings into things to do. Asked for explicitly, because it takes seconds. */
+  insightsAdvise(days: number): Promise<Result<ChannelAdvice>>;
   /** Previously published videos, so their details can be reused on a new posting. */
   pastUploadsList(pageToken?: string): Promise<Result<PastUploadPage>>;
   uploadsList(): Promise<Result<UploadDTO[]>>;
@@ -202,6 +217,8 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'updateInstall',
   'updateRebuild',
   'analyticsGet',
+  'insightsGet',
+  'insightsAdvise',
   'pastUploadsList',
   'uploadsList',
   'activityList',

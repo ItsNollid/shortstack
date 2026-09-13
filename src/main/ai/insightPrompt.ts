@@ -8,6 +8,7 @@
 // So its job is narrow: take findings it cannot check and turn them into things to do. The
 // instructions are mostly about what it may not do — invent a number, add a fact, or pad the answer
 // when the findings are thin.
+import { GOAL_WORDS, type InsightGoal } from '../../shared/insightGoal';
 import type { Brief } from '../../shared/insights';
 
 export interface InsightPromptInput {
@@ -19,13 +20,6 @@ export interface InsightPromptInput {
   context?: string;
 }
 
-export type InsightGoal = 'views' | 'subscribers' | 'watch_time';
-
-const GOAL_WORDS: Record<InsightGoal, string> = {
-  views: 'reaching as many people as possible',
-  subscribers: 'turning viewers into subscribers',
-  watch_time: 'keeping people watching for longer'
-};
 
 export function buildInsightPrompt(input: InsightPromptInput): string {
   const channel = input.channelName ?? 'this channel';

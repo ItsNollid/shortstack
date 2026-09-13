@@ -302,6 +302,32 @@ export function installDevApiStub(): void {
         ]
       });
     },
+    insightsGet: () =>
+      ok({
+        videoCount: 46,
+        tooEarly: false,
+        usable: [
+          { id: 'game', statement: 'Counter-Strike 2 gets the most views: a median of 4,100 across 14 videos, against 900 for Minecraft. But Minecraft brings more subscribers per view: 3.8 per thousand against 1.1.', sampleSize: 31, confidence: 'strong' },
+          { id: 'conversion', statement: 'A video earns 1.9 subscribers per thousand views. The ones that travel furthest convert worst, which is what reaching strangers looks like.', sampleSize: 46, confidence: 'strong' },
+          { id: 'time-of-day', statement: 'Videos posted in the evening (5pm to 9pm) get a median of 3,200 views, against 1,100 for the morning (9am to noon) — 191% higher, across 11 and 9 videos.', sampleSize: 46, confidence: 'strong' },
+          { id: 'retention', statement: 'The half of videos people watch furthest through (median 71%) get 3,900 views; the half they drop out of soonest (median 38%) get 640.', sampleSize: 46, confidence: 'strong' },
+          { id: 'shouted-title', statement: 'Videos where the title is in capitals get a median of 2,800 views against 1,400 where it is not — 100% higher, across 25 and 21 videos.', sampleSize: 46, confidence: 'weak' }
+        ],
+        missing: [
+          { id: 'weekday', statement: 'No day of the week yet has 3 videos to compare against another.', sampleSize: 46, confidence: 'insufficient' },
+          { id: 'cadence', statement: 'Uploads are too evenly spaced to compare a short gap against a long one.', sampleSize: 46, confidence: 'insufficient' }
+        ]
+      }),
+    insightsAdvise: () =>
+      ok({
+        headline: 'Your reach and your subscribers are coming from different games.',
+        recommendations: [
+          { action: 'Keep recording CS2 for reach, but cut more Shorts out of the Minecraft sessions.', because: 'CS2 gets four times the views, while Minecraft earns three times the subscribers per view.' },
+          { action: 'Move your 9am slot to the evening.', because: 'Evening posts get 191% more views across 11 and 9 videos.' },
+          { action: 'Cut the first three seconds harder on the weaker half.', because: 'The videos people watch furthest through get six times the views of the ones they drop out of.' },
+          { action: 'Post on a different day of the week for a few weeks.', because: 'No day yet has enough videos to compare, so there is nothing to act on.' }
+        ]
+      }),
     uploadsList: () => ok([]),
     on: (event: AppEvent, listener: (payload: unknown) => void) => {
       const set = listeners.get(event) ?? new Set();

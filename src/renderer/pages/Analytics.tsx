@@ -7,6 +7,7 @@ import { PageHeader } from '../components/PageHeader';
 import { Banner, Button, EmptyState, FilterChips, Skeleton } from '../components/ui';
 import { useAppStatus } from '../app/status';
 import { useApiQuery } from '../hooks/useApi';
+import { Insights } from './analytics/Insights';
 import { AudienceSection, CountriesSection, DepthKpis, ReachSection, SourcesSection, TopVideosSection } from './analytics/Sections';
 import styles from './Analytics.module.css';
 
@@ -146,6 +147,7 @@ export function Analytics(): React.JSX.Element {
               </div>
 
               <DepthKpis data={data} />
+              <Insights days={Number(range)} />
               <ReachSection data={data} />
               <TopVideosSection videos={data.topVideos} />
               <div className={styles.columns}>

@@ -1,6 +1,7 @@
 // Typed app settings: defaults, decoding of stored strings, and validation of changes.
 // Shared so the renderer can validate inline with exactly the rules the main process enforces.
 import type { FormattingRules, TitleCase } from './formatting';
+import type { InsightGoal } from './insightGoal';
 import type { Privacy, UploadMethod } from './queue';
 
 export interface AppSettings {
@@ -35,6 +36,11 @@ export interface AppSettings {
   ai_host: string;
   ai_model: string;
   ai_auto_draft: boolean;
+
+  /** What the channel is being grown for, which decides what "better" means in any comparison. */
+  insight_goal: InsightGoal;
+  /** How the person works, in their own words, so advice is about what they can change. */
+  insight_context: string;
 
   /** House style, applied to whatever ends up in a title or description. All of it optional. */
   format_title_case: TitleCase;
@@ -229,6 +235,9 @@ export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> 
   ai_host: text('http://127.0.0.1:11434', checkHttpUrl),
   ai_model: text('', (value) => (value.length > 200 ? 'That model name is too long' : null)),
   ai_auto_draft: bool(false),
+
+  insight_goal: oneOf<InsightGoal>('reach_and_subscribers', ['reach_and_subscribers', 'views', 'subscribers', 'watch_time']),
+  insight_context: text('', (value) => (value.length > 600 ? 'Keep this to a couple of sentences' : null)),
 
   format_title_case: oneOf<TitleCase>('as_written', ['as_written', 'upper', 'title']),
   format_title_prefix: text('', (value) => (charCount(value) > 40 ? 'A prefix that long leaves no room for a title' : null)),
