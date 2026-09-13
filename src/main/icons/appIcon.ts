@@ -1,14 +1,15 @@
 // Puts the connected channel's picture on the window, the taskbar and the tray, and takes it off
 // again when the channel is disconnected.
 //
-// Windows is not consistent about which of these a running app may change. The window icon (title
-// bar, Alt+Tab) follows setIcon reliably; whether the taskbar button follows it depends on how the
-// app was launched and whether it is pinned. setOverlayIcon is the one that always shows, so the
-// avatar goes there too. Nothing here depends on which of them wins.
+// setIcon does repaint the taskbar button on Windows 11, confirmed against an installed build, so
+// the channel picture goes there. The overlay badge is then free to carry what the icon cannot:
+// whether ShortStack is stopped or wants something. Putting the avatar in both was a picture on top
+// of the same picture.
 import { app, nativeImage, net, type BrowserWindow, type NativeImage, type Tray } from 'electron';
 import * as path from 'path';
 import { brandIconPng } from '../brandIcon';
 import { bgraToRgba } from './circle';
+import { drawStatusOverlay, statusFor, type IconStatus } from './statusOverlay';
 import {
   clearIconCache,
   fetchChannelIcons,
@@ -51,6 +52,7 @@ export interface AppIconTargets {
 
 export class AppIcon {
   private set: IconSet | null = null;
+  private status: IconStatus = 'running';
 
   constructor(private readonly targets: AppIconTargets) {}
 
@@ -83,13 +85,10 @@ export class AppIcon {
   apply(): void {
     const window = this.targets.window();
     const large = this.image(TASKBAR_SIZE);
-    const overlay = this.image(OVERLAY_SIZE);
     const small = this.image(TRAY_SIZE);
 
     if (window !== null && large !== null) window.setIcon(large);
-    if (window !== null && overlay !== null && process.platform === 'win32') {
-      window.setOverlayIcon(overlay, 'Connected channel');
-    }
+    this.applyStatusOverlay();
     this.targets.tray()?.setImage(small ?? nativeImage.createFromBuffer(brandIconPng(TRAY_SIZE)));
 
     // The relaunch entry Windows keeps for a pinned app needs all three parts together, and an
@@ -103,6 +102,25 @@ export class AppIcon {
         appIconIndex: 0
       });
     }
+  }
+
+  /** The corner badge: paused or needing attention, and nothing at all when all is well. */
+  setStatus(state: { paused: boolean; needsAttention: boolean }): void {
+    this.status = statusFor(state);
+    this.applyStatusOverlay();
+  }
+
+  private applyStatusOverlay(): void {
+    if (process.platform !== 'win32') return;
+    const window = this.targets.window();
+    if (window === null) return;
+
+    if (this.status === 'running') {
+      window.setOverlayIcon(null, '');
+      return;
+    }
+    const description = this.status === 'paused' ? 'Uploads are paused' : 'Something needs your attention';
+    window.setOverlayIcon(nativeImage.createFromBuffer(drawStatusOverlay(this.status, OVERLAY_SIZE)), description);
   }
 
   /** Back to the ShortStack mark, and the channel picture off the disk. */

@@ -20,6 +20,16 @@ npm run preview:ui     # the interface in a browser, with stubbed data, for desi
 npm run docs:legal     # regenerate docs/legal/*.md from the text bundled in the app
 ```
 
+Or double-click, from the project folder:
+
+- **Build and run ShortStack.bat** — rebuilds and starts the packaged app, which uses the real
+  profile and the real channel.
+- **Run ShortStack (test profile).bat** — the same build against `shortstack-dev`, which cannot
+  upload anything.
+
+```bash
+```
+
 ### Profiles — the safety net
 
 An unpackaged run **always** uses `%APPDATA%\shortstack-dev` and refuses to upload. Touching the
@@ -144,9 +154,6 @@ cursor that stays put as the list shrinks under it.
 
 Being specific about this, because the last handoff was not.
 
-- **Whether Windows repaints the taskbar button** for an installed, pinned app when `setIcon` is
-  called. The decode and mask pipeline is verified by running it; this last hop needs a packaged
-  install and a human looking at the taskbar. `setOverlayIcon` is set too, which always shows.
 - **No upload has ever run against a real channel.** The resumable uploader is tested against a
   local mock server covering 308, 404, 5xx, crash-resume and completed-before-crash. It has not
   been tested against Google.
@@ -154,6 +161,10 @@ Being specific about this, because the last handoff was not.
   YouTube refuses, the item is flagged "set the schedule in Studio" with the exact time.
 - **Whether `fileDetails` is returned for private videos**, which is how assisted uploads are
   detected. The paste-the-link fallback exists for when it is not.
+
+Answered since: **Windows does repaint the taskbar button** when `setIcon` is called on an
+installed build — confirmed by a person looking at their own taskbar. The channel picture goes
+there, and the corner badge now carries what the icon cannot: paused, or needing attention.
 
 Answered since: **Chromium does play H.264 with LPCM audio in a QuickTime container.** Measured
 rather than assumed — readyState 4, 1080x1920, 17.7s, no error. Videos play in the app through the

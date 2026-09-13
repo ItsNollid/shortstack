@@ -32,6 +32,8 @@ export interface IpcContext {
   credentialsDir: string;
   /** Where poster frames are cached. */
   thumbnailDir: string;
+  /** Called when the scheduler is paused or resumed, so the taskbar badge can follow. */
+  onSchedulerChanged?(): void;
   getWindow(): BrowserWindow | null;
   /** The app's icon follows the connected channel's picture. */
   appIcon: { refresh(avatarUrl: string | null): Promise<boolean>; clear(): Promise<void> };
@@ -257,11 +259,13 @@ export function registerIpcHandlers(context: IpcContext): void {
     schedulerStatus: async () => ok(engine.status()),
     schedulerPause: async () => {
       engine.pause();
+      context.onSchedulerChanged?.();
       broadcast(context.getWindow(), 'scheduler:status');
       return ok(engine.status());
     },
     schedulerResume: async () => {
       engine.resume();
+      context.onSchedulerChanged?.();
       broadcast(context.getWindow(), 'scheduler:status');
       return ok(engine.status());
     },

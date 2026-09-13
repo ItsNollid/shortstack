@@ -102,6 +102,7 @@ async function start(): Promise<void> {
     now: () => new Date(),
     onChange: () => {
       tray?.refresh?.();
+      refreshStatusBadge();
       // Through the same typed helper the IPC handlers use. Sending a raw channel name here is
       // how background work stopped reaching the screen: the renderer subscribes by exact name.
       broadcast(mainWindow, 'queue:changed');
@@ -127,6 +128,7 @@ async function start(): Promise<void> {
     profile: { profile: runtimeProfile.profile, uploads: runtimeProfile.uploads },
     credentialsDir,
     thumbnailDir,
+    onSchedulerChanged: refreshStatusBadge,
     getWindow: () => mainWindow,
     appIcon
   });
@@ -175,7 +177,18 @@ async function start(): Promise<void> {
   applyStartWithWindows(readSettings(db).settings.start_with_windows);
 
   engine.start();
+  refreshStatusBadge();
   console.info(`[ShortStack] started (uploads ${runtimeProfile.uploads})`);
+}
+
+/** Keeps the taskbar badge in step with what the scheduler is doing. */
+function refreshStatusBadge(): void {
+  const status = engine?.status();
+  if (status === undefined) return;
+  appIcon?.setStatus({
+    paused: status.paused,
+    needsAttention: (status.counts.needs_attention ?? 0) > 0 || status.auth !== 'ok'
+  });
 }
 
 function describeStatus(): string {
