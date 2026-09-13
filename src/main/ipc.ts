@@ -18,7 +18,7 @@ import { scanFolder } from './files/scanner';
 import type { SchedulerEngine } from './scheduler/engine';
 import { createPosting, markPublishedBefore, setRotationPaused } from './db/rotationRepo';
 import { listKnownGames, setVideoGame } from './db/videoRepo';
-import { draftFor } from './ai/draft';
+import { clearPastUploadsCache, draftFor } from './ai/draft';
 import { buildInsightPrompt, sanitizeAdvice } from './ai/insightPrompt';
 import { buildBrief } from '../shared/insights';
 import { moodFor, quotaState, whatIsLeft } from '../shared/quota';
@@ -387,6 +387,8 @@ export function registerIpcHandlers(context: IpcContext): void {
       await context.appIcon.clear();
       // Poster frames are drawn from the user's own videos, so they go with the rest of it.
       await clearThumbnails(context.thumbnailDir);
+      // The uploads list kept for drafting is this channel's data too, and goes when permission does.
+      clearPastUploadsCache();
       for (const item of listQueueItems(db)) {
         if (item.youtube_video_id !== null) applyQueueEvent(db, item.id, { type: 'disconnect' }, eventContext());
       }

@@ -22,6 +22,37 @@ export interface DraftDeps {
   listPastUploads(playlistId: string, options: { limit: number }): Promise<{ ok: boolean; value?: { items: PastUpload[] } }>;
 }
 
+/**
+ * Past uploads change over days, and a drafting run asked for them once per video — two YouTube calls
+ * each, so a folder of two hundred cost four hundred calls to fetch the same six videos. Kept for half
+ * an hour instead.
+ */
+const PAST_UPLOADS_TTL_MS = 30 * 60_000;
+const pastUploadsCache = new Map<string, { at: number; items: PastUpload[] }>();
+
+export async function cachedPastUploads(
+  deps: Pick<DraftDeps, 'listPastUploads'>,
+  playlistId: string,
+  now: number = Date.now()
+): Promise<PastUpload[]> {
+  const hit = pastUploadsCache.get(playlistId);
+  if (hit !== undefined && now - hit.at < PAST_UPLOADS_TTL_MS) return hit.items;
+
+  const items = await deps
+    .listPastUploads(playlistId, { limit: 6 })
+    .then((result) => (result.ok ? (result.value?.items ?? []) : null))
+    .catch(() => null);
+
+  // A failure is never cached: the next video should try again rather than inherit nothing. A list
+  // that was good before is better than none while YouTube is not answering.
+  if (items === null) return hit?.items ?? [];
+  pastUploadsCache.set(playlistId, { at: now, items });
+  return items;
+}
+
+/** Cleared on disconnect: a cached list of someone's uploads must not outlive their permission. */
+export const clearPastUploadsCache = (): void => pastUploadsCache.clear();
+
 export async function draftFor(deps: DraftDeps, queueId: number): Promise<AiResult<MetadataSuggestion>> {
   const { db } = deps;
   const item = getQueueItem(db, queueId);
@@ -42,13 +73,7 @@ export async function draftFor(deps: DraftDeps, queueId: number): Promise<AiResu
   // The two things that turn a guess into an answer: what this channel's own uploads look like, and
   // what is actually on screen in the video.
   const playlistId = channel?.uploadsPlaylistId ?? null;
-  const examples =
-    playlistId === null
-      ? []
-      : await deps
-          .listPastUploads(playlistId, { limit: 6 })
-          .then((result) => (result.ok ? (result.value?.items ?? []) : []))
-          .catch(() => []);
+  const examples = playlistId === null ? [] : await cachedPastUploads(deps, playlistId);
 
   // The strip if it has been decoded, otherwise the poster, which is small but better than nothing.
   // Either way a text-only model never receives them.
