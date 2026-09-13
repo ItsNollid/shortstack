@@ -2,6 +2,7 @@ import React from 'react';
 import { ExternalLink, FolderOpen } from 'lucide-react';
 import type { QueueItemDTO } from '../../shared/dto';
 import { formatDuration, formatFileSize, formatRelativeTime, presentAttention, shortsWarning } from '../../shared/presentation';
+import { explainWhereabouts } from '../../shared/onYouTube';
 import { actionableIds, type BulkAction } from '../../shared/queueActions';
 import { VideoPreview } from '../components/VideoPreview';
 import { Banner, Button, StatusPill } from '../components/ui';
@@ -38,12 +39,24 @@ export function VideoSidePanel({ item, busy, onAction }: VideoSidePanelProps): R
         </div>
         {attention !== null && attention.action !== null && <div className={styles.factValue}>{attention.action}</div>}
         <div className={styles.facts}>
+          <span className={styles.factLabel}>Where it is</span>
+          <span className={styles.factValue}>{explainWhereabouts(item)}</span>
           <span className={styles.factLabel}>Publishes</span>
           <span className={styles.factValue}>
             {item.scheduled_for === null
               ? 'No time set yet'
               : `${new Date(item.scheduled_for).toLocaleString()} · ${formatRelativeTime(item.scheduled_for)}`}
           </span>
+          {(item.ai_drafted_at !== null || item.metadata_edited_at !== null) && (
+            <>
+              <span className={styles.factLabel}>Details</span>
+              <span className={styles.factValue}>
+                {item.metadata_edited_at !== null
+                  ? 'Written by you'
+                  : 'Drafted by the local model, and not changed since'}
+              </span>
+            </>
+          )}
           {item.remote_sync !== null && (
             <>
               <span className={styles.factLabel}>YouTube</span>
