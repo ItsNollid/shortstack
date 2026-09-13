@@ -9,6 +9,8 @@ export interface QueryResult<T> {
   error: string | null;
   /** True only while the first load is in flight; refreshes keep the previous data visible. */
   loading: boolean;
+  /** True whenever a request is in flight, refreshes included, for a button that says it is working. */
+  fetching: boolean;
   refresh: () => void;
 }
 
@@ -30,12 +32,16 @@ export function useApiQuery<T>(fetcher: () => Promise<Result<T>>, options: Query
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(enabled);
+  const [fetching, setFetching] = useState(false);
   const [nonce, setNonce] = useState(0);
 
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      setFetching(false);
+      return;
+    }
     let live = true;
     // A fetcher can throw before it returns a promise (no bridge, bad argument); treating that the
     // same as a rejection keeps one broken call from taking the whole screen down.
@@ -45,8 +51,10 @@ export function useApiQuery<T>(fetcher: () => Promise<Result<T>>, options: Query
     } catch (thrown: unknown) {
       setError(thrown instanceof Error ? thrown.message : String(thrown));
       setLoading(false);
+      setFetching(false);
       return;
     }
+    setFetching(true);
     void started.then(
       (result) => {
         if (!live) return;
@@ -57,11 +65,13 @@ export function useApiQuery<T>(fetcher: () => Promise<Result<T>>, options: Query
           setError(result.error.message);
         }
         setLoading(false);
+        setFetching(false);
       },
       (thrown: unknown) => {
         if (!live) return;
         setError(thrown instanceof Error ? thrown.message : String(thrown));
         setLoading(false);
+        setFetching(false);
       }
     );
     // Ignoring a resolved response from a superseded request keeps the newest one authoritative.
@@ -76,7 +86,7 @@ export function useApiQuery<T>(fetcher: () => Promise<Result<T>>, options: Query
     return () => unsubscribes.forEach((off) => off());
   }, [events, enabled, refresh]);
 
-  return { data, error, loading, refresh };
+  return { data, error, loading, fetching, refresh };
 }
 
 export interface MutationResult<A extends unknown[], T> {

@@ -25,6 +25,7 @@ import { moodFor, quotaState, whatIsLeft } from '../shared/quota';
 import { listSpendSince, pruneSpend } from './db/spendRepo';
 import { changeFor, parseAction } from '../shared/channelActions';
 import { adviseWith } from './ai/advise';
+import { PulledCache, parseMaxAge } from './youtube/pulledCache';
 import type { UpdateService } from './updates/updateService';
 import { saveFrames, readFrames } from './media/frames';
 import { clearThumbnails, missingThumbnails, readThumbnail, saveThumbnail } from './media/thumbnails';
@@ -154,6 +155,10 @@ export function registerIpcHandlers(context: IpcContext): void {
             }
     };
   };
+
+  // The last answer to each Analytics question, kept while the app runs so that opening the page does
+  // not ask YouTube again. Cleared whenever the channel is disconnected or another one connected.
+  const analyticsPulls = new PulledCache();
 
   const handlers: Handlers = {
     appInfo: async (): Promise<AppInfo> => ({
@@ -320,9 +325,11 @@ export function registerIpcHandlers(context: IpcContext): void {
       return ok(engine.status());
     },
 
-    analyticsGet: async (days) => {
+    analyticsGet: async (days, maxAge) => {
       const window = typeof days === 'number' && Number.isFinite(days) ? Math.min(365, Math.max(1, Math.round(days))) : 28;
-      const result = await context.gateway.fetchChannelAnalytics(window);
+      const limit = parseMaxAge(maxAge);
+      if (limit === undefined) return fail('invalid', 'That refresh limit is not valid');
+      const result = await analyticsPulls.get(`channel:${window}`, limit, () => context.gateway.fetchChannelAnalytics(window));
       if (!result.ok) return fail(result.code ?? 'analytics_failed', result.reason);
       return ok(result.value);
     },
@@ -373,6 +380,8 @@ export function registerIpcHandlers(context: IpcContext): void {
       // The sign-in itself succeeded, so this still returns ok: the grant is stored and the user
       // should not be told to try again. But a failure here is why the app would otherwise know it
       // is signed in without knowing whose channel it is holding, so it is said out loud.
+      // Another channel's numbers must never show under this one.
+      analyticsPulls.clear();
       const channelProblem = await captureChannel();
       if (channelProblem !== null) console.warn('[ShortStack] signed in, but reading the channel failed:', channelProblem);
       broadcast(context.getWindow(), 'auth:changed');
@@ -389,6 +398,8 @@ export function registerIpcHandlers(context: IpcContext): void {
       await clearThumbnails(context.thumbnailDir);
       // The uploads list kept for drafting is this channel's data too, and goes when permission does.
       clearPastUploadsCache();
+      // So do the analytics kept for the page.
+      analyticsPulls.clear();
       for (const item of listQueueItems(db)) {
         if (item.youtube_video_id !== null) applyQueueEvent(db, item.id, { type: 'disconnect' }, eventContext());
       }
@@ -433,13 +444,16 @@ export function registerIpcHandlers(context: IpcContext): void {
         ? ok({ running: true, models: models.value, message: `${models.value.length} model${models.value.length === 1 ? '' : 's'} available` })
         : ok({ running: models.code !== 'not_running', models: [], message: models.reason });
     },
-    insightsGet: async (days) => {
+    insightsGet: async (days, maxAge) => {
       const window = Number(days);
       if (!Number.isFinite(window) || window < 1) return fail('invalid', 'That range is not valid');
-      const stats = await context.gateway.fetchVideoPerformance(window);
+      const limit = parseMaxAge(maxAge);
+      if (limit === undefined) return fail('invalid', 'That refresh limit is not valid');
+      const stats = await analyticsPulls.get(`videos:${window}`, limit, () => context.gateway.fetchVideoPerformance(window));
       if (!stats.ok) return fail(stats.code ?? 'error', stats.reason);
+      if (stats.value === null) return ok(null);
 
-      const brief = buildBrief(stats.value);
+      const brief = buildBrief(stats.value.value);
       // Kept so writing a title can use it without two YouTube calls per video.
       writeSetting(db, 'insight_findings', JSON.stringify(brief).slice(0, 8000));
       return ok(brief);
@@ -448,12 +462,16 @@ export function registerIpcHandlers(context: IpcContext): void {
     insightsAdvise: async (days) => {
       const window = Number(days);
       if (!Number.isFinite(window) || window < 1) return fail('invalid', 'That range is not valid');
-      const stats = await context.gateway.fetchVideoPerformance(window);
+      // The numbers the findings on screen were built from, not a second round of YouTube calls.
+      const stats = await analyticsPulls.get(`videos:${window}`, Number.POSITIVE_INFINITY, () =>
+        context.gateway.fetchVideoPerformance(window)
+      );
       if (!stats.ok) return fail(stats.code ?? 'error', stats.reason);
+      if (stats.value === null) return fail('not_pulled', 'Pull your analytics first');
 
       const { settings } = readSettings(db);
       const channel = readActiveChannel(db);
-      const brief = buildBrief(stats.value);
+      const brief = buildBrief(stats.value.value);
       const prompt = buildInsightPrompt({
         brief,
         channelName: channel?.title ?? null,

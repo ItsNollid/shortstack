@@ -5,6 +5,9 @@ import type { AppEvent, ShortStackApi } from '../shared/ipc';
 import { LEGAL_VERSION } from '../shared/legal';
 import { defaultSettings, type AppSettings } from '../shared/settings';
 
+/** The stub answers at once, so every answer is as fresh as the moment it was asked for. */
+const pulledNow = <T>(value: T): { value: T; pulledAt: string } => ({ value, pulledAt: new Date().toISOString() });
+
 const FOLDER = String.raw`E:\Youtube\Rendered\ShortStack`;
 
 const iso = (hoursFromNow: number): string => new Date(Date.now() + hoursFromNow * 3600_000).toISOString();
@@ -255,7 +258,7 @@ export function installDevApiStub(): void {
       const sum = (pick: (day: (typeof list)[number]) => number): number => list.reduce((total, day) => total + pick(day), 0);
       const gained = sum((day) => day.subscribersGained);
       const lost = sum((day) => day.subscribersLost);
-      return ok({
+      return ok(pulledNow({
         startDate: list[0]!.date,
         endDate: list[list.length - 1]!.date,
         totals: {
@@ -301,7 +304,7 @@ export function installDevApiStub(): void {
           { ageGroup: 'age18-24', gender: 'female', viewerPercentage: 9.8 },
           { ageGroup: 'age35-44', gender: 'male', viewerPercentage: 7.3 }
         ]
-      });
+      }));
     },
     insightsGet: () =>
       ok({

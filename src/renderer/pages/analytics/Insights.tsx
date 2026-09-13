@@ -1,5 +1,6 @@
 import React from 'react';
 import { Lightbulb, Sparkles } from 'lucide-react';
+import type { MaxAge } from '../../../shared/analyticsRefresh';
 import type { Brief, Fact } from '../../../shared/insights';
 import { describeChange, type SettingChange } from '../../../shared/channelActions';
 import type { AdviceItemDTO, ChannelAdvice, Result } from '../../../shared/ipc';
@@ -11,9 +12,14 @@ import styles from '../Analytics.module.css';
  * Two halves, deliberately in this order. What was measured comes first and is always shown; the
  * model's reading of it comes second and only when asked for. Someone who never presses the button
  * still gets everything that is true — the findings are the product, the advice is a convenience.
+ *
+ * Measured whenever the numbers above are pulled, and kept the same way, so opening the page does
+ * not measure again. `pullId` changes with each look the page takes.
  */
-export function Insights({ days }: { days: number }): React.JSX.Element {
-  const brief = useApiQuery((): Promise<Result<Brief>> => window.api.insightsGet(days), { key: `insights:${days}` });
+export function Insights({ days, pullId, maxAge }: { days: number; pullId: number; maxAge: MaxAge }): React.JSX.Element {
+  const brief = useApiQuery((): Promise<Result<Brief | null>> => window.api.insightsGet(days, maxAge), {
+    key: `insights:${days}:${pullId}`
+  });
   const advise = useApiMutation((): Promise<Result<ChannelAdvice>> => window.api.insightsAdvise(days));
 
   if (brief.loading) return <Skeleton height={160} radius="var(--radius)" />;

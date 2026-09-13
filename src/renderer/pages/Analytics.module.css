@@ -115,3 +115,28 @@
   padding: 3px 8px;
 }
 .applied { color: var(--live); font-size: var(--text-sm); margin-top: var(--space-2); }
+
+.pullBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.pulledAt {
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.refreshChoice {
+  height: 30px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+}

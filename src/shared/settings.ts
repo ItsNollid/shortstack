@@ -1,5 +1,6 @@
 // Typed app settings: defaults, decoding of stored strings, and validation of changes.
 // Shared so the renderer can validate inline with exactly the rules the main process enforces.
+import { ANALYTICS_REFRESH_MODES, DEFAULT_REFRESH_MINUTES, MAX_REFRESH_MINUTES, MIN_REFRESH_MINUTES, type AnalyticsRefresh } from './analyticsRefresh';
 import { DRAFT_FIELDS, checkDraftFields, type DraftField } from './draftFields';
 import type { FormattingRules, TitleCase } from './formatting';
 import type { InsightGoal } from './insightGoal';
@@ -59,6 +60,10 @@ export interface AppSettings {
   format_max_hashtags: number;
   /** Words the description checker accepts on top of its dictionary: names, slang, in-jokes. */
   spell_words: string[];
+  /** When Analytics asks YouTube again rather than showing the numbers it already pulled. */
+  analytics_refresh: AnalyticsRefresh;
+  /** How old the numbers may get before they are pulled again, when refreshing on an interval. */
+  analytics_refresh_minutes: number;
   close_to_tray: boolean;
   close_to_tray_notice_shown: boolean;
   start_with_windows: boolean;
@@ -283,6 +288,8 @@ export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> 
   format_tidy: bool(false),
   format_max_hashtags: integer(0, 0, 60),
   spell_words: stringList([], checkSpellWords),
+  analytics_refresh: oneOf<AnalyticsRefresh>('interval', ANALYTICS_REFRESH_MODES),
+  analytics_refresh_minutes: integer(DEFAULT_REFRESH_MINUTES, MIN_REFRESH_MINUTES, MAX_REFRESH_MINUTES),
   close_to_tray: bool(true),
   close_to_tray_notice_shown: bool(false),
   start_with_windows: bool(false)

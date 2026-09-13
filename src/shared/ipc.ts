@@ -3,6 +3,7 @@
 import type { AiModel } from './aiModels';
 import type { UpdateStatus } from './updates';
 import type { ChannelAnalytics } from './analytics';
+import type { Pulled } from './analyticsRefresh';
 import type { ChannelAction, SettingChange } from './channelActions';
 import type { Brief } from './insights';
 import type { Affordable, QuotaMood, QuotaState } from './quota';
@@ -168,9 +169,13 @@ export interface ShortStackApi {
   /** The development equivalent: hands over to the build script, which closes this app. */
   updateRebuild(): Promise<Result<null>>;
 
-  analyticsGet(days: number): Promise<Result<ChannelAnalytics>>;
+  /**
+   * A range's numbers. A kept answer no older than `maxAgeMs` comes back instead of asking YouTube;
+   * `null` returns only what is kept, and nothing when nothing is. Left out, any kept answer will do.
+   */
+  analyticsGet(days: number, maxAgeMs?: number | null): Promise<Result<Pulled<ChannelAnalytics> | null>>;
   /** What the channel's own numbers say, measured in code. No model involved. */
-  insightsGet(days: number): Promise<Result<Brief>>;
+  insightsGet(days: number, maxAgeMs?: number | null): Promise<Result<Brief | null>>;
   /** Turns those findings into things to do. Asked for explicitly, because it takes seconds. */
   insightsAdvise(days: number): Promise<Result<ChannelAdvice>>;
   /** What ShortStack has spent of today's YouTube allowance, and what the rest will still buy. */
