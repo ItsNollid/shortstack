@@ -6,17 +6,17 @@ import { findModel } from '../../shared/aiModels';
 import { favouredAngle, parseBrief, writingFacts } from '../../shared/insights';
 import type { PastUpload } from '../../shared/pastUploads';
 import { readActiveChannel } from '../db/channelRepo';
-import { getQueueItem } from '../db/queueRepo';
+import { getQueueItem, listOtherPostingTitles } from '../db/queueRepo';
 import { readSettings } from '../db/settingsRepo';
 import { readFrames } from '../media/frames';
 import { readThumbnail } from '../media/thumbnails';
 import { tagVocabulary } from '../../shared/channelTags';
 import { hashtagNames, mentionedIn } from '../../shared/blockedNames';
 import { buildHashtagBlock, hashtagDescription } from '../../shared/hashtags';
-import type { MetadataSuggestion, TitleOption } from './metadataSuggestion';
+import type { MetadataSuggestion } from './metadataSuggestion';
+import { chooseTitles } from './titleChoice';
 import { generateMetadata, listModels, type AiResult } from './ollamaClient';
 import { buildTags } from '../../shared/tags';
-import { orderAngles } from '../../shared/titleAngles';
 
 export interface DraftDeps {
   db: Database.Database;
@@ -83,6 +83,9 @@ export async function draftFor(deps: DraftDeps, queueId: number): Promise<AiResu
   const strip = await readFrames({ db, dir: deps.thumbnailDir }, queueId);
   const stills = strip.length > 0 ? strip : [await readThumbnail({ db, dir: deps.thumbnailDir }, queueId)];
 
+  // A re-run should not go out under a title it already has, so the model is told what those were.
+  const previousTitles = listOtherPostingTitles(db, item.video_id, item.id);
+
   const suggestion = await generateMetadata(
     {
       model,
@@ -102,7 +105,8 @@ export async function draftFor(deps: DraftDeps, queueId: number): Promise<AiResu
         width: item.width,
         height: item.height,
         currentTitle: item.title,
-        currentDescription: item.description
+        currentDescription: item.description,
+        previousTitles
       }
     },
     { host: settings.ai_host }
@@ -128,18 +132,15 @@ export async function draftFor(deps: DraftDeps, queueId: number): Promise<AiResu
   // Built like the description: the game and this clip first, then what the model offered, once anything
   // generic, about another game or naming someone is taken out.
   const tags = buildTags({ game: item.game, topics, modelTags: suggestion.value.tags, names });
-  // A title is a sentence, and cutting a name out of one leaves it broken, so an offer that names someone
-  // is left out whole. The rest go in the order this channel's numbers favour, and the first is the title;
-  // if every offer named someone, the video keeps the title it already had.
-  const offered = suggestion.value.titleOptions ?? [];
-  const titleOptions = orderAngles(favouredAngle(parseBrief(settings.insight_findings)))
-    .map((angle) => offered.find((option) => option.angle === angle))
-    .filter((option): option is TitleOption => option !== undefined && !mentionedIn(option.title, names));
-  const single = suggestion.value.title === '' || mentionedIn(suggestion.value.title, names) ? item.title : suggestion.value.title;
-  const title = titleOptions[0]?.title ?? (offered.length > 0 ? item.title : single);
-  const titleAngle = titleOptions[0]?.angle ?? null;
-  return {
-    ok: true,
-    value: { ...suggestion.value, title, titleOptions, titleAngle, topics, tags, description: hashtagDescription(block) }
-  };
+  // Offered in the order this channel's numbers favour, without any that names someone or that this video
+  // already went out under. If none is left, the video keeps the title it has.
+  const titles = chooseTitles({
+    offered: suggestion.value.titleOptions ?? [],
+    single: suggestion.value.title,
+    names,
+    previous: previousTitles,
+    leader: favouredAngle(parseBrief(settings.insight_findings)),
+    current: item.title
+  });
+  return { ok: true, value: { ...suggestion.value, ...titles, topics, tags, description: hashtagDescription(block) } };
 }

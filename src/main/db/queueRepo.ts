@@ -375,3 +375,11 @@ export function listTitleAngles(db: Database.Database): Map<string, TitleAngle> 
   for (const row of rows) if (isTitleAngle(row.title_angle)) angles.set(row.youtube_video_id, row.title_angle);
   return angles;
 }
+
+/** Titles the other postings of a video went out under, or are set to, newest first and each once. */
+export function listOtherPostingTitles(db: Database.Database, videoId: number, exceptQueueId: number): string[] {
+  const rows = db
+    .prepare("SELECT title FROM queue WHERE video_id = ? AND id <> ? AND trim(title) <> '' ORDER BY id DESC LIMIT 10")
+    .all(videoId, exceptQueueId) as Array<{ title: string }>;
+  return [...new Set(rows.map((row) => row.title.trim()))].slice(0, 5);
+}

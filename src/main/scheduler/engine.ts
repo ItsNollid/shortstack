@@ -180,7 +180,16 @@ export class SchedulerEngine {
    * works per video rather than per posting, and its answer depends on the whole history of a file
    * rather than the state of one queue row.
    */
-  private queueRotations(settings: { rotation_max_postings: number; rotation_min_gap_days: number; notify_subscribers: boolean }, now: Date): number {
+  private queueRotations(
+    settings: {
+      rotation_max_postings: number;
+      rotation_min_gap_days: number;
+      notify_subscribers: boolean;
+      ai_auto_draft: boolean;
+      ai_refresh_reruns: boolean;
+    },
+    now: Date
+  ): number {
     if (settings.rotation_max_postings <= 0) return 0;
 
     let created = 0;
@@ -193,7 +202,10 @@ export class SchedulerEngine {
         {
           notifyOnNew: settings.notify_subscribers,
           maxPostings: settings.rotation_max_postings,
-          minGapDays: settings.rotation_min_gap_days
+          minGapDays: settings.rotation_min_gap_days,
+          // Only with drafting on: otherwise nothing would write the new details, and a later switch-on would
+          // draft over what was copied.
+          freshDetails: settings.ai_auto_draft && settings.ai_refresh_reruns
         },
         now
       );

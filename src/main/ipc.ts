@@ -254,7 +254,12 @@ export function registerIpcHandlers(context: IpcContext): void {
         const result = createPosting(
           db,
           videoId,
-          { notifyOnNew: settings.notify_subscribers, maxPostings: settings.rotation_max_postings, force: true },
+          {
+            notifyOnNew: settings.notify_subscribers,
+            maxPostings: settings.rotation_max_postings,
+            force: true,
+            freshDetails: settings.ai_auto_draft && settings.ai_refresh_reruns
+          },
           now
         );
         if (result.ok) created += 1;

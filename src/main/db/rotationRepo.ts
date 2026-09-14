@@ -146,6 +146,8 @@ export interface PostingDefaults {
   minGapDays?: number;
   /** Ignores the limit and the pause: what the user asked for directly, rather than automation. */
   force?: boolean;
+  /** A re-run starts as though nobody had written its details, so drafting writes new ones. */
+  freshDetails?: boolean;
 }
 
 /**
@@ -180,6 +182,8 @@ export function createPosting(
     if (previous === undefined) return { ok: false, reason: 'That video has never been posted, so there is nothing to repeat' };
 
     const kind = nextPostingKind(rotation);
+    // The earlier details are still copied, and stay until drafting replaces them: a re-run is never left empty.
+    const fresh = kind === 'rotation' && defaults.freshDetails === true;
     const nowIso = now.toISOString();
     const inserted = db
       .prepare(
@@ -204,8 +208,8 @@ export function createPosting(
         kind,
         // Carried over with the details they describe. Without this, every re-run of a video whose
         // details someone wrote by hand would look untouched and be drafted over.
-        previous.ai_drafted_at ?? null,
-        previous.metadata_edited_at ?? null,
+        fresh ? null : (previous.ai_drafted_at ?? null),
+        fresh ? null : (previous.metadata_edited_at ?? null),
         previous.title_angle ?? null,
         nowIso,
         nowIso
@@ -218,7 +222,7 @@ export function createPosting(
       action: defaults.force === true ? 'posting_created' : 'posting_rotated',
       detail:
         kind === 'rotation'
-          ? `Queued again as a re-run (posting ${rotation.postings + 1}), without notifying subscribers`
+          ? `Queued again as a re-run (posting ${rotation.postings + 1}), without notifying subscribers${fresh ? ', with new details to be drafted' : ''}`
           : 'Queued for its first posting',
       now
     });

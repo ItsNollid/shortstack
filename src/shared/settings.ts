@@ -43,6 +43,8 @@ export interface AppSettings {
   ai_auto_draft: boolean;
   /** Which details automatic drafting writes. At least one. */
   ai_auto_draft_fields: DraftField[];
+  /** Re-runs drafted afresh, so they do not go out under the same title again. Off unless chosen: it replaces details written by hand. */
+  ai_refresh_reruns: boolean;
   /** Names drafting must never use: friends' gamertags, mostly. The channel's own name is always kept out. */
   ai_blocked_names: string[];
 
@@ -273,6 +275,7 @@ export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> 
   ai_auto_draft: bool(false),
   // All three by default, which is what drafting did before there was a choice.
   ai_auto_draft_fields: stringList([...DRAFT_FIELDS], checkDraftFields) as unknown as SettingCodec<DraftField[]>,
+  ai_refresh_reruns: bool(false),
   ai_blocked_names: stringList([], checkBlockedNames),
 
   insight_goal: oneOf<InsightGoal>('reach_and_subscribers', ['reach_and_subscribers', 'views', 'subscribers', 'watch_time']),

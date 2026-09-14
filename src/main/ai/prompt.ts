@@ -14,6 +14,8 @@ export interface VideoFacts {
   height: number | null;
   /** The game, when the user has said. Named rather than guessed at. */
   game?: string | null;
+  /** Titles this video already went out under on other postings. A re-run should not repeat them. */
+  previousTitles?: readonly string[];
   /** Whatever is already in the form, which is often the best clue about the subject. */
   currentTitle?: string;
   currentDescription?: string;
@@ -86,6 +88,11 @@ function renderVideo(video: VideoFacts, hasFrames: boolean): string[] {
   }
   if (video.currentDescription !== undefined && video.currentDescription.trim() !== '') {
     lines.push(`Existing description: ${truncate(video.currentDescription.trim(), EXAMPLE_DESCRIPTION_CHARS)}`);
+  }
+  const previous = (video.previousTitles ?? []).map((title) => title.trim()).filter((title) => title !== '');
+  if (previous.length > 0) {
+    lines.push('It has gone out before, under these titles. Write new ones that are clearly different from each:');
+    for (const title of previous) lines.push(`- ${title}`);
   }
   const knowsGame = video.game !== undefined && video.game !== null && video.game.trim() !== '';
   lines.push(

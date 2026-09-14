@@ -99,6 +99,15 @@ export function AiSection({ writer }: { writer: SettingsWriter }): React.JSX.Ele
         </fieldset>
       )}
 
+      {settings.ai_auto_draft && (
+        <Switch
+          label="Draft re-runs afresh"
+          hint="When a video is queued to go out again, the local model writes it new details and is told the titles it already went out under, so the re-run does not look like a repeat. This includes details you wrote yourself for the earlier posting, which keeps them. You still approve every re-run."
+          checked={settings.ai_refresh_reruns}
+          onChange={(value) => writer.set('ai_refresh_reruns', value)}
+        />
+      )}
+
       <TagInput
         label="Names never to use"
         value={settings.ai_blocked_names}
