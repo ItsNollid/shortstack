@@ -19,6 +19,7 @@ import type { SchedulerEngine } from './scheduler/engine';
 import { createPosting, markPublishedBefore, setRotationPaused } from './db/rotationRepo';
 import { linkNamedSource, listKnownGames, listKnownSources, setVideoGame, setVideoSource } from './db/videoRepo';
 import { clearPastUploadsCache, draftFor } from './ai/draft';
+import { lookAtVideo, storedReport } from './ai/lookAtVideo';
 import { buildInsightPrompt, sanitizeAdvice } from './ai/insightPrompt';
 import { buildBrief } from '../shared/insights';
 import { moodFor, quotaState, whatIsLeft } from '../shared/quota';
@@ -27,7 +28,7 @@ import { changeFor, parseAction } from '../shared/channelActions';
 import { adviseWith } from './ai/advise';
 import { PulledCache, parseMaxAge } from './youtube/pulledCache';
 import type { UpdateService } from './updates/updateService';
-import { saveFrames, readFrames } from './media/frames';
+import { saveFrames, readFrames, parseFrameSetInfo } from './media/frames';
 import { clearThumbnails, missingThumbnails, readThumbnail, saveThumbnail } from './media/thumbnails';
 import { applyStartWithWindows } from './startup';
 import type { AuthService } from './youtube/authService';
@@ -275,14 +276,24 @@ export function registerIpcHandlers(context: IpcContext): void {
       return saved.ok ? ok(null) : fail('refused', saved.reason);
     },
 
-    framesSave: async (queueId, frames) => {
+    framesSave: async (queueId, frames, info) => {
       const parsed = asId(queueId);
       if (parsed === null) return fail('invalid', 'That video id is not valid');
       if (!Array.isArray(frames) || frames.some((frame) => !(frame instanceof Uint8Array))) {
         return fail('invalid', 'Expected image bytes');
       }
-      const saved = await saveFrames({ db, dir: context.thumbnailDir }, parsed, frames.map((frame) => Buffer.from(frame)));
-      return saved.ok ? ok(null) : fail('refused', saved.reason);
+      const details = parseFrameSetInfo(info);
+      if (details === 'invalid') return fail('invalid', 'Those still details are not valid');
+      const saved = await saveFrames(
+        { db, dir: context.thumbnailDir },
+        parsed,
+        frames.map((frame) => Buffer.from(frame)),
+        details ?? undefined
+      );
+      if (!saved.ok) return fail('refused', saved.reason);
+      // New stills make whatever the model said about the old ones go away.
+      broadcast(context.getWindow(), 'reading:changed');
+      return ok(null);
     },
 
     videoSetGame: async (queueId, game) => {
@@ -594,6 +605,19 @@ export function registerIpcHandlers(context: IpcContext): void {
 
       const suggestion = await draftFor(draftDeps, parsed);
       return suggestion.ok ? ok(suggestion.value) : fail(suggestion.code, suggestion.reason);
+    },
+    videoReading: async (queueId) => {
+      const parsed = asId(queueId);
+      if (parsed === null) return fail('invalid', 'That video id is not valid');
+      return ok(storedReport(db, parsed));
+    },
+    videoLook: async (queueId) => {
+      const parsed = asId(queueId);
+      if (parsed === null) return fail('invalid', 'That video id is not valid');
+      const report = await lookAtVideo({ db, thumbnailDir: context.thumbnailDir }, parsed);
+      if (!report.ok) return fail(report.code, report.reason);
+      broadcast(context.getWindow(), 'reading:changed');
+      return ok(report.value);
     },
 
     selectFolder: async () => {

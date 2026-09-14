@@ -5,6 +5,8 @@ import { PRIVACY_OPTIONS } from '../../shared/privacyCopy';
 import { parseVideoId } from '../../shared/youtubeUrl';
 import { Banner, Button, CopyField, TextField } from '../components/ui';
 import { useApiMutation } from '../hooks/useApi';
+import { stillUrl, useVideoReport } from '../hooks/useVideoReport';
+import { clipTime } from '../../shared/videoReading';
 import styles from './AssistedUploadPanel.module.css';
 
 function Step({ title, text, children }: { title: string; text?: string; children?: React.ReactNode }): React.JSX.Element {
@@ -29,6 +31,7 @@ export function AssistedUploadPanel({ item }: { item: QueueItemDTO }): React.JSX
     onDone: () => setPasted('')
   });
 
+  const cover = useVideoReport(item.id).data?.cover ?? null;
   const privacyLabel = PRIVACY_OPTIONS.find((option) => option.value === item.privacy)?.label ?? item.privacy;
   const when = item.scheduled_for === null ? null : new Date(item.scheduled_for);
   const parsedId = parseVideoId(pasted);
@@ -62,6 +65,15 @@ export function AssistedUploadPanel({ item }: { item: QueueItemDTO }): React.JSX
           <CopyField label="Description" value={item.description} emptyText="No description" />
           <CopyField label="Tags" value={item.tags.join(', ')} emptyText="No tags" />
         </Step>
+
+        {cover !== null && (
+          <Step
+            title="Choose the cover"
+            text={`Where YouTube lets you pick a frame for the Short's thumbnail, choose the moment at ${clipTime(cover.time) ?? 'the one shown here'}${cover.what === '' ? '' : ` — ${cover.what}`}. The local model picked it from the stills.`}
+          >
+            <img className={styles.cover} src={stillUrl(item.id, cover.part)} alt="The suggested cover frame" />
+          </Step>
+        )}
 
         {item.source_url !== null && (
           <Step

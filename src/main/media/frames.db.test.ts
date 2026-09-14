@@ -105,7 +105,10 @@ describe('videosWithFrames', () => {
     expect(await videosWithFrames(dir)).toEqual(new Set());
 
     const queueId = seedQueueItem(db, { filename: 'clip.mov' });
+    // Stills without their times are not done: the video is drawn again, once, to get them.
     await saveFrames({ db, dir }, queueId, [jpeg(), jpeg()]);
+    expect(await videosWithFrames(dir)).toEqual(new Set());
+    await saveFrames({ db, dir }, queueId, [jpeg(), jpeg()], { times: [1, 2], opening: [], openingTimes: [], duration: 5 });
     expect(await videosWithFrames(dir)).toEqual(new Set([videoIdFor(queueId)]));
   });
 });

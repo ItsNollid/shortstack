@@ -198,3 +198,59 @@ export async function generateMetadata(input: GenerateInput, deps: OllamaDeps): 
     return unreachable(error);
   }
 }
+
+export interface JsonRequest {
+  model: string;
+  prompt: string;
+  /** Base64 images. Leave out for a question about text alone. */
+  images?: readonly string[];
+  thinking?: boolean;
+  temperature?: number;
+}
+
+/**
+ * One request for a JSON answer, for the smaller questions asked about a video: what a still shows,
+ * whether a title fits it. Failures carry the same codes as a suggestion, so the screen can say the
+ * same things about them.
+ */
+export async function generateJson(request: JsonRequest, deps: OllamaDeps): Promise<AiResult<unknown>> {
+  const doFetch = deps.fetch ?? fetch;
+  try {
+    const response = await withTimeout(deps.generateTimeoutMs ?? DEFAULT_GENERATE_TIMEOUT_MS, (signal) =>
+      doFetch(`${deps.host}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal,
+        body: JSON.stringify({
+          model: request.model,
+          prompt: request.prompt,
+          images: [...(request.images ?? [])],
+          stream: false,
+          format: 'json',
+          // As for suggestions: thinking at length took 84 seconds and timed out, and there is nothing here to reason about.
+          ...(request.thinking === true ? { think: false } : {}),
+          options: { temperature: request.temperature ?? 0.2 }
+        })
+      })
+    );
+    if (response === 'timeout') return { ok: false, code: 'timeout', reason: 'The model took too long to answer' };
+
+    const body = await response.text();
+    if (!response.ok) return { ok: false, ...classifyFailure(response.status, body, request.model) };
+
+    const envelope = JSON.parse(body) as { response?: unknown; thinking?: unknown };
+    const answer =
+      typeof envelope.response === 'string' && envelope.response.trim() !== ''
+        ? envelope.response
+        : typeof envelope.thinking === 'string'
+          ? envelope.thinking
+          : null;
+    if (answer === null) return { ok: false, code: 'bad_output', reason: 'Ollama returned an unexpected response' };
+    const parsed = extractJson(answer);
+    return parsed === null || parsed === undefined
+      ? { ok: false, code: 'bad_output', reason: 'The model did not answer in JSON' }
+      : { ok: true, value: parsed };
+  } catch (error) {
+    return unreachable(error);
+  }
+}

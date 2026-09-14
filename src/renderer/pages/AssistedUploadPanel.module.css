@@ -49,3 +49,12 @@
 
 .link { display: flex; gap: var(--space-2); align-items: flex-start; }
 .linkInput { flex: 1; }
+
+.cover {
+  width: 72px;
+  aspect-ratio: 9 / 16;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  margin-top: var(--space-2);
+  background: var(--bg);
+}

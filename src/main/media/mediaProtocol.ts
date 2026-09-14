@@ -6,6 +6,7 @@ import { protocol } from 'electron';
 import * as fs from 'fs';
 import { Readable } from 'stream';
 import { extname } from 'path';
+import { readFramePart } from './frames';
 import { readThumbnail } from './thumbnails';
 
 export const MEDIA_SCHEME = 'ss-media';
@@ -69,18 +70,29 @@ export function parseRange(header: string | null, size: number): ByteRange | nul
   return end < start ? undefined : { start, end };
 }
 
-export type MediaKind = 'video' | 'thumb';
+export type MediaKind = 'video' | 'thumb' | 'frame';
 
-/** Pulls the kind and queue id out of ss-media://video/<id> or ss-media://thumb/<id>. */
-export function parseMediaUrl(url: string): { kind: MediaKind; queueId: number } | null {
+export type MediaRequest = { kind: 'video' | 'thumb'; queueId: number } | { kind: 'frame'; queueId: number; part: string };
+
+/**
+ * Pulls the kind and queue id out of ss-media://video/<id> or ss-media://thumb/<id>, and the still
+ * out of ss-media://frame/<id>/<still>.
+ */
+export function parseMediaUrl(url: string): MediaRequest | null {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== `${MEDIA_SCHEME}:`) return null;
-    if (parsed.hostname !== 'video' && parsed.hostname !== 'thumb') return null;
-    // pathname always begins with a slash, so slicing it is clearer than a regex.
-    const id = Number(parsed.pathname.slice(1));
+    // pathname always begins with a slash, so splitting it is clearer than a regex.
+    const segments = parsed.pathname.split('/').filter((segment) => segment !== '');
+    const id = Number(segments[0]);
     if (!Number.isInteger(id) || id <= 0) return null;
-    return { kind: parsed.hostname as MediaKind, queueId: id };
+
+    if (parsed.hostname === 'frame') {
+      const part = segments[1];
+      return segments.length === 2 && part !== undefined && /^[so]\d$/.test(part) ? { kind: 'frame', queueId: id, part } : null;
+    }
+    if (parsed.hostname !== 'video' && parsed.hostname !== 'thumb') return null;
+    return segments.length === 1 ? { kind: parsed.hostname, queueId: id } : null;
   } catch {
     return null;
   }
@@ -119,6 +131,13 @@ export function handleMediaRequests(deps: MediaDeps): void {
       return image === null
         ? new Response('No thumbnail yet', { status: 404 })
         : new Response(image, { status: 200, headers: { 'Content-Type': 'image/png', ...ALLOW_READING } });
+    }
+
+    if (asked.kind === 'frame') {
+      const image = await readFramePart({ db: deps.db, dir: deps.thumbnailDir }, asked.queueId, asked.part);
+      return image === null
+        ? new Response('No still yet', { status: 404 })
+        : new Response(image, { status: 200, headers: { 'Content-Type': 'image/jpeg', ...ALLOW_READING } });
     }
 
     const queueId = asked.queueId;

@@ -11,21 +11,21 @@ const sample = sampleVideo();
 test.describe('frames for the model', () => {
   test.skip(sample === null, 'needs a real video file to decode');
 
-  test('draws a poster and a strip of stills from a real file', async () => {
+  test('draws a poster, a strip of stills with their times, and the opening second from a real file', async () => {
     const harness = await launch([{ filename: 'clip.mov', realFile: sample as string }]);
     try {
       await goTo(harness.page, '#/queue');
 
       const thumbs = path.join(harness.userData, 'thumbs');
       const frames = path.join(thumbs, 'frames');
+      const meta = path.join(frames, '1.json');
 
-      await expect
-        .poll(() => (fs.existsSync(frames) ? fs.readdirSync(frames) : []), { timeout: 45_000, intervals: [500] })
-        .not.toHaveLength(0);
+      // The times are written last, so they mark a finished pass.
+      await expect.poll(() => fs.existsSync(meta), { timeout: 45_000, intervals: [500] }).toBe(true);
 
-      const stills = fs.readdirSync(frames).sort();
-      expect(stills.length).toBeGreaterThan(1);
+      const stills = fs.readdirSync(frames).filter((name) => name.endsWith('.jpg')).sort();
       expect(stills[0]).toBe('1-0.jpg');
+      expect(stills.filter((name) => name.includes('-open-')).length).toBeGreaterThan(0);
 
       for (const name of stills) {
         const bytes = fs.readFileSync(path.join(frames, name));
@@ -33,6 +33,17 @@ test.describe('frames for the model', () => {
         expect([bytes[0], bytes[1], bytes[2]]).toEqual([0xff, 0xd8, 0xff]);
         expect(bytes.length).toBeGreaterThan(4096);
       }
+
+      const recorded = JSON.parse(fs.readFileSync(meta, 'utf8')) as {
+        version: number;
+        times: number[];
+        openingTimes: number[];
+        duration: number;
+      };
+      expect(recorded.version).toBe(2);
+      expect(recorded.times).toHaveLength(stills.filter((name) => !name.includes('-open-')).length);
+      expect(recorded.times.every((time) => time > 0 && time <= recorded.duration)).toBe(true);
+      expect(recorded.openingTimes[0]).toBeLessThan(1);
 
       const poster = fs.readFileSync(path.join(thumbs, '1.png'));
       expect(poster.subarray(0, 4)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47]));

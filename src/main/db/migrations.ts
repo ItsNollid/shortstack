@@ -513,6 +513,25 @@ const v9SourceVideo: Migration = {
   }
 };
 
+/**
+ * What the local model made of a video's stills: one reading per video, since every posting of a file
+ * shows the same frames. Kept so a video is looked at once, not on every visit.
+ */
+const v10VideoReadings: Migration = {
+  version: 10,
+  name: 'keep what the local model saw in each video',
+  up(db) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS video_readings (
+        video_id INTEGER PRIMARY KEY REFERENCES videos(id) ON DELETE CASCADE,
+        model TEXT NOT NULL,
+        read_at TEXT NOT NULL,
+        stills TEXT NOT NULL
+      )
+    `);
+  }
+};
+
 export const MIGRATIONS: readonly Migration[] = [
   v1Baseline,
   v2Lifecycle,
@@ -522,7 +541,8 @@ export const MIGRATIONS: readonly Migration[] = [
   v6Game,
   v7ApiSpend,
   v8GameGuess,
-  v9SourceVideo
+  v9SourceVideo,
+  v10VideoReadings
 ];
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
 

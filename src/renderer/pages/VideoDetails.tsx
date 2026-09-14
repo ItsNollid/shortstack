@@ -21,6 +21,7 @@ import { GameField } from '../components/GameField';
 import { useAppStatus } from '../app/status';
 import { useApiMutation, useApiQuery } from '../hooks/useApi';
 import { AiAssistPanel, type AiField } from './AiAssistPanel';
+import { VideoReadingPanel } from './VideoReadingPanel';
 import { AssistedUploadPanel } from './AssistedUploadPanel';
 import styles from './VideoDetails.module.css';
 import { VideoSidePanel } from './VideoSidePanel';
@@ -175,6 +176,8 @@ export function VideoDetails({ onApprove }: { onApprove: (item: QueueItemDTO) =>
             disabled={blocked}
           />
 
+          <VideoReadingPanel key={`reading-${loaded.id}`} queueId={loaded.id} />
+
           <TextField
             label="Title"
             value={draft.title}
@@ -207,7 +210,7 @@ export function VideoDetails({ onApprove }: { onApprove: (item: QueueItemDTO) =>
             />
           </DescriptionCheck>
 
-<GameField queueId={loaded.id} value={loaded.game} />
+          <GameField queueId={loaded.id} value={loaded.game} />
           <SourceField queueId={loaded.id} title={loaded.source_title} url={loaded.source_url} />
 
           <TagInput

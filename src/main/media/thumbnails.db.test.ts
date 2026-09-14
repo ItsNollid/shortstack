@@ -82,7 +82,7 @@ describe('finding what still needs one', () => {
     expect(await missingThumbnails({ db, dir })).toHaveLength(2);
 
     await saveThumbnail({ db, dir }, a, png());
-    await saveFrames({ db, dir }, a, [jpeg()]);
+    await saveFrames({ db, dir }, a, [jpeg()], { times: [1], opening: [], openingTimes: [], duration: 5 });
     const remaining = await missingThumbnails({ db, dir });
     expect(remaining).toHaveLength(1);
     expect(remaining).not.toContain(a);

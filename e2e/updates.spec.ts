@@ -1,5 +1,6 @@
 // A development build knows it is behind its own source, and says so with a way to act on it.
 import { expect, test } from '@playwright/test';
+import { CHANGELOG, sortedChangelog } from '../src/shared/changelog';
 import { goTo, launch } from './fixtures';
 
 test.describe('updates', () => {
@@ -10,8 +11,8 @@ test.describe('updates', () => {
       await expect(harness.page.getByRole('heading', { name: 'Updates' })).toBeVisible();
       await expect(harness.page.getByText(/rebuilds rather than downloads/)).toBeVisible();
       await expect(harness.page.getByText(/This build:/)).toBeVisible();
-      // The newest release note, from the bundled changelog.
-      await expect(harness.page.getByText(/Suggestions that have seen the video/)).toBeVisible();
+      // The newest release note from the bundled changelog, whichever release that is by now.
+      await expect(harness.page.getByText(sortedChangelog(CHANGELOG)[0]?.headline ?? '')).toBeVisible();
       await expect(harness.page.getByRole('button', { name: /check now/i })).toBeVisible();
     } finally {
       await harness.close();

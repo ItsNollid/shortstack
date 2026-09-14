@@ -13,6 +13,7 @@ import type { PastUploadPage } from './pastUploads';
 import type { ActivityEntryDTO, QueueItemDTO, UploadDTO } from './dto';
 import type { AppSettings, IgnoredSetting } from './settings';
 import type { QueueMetadataPatch } from './videoMetadata';
+import type { VideoReport } from './videoReading';
 
 /** Failures are values, not thrown errors: Electron turns a rejection into an unreadable string. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
@@ -91,7 +92,8 @@ export const APP_EVENTS = [
   'auth:changed',
   'upload:progress',
   'toast',
-  'update:changed'
+  'update:changed',
+  'reading:changed'
 ] as const;
 
 /**
@@ -143,7 +145,12 @@ export interface ShortStackApi {
   /** Stores a poster frame the renderer drew, as raw PNG bytes. */
   thumbnailSave(queueId: number, png: Uint8Array): Promise<Result<null>>;
   /** Stores the strip of stills the local model reads, as raw JPEG bytes. */
-  framesSave(queueId: number, frames: Uint8Array[]): Promise<Result<null>>;
+  /** The strip, and with it when each still was taken, the opening stills, and how long the video is. */
+  framesSave(
+    queueId: number,
+    frames: Uint8Array[],
+    info?: { times: number[]; opening: Uint8Array[]; openingTimes: number[]; duration: number | null }
+  ): Promise<Result<null>>;
 
   settingsGetAll(): Promise<Result<AppSettings>>;
   settingsSet(key: string, value: unknown): Promise<Result<AppSettings>>;
@@ -167,6 +174,10 @@ export interface ShortStackApi {
   aiGenerate(queueId: number): Promise<Result<MetadataSuggestionDTO>>;
   /** Loads a model and asks it one question, so a choice can be checked before it is relied on. */
   aiTest(model: string): Promise<Result<null>>;
+  /** What the local model saw in a video's stills last time, with the cover, opening and game drawn from it. */
+  videoReading(queueId: number): Promise<Result<VideoReport | null>>;
+  /** Has the model look at each still now. Seconds per still, so only ever when asked. */
+  videoLook(queueId: number): Promise<Result<VideoReport>>;
 
   /** What the app knows about newer versions right now, without going and looking. */
   updateStatus(): Promise<Result<UpdateStatus>>;
@@ -253,6 +264,8 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'authRefreshChannel',
   'aiStatus',
   'aiGenerate',
+  'videoReading',
+  'videoLook',
   'aiTest',
   'updateStatus',
   'updateCheck',
