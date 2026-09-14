@@ -18,6 +18,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: '1.2.0',
+    date: '2026-09-13',
+    headline: 'Descriptions, tags and titles you can trust, and a schedule you can change from anywhere',
+    changes: [
+      'Descriptions are built from hashtags for the game and what happens in the clip, and tags from the ways the game is spelled, instead of being written by the model. Nothing names another game or someone on your never-use list.',
+      'Say which game a video is, and the model stops guessing from the picture. Say which long video a Short was cut from — paste its link and ShortStack gets the title from YouTube — and the model gets the context and the Studio steps include it as the related video.',
+      'A checker under every description finds spelling, grammar and hashtag mistakes — repeats, commas, another app’s hashtags, a hashtag YouTube cuts short — with Fix all and Undo.',
+      'Choose which details automatic drafting writes, and list names it must never use, such as friends’ gamertags read off the screen.',
+      'Set or change a video’s publish time from the video itself or in Review, not only by dragging it on the Calendar.',
+      'Videos uploaded in YouTube Studio are noticed while the scheduler is paused, a desktop reminder comes when one is due within two hours, and looking for them costs a few hundred units a day instead of more than half your allowance.',
+      'Analytics goes deeper, works out what your own videos have in common, and can suggest changes you apply with one button. It pulls when you press Refresh or on a timer you choose, instead of every time the page opens.',
+      'Settings shows how much of the daily YouTube allowance is left and what it still buys, and can keep Shorts from the same long video from all going out on one day.',
+      'House style for titles and descriptions — capitals, a prefix or suffix, a footer, a hashtag limit — all optional, and one button brings videos already waiting into line.',
+      'A saved setting that can no longer be used is shown with the reason, instead of being quietly ignored. A description footer saved before the 40-hashtag limit can be put back and cleaned up.',
+      'The local model no longer times out on models that think before answering, and suggestions are written with your channel’s own recent findings in mind.',
+      'Only the newest three database backups are kept, and dialogs are announced by name to screen readers.'
+    ]
+  },
+  {
     version: '1.1.0',
     date: '2026-09-13',
     headline: 'Suggestions that have seen the video, and drafting that runs on its own',

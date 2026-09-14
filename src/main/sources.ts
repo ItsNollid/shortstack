@@ -4,17 +4,24 @@ import type { GatewayResult } from './youtube/gateway';
 
 export type ResolvedSource = { ok: true; source: SourceVideo } | { ok: false; problem: string };
 
+export type TitleLookup = (videoId: string) => Promise<GatewayResult<{ title: string; channelId: string | null }>>;
+
 /**
  * A link is named by YouTube, since it already knows the title — asking someone to retype it was the
  * wrong way round. It is only asked when it has to be: a link this video already has keeps its title,
  * and a link another Short already uses borrows that title, both for nothing. Asking costs one unit.
+ *
+ * The video has to be on the person's own channel. A Short's related video is one of their own, and
+ * reading other channels' videos is not something ShortStack's privacy policy says it does.
+ *
  * If YouTube cannot answer, a name the person gave will do; without one, they are asked for it.
  */
 export async function resolveSource(
   input: SourceInput,
   stored: { title: string | null; url: string | null },
   known: readonly SourceVideo[],
-  lookupTitle: (videoId: string) => Promise<GatewayResult<{ title: string }>>
+  ownChannelId: string | null,
+  lookupTitle: TitleLookup
 ): Promise<ResolvedSource> {
   const parsed = parseSourceInput(input);
   if (!parsed.ok) return parsed;
@@ -26,7 +33,12 @@ export async function resolveSource(
   if (already !== undefined) return { ok: true, source: { title: already.title, url } };
 
   const found = await lookupTitle(parsed.videoId);
-  if (found.ok) return { ok: true, source: { title: found.value.title, url } };
+  if (found.ok) {
+    if (ownChannelId !== null && found.value.channelId !== null && found.value.channelId !== ownChannelId) {
+      return { ok: false, problem: 'That video is on another channel. A Short’s related video has to be one of your own.' };
+    }
+    return { ok: true, source: { title: found.value.title, url } };
+  }
   if (parsed.title !== null) return { ok: true, source: { title: parsed.title, url } };
   return { ok: false, problem: `ShortStack could not get that video’s title from YouTube (${found.reason}). Name it yourself for now.` };
 }

@@ -64,7 +64,7 @@ export interface YouTubeGateway {
   fetchChannelProfile(): Promise<GatewayResult<ChannelProfile>>;
   fetchVideoStatus(videoId: string): Promise<GatewayResult<VideoStatusSnapshot>>;
   /** A video's title, for naming a long video from its link. */
-  fetchVideoTitle(videoId: string): Promise<GatewayResult<{ title: string }>>;
+  fetchVideoTitle(videoId: string): Promise<GatewayResult<{ title: string; channelId: string | null }>>;
   setPublishPlan(videoId: string, plan: { privacyStatus: Privacy; publishAt: string | null }): Promise<GatewayResult<VideoStatusSnapshot>>;
   listRecentUploads(playlistId: string, limit?: number): Promise<GatewayResult<RecentUpload[]>>;
   fetchChannelAnalytics(days: number, now?: Date): Promise<GatewayResult<ChannelAnalytics>>;
@@ -177,17 +177,18 @@ export class HttpYouTubeGateway implements YouTubeGateway {
   }
 
   /** One unit, and it reads private and unlisted videos on this channel, which a public lookup would not. */
-  async fetchVideoTitle(videoId: string): Promise<GatewayResult<{ title: string }>> {
+  async fetchVideoTitle(videoId: string): Promise<GatewayResult<{ title: string; channelId: string | null }>> {
     const response = await this.request(`/videos?part=snippet&id=${encodeURIComponent(videoId)}`);
     const body = await response.text();
     if (!response.ok) return failure(response.status, body, 'Looking the video up');
 
-    const parsed = JSON.parse(body) as { items?: Array<{ snippet?: { title?: unknown } }> };
+    const parsed = JSON.parse(body) as { items?: Array<{ snippet?: { title?: unknown; channelId?: unknown } }> };
     const title = parsed.items?.[0]?.snippet?.title;
+    const channelId = parsed.items?.[0]?.snippet?.channelId;
     if (typeof title !== 'string' || title.trim() === '') {
       return { ok: false, reason: 'YouTube has no video at that link', code: 'not_found', retryable: false };
     }
-    return { ok: true, value: { title } };
+    return { ok: true, value: { title, channelId: typeof channelId === 'string' ? channelId : null } };
   }
 
   /**
@@ -531,7 +532,7 @@ export class DryRunYouTubeGateway implements YouTubeGateway {
     return this.refusal;
   }
 
-  async fetchVideoTitle(): Promise<GatewayResult<{ title: string }>> {
+  async fetchVideoTitle(): Promise<GatewayResult<{ title: string; channelId: string | null }>> {
     return this.refusal;
   }
 

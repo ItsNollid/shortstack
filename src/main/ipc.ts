@@ -318,6 +318,7 @@ export function registerIpcHandlers(context: IpcContext): void {
           source,
           { title: item.source_title, url: item.source_url },
           listKnownSources(db),
+          readActiveChannel(db)?.id ?? null,
           (videoId) => context.gateway.fetchVideoTitle(videoId)
         );
         if (!resolved.ok) return fail('invalid', resolved.problem);
