@@ -131,6 +131,10 @@ function describeEvent(event: QueueEvent, before: QueueStateFields, patch: Parti
       return 'Taken off the schedule';
     case 'auto_slot':
       return `Automatically scheduled to publish at ${event.at}`;
+    case 'fill_slot':
+      return `Given a time from your daily schedule: ${event.at}`;
+    case 'unschedule':
+      return 'Time taken away';
     case 'edit_metadata':
       return 'Details edited';
     case 'begin_manual_upload':

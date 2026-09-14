@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, CloudCheck } from 'lucide-react';
+import { CalendarPlus, ChevronLeft, ChevronRight, CloudCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { DRAG_TYPE, dropOnDay, scheduleBlocker } from '../../../shared/calendarDnd';
 import type { QueueItemDTO } from '../../../shared/dto';
@@ -13,6 +13,7 @@ import { planInsert, planNextFree, planSwap, type DropStrategy, type Scheduled }
 import { nextFreeSlot } from '../../../shared/slots';
 import { Chip } from './Chip';
 import { DropChoice } from './DropChoice';
+import { FillDialog } from './FillDialog';
 import styles from './Calendar.module.css';
 
 const readQueue = (): Promise<Result<QueueItemDTO[]>> => window.api.queueList();
@@ -42,9 +43,11 @@ export function Calendar(): React.JSX.Element {
   const [dragging, setDragging] = useState<QueueItemDTO | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [full, setFull] = useState<{ item: QueueItemDTO; day: Date } | null>(null);
+  const [filling, setFilling] = useState(false);
 
   const schedule = useApiMutation((id: number, at: string) => window.api.queueSchedule(id, at));
   const hold = useApiMutation((id: number) => window.api.queueHold(id));
+  const undoFill = useApiMutation((entries: Array<{ id: number; at: string }>) => window.api.queueUndoFill(entries));
 
   const items = queue.data ?? [];
   const uploadTimes = settings?.upload_times ?? [];
@@ -228,6 +231,9 @@ export function Calendar(): React.JSX.Element {
               onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))}
             />
             <Button onClick={() => setCursor(new Date())}>Today</Button>
+            <Button variant="primary" icon={<CalendarPlus size={15} />} onClick={() => setFilling(true)}>
+              Fill the calendar
+            </Button>
           </div>
         }
       />
@@ -351,6 +357,27 @@ export function Calendar(): React.JSX.Element {
         onCancel={() => setFull(null)}
         onChoose={applyStrategy}
       />
+
+      {/* Mounted only while open, so a second fill starts from a fresh preview rather than the last one. */}
+      {filling && (
+        <FillDialog
+          open
+          onCancel={() => setFilling(false)}
+          onFilled={(result) => {
+            setFilling(false);
+            const count = result.filled.length;
+            const first = result.filled.map((entry) => entry.at).sort()[0];
+            if (first !== undefined) setCursor(new Date(first));
+            toast({
+              text:
+                count === 0
+                  ? 'No times were given: the queue changed while filling'
+                  : `Gave ${count} video${count === 1 ? '' : 's'} a time${result.refused > 0 ? `; ${result.refused} had changed and were left alone` : ''}`,
+              ...(count > 0 ? { action: { label: 'Undo', run: () => void undoFill.run(result.filled) } } : {})
+            });
+          }}
+        />
+      )}
     </>
   );
 }

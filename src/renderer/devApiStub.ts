@@ -4,6 +4,10 @@ import type { QueueItemDTO } from '../shared/dto';
 import type { AppEvent, ShortStackApi } from '../shared/ipc';
 import { LEGAL_VERSION } from '../shared/legal';
 import { defaultSettings, type AppSettings } from '../shared/settings';
+import { planFill } from '../shared/fillSchedule';
+
+/** The default daily times, for filling the sample calendar. */
+const STUB_BOOKING = { uploadTimes: ['09:00', '13:00', '18:00', '22:00'], rotationUploadTimes: ['11:00', '15:00', '20:00'], horizonDays: 14 };
 
 /** The stub answers at once, so every answer is as fresh as the moment it was asked for. */
 const pulledNow = <T>(value: T): { value: T; pulledAt: string } => ({ value, pulledAt: new Date().toISOString() });
@@ -249,6 +253,31 @@ export function installDevApiStub(): void {
       item.schedule_source = 'hold';
       emit('queue:changed');
       return ok(item);
+    },
+    queueFillPreview: (includeUnapproved: boolean) =>
+      ok(planFill({ items: SAMPLE, settings: STUB_BOOKING, now: new Date(), includeUnapproved })),
+    queueFill: (includeUnapproved: boolean) => {
+      const { assignments } = planFill({ items: SAMPLE, settings: STUB_BOOKING, now: new Date(), includeUnapproved });
+      for (const entry of assignments) {
+        const item = SAMPLE.find((candidate) => candidate.id === entry.id);
+        if (item === undefined) continue;
+        item.scheduled_for = entry.at;
+        item.schedule_source = 'auto';
+      }
+      emit('queue:changed');
+      return ok({ filled: assignments.map(({ id, at }) => ({ id, at })), refused: 0 });
+    },
+    queueUndoFill: (entries: Array<{ id: number; at: string }>) => {
+      let undone = 0;
+      for (const entry of entries) {
+        const item = SAMPLE.find((candidate) => candidate.id === entry.id);
+        if (item === undefined || item.scheduled_for !== entry.at) continue;
+        item.scheduled_for = null;
+        item.schedule_source = null;
+        undone += 1;
+      }
+      emit('queue:changed');
+      return ok(undone);
     },
     settingsIgnored: () => ok([]),
     queueRestylePreview: () => ok([]),

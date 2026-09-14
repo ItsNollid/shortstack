@@ -37,6 +37,8 @@ export type QueueEvent =
   | { type: 'schedule'; at: string }
   | { type: 'hold' }
   | { type: 'auto_slot'; at: string }
+  | { type: 'fill_slot'; at: string }
+  | { type: 'unschedule' }
   | { type: 'edit_metadata' }
   | { type: 'method_changed' }
   | { type: 'begin_manual_upload' }
@@ -232,6 +234,24 @@ export function transition(item: QueueStateFields, event: QueueEvent, ctx: Trans
         schedule_source: 'auto',
         ...(item.youtube_video_id !== null ? { remote_sync: 'pending' as const } : {})
       });
+
+    case 'fill_slot':
+      // Asked for by the person, so unlike the scheduler's own slots it may go to a video still waiting for approval.
+      // It stays a slot ShortStack may move: if it passes before approval, the scheduler finds a new one afterwards.
+      if (item.privacy !== 'public') return deny('Only public videos are given times');
+      if (item.scheduled_for !== null || item.schedule_source === 'hold') return deny('This video already has a time, or was taken off the schedule');
+      if (item.state !== 'pending' && !AUTO_SLOTTABLE.has(item.state)) return deny(`A ${item.state} video can't be given a time`);
+      if (!isReachableSlot(event.at, ctx.now)) return deny('Times must be at least 30 minutes away');
+      return ok({
+        scheduled_for: new Date(event.at).toISOString(),
+        schedule_source: 'auto',
+        ...(item.youtube_video_id !== null ? { remote_sync: 'pending' as const } : {})
+      });
+
+    case 'unschedule':
+      // Back to no time, not kept off: unlike taking it off the schedule, it can be given a time again.
+      if (item.scheduled_for === null) return deny('This video has no time to take away');
+      return applyScheduleChange(item, { scheduled_for: null, schedule_source: null });
 
     case 'edit_metadata':
       if (item.state === 'uploading') return deny('Wait for the upload to finish before editing');

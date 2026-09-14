@@ -19,6 +19,7 @@ import type { ListeningStatus } from './listening';
 import type { HeardDTO } from './transcript';
 import type { PlatformPostDTO, PreparedFileDTO } from './platformPosts';
 import type { Platform } from './queue';
+import type { FillPlan } from './fillSchedule';
 
 /** Failures are values, not thrown errors: Electron turns a rejection into an unreadable string. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
@@ -128,6 +129,12 @@ export interface ShortStackApi {
   queueReject(ids: number[]): Promise<Result<QueueItemDTO[]>>;
   queueRestore(ids: number[]): Promise<Result<QueueItemDTO[]>>;
   queueSchedule(id: number, publishAt: string): Promise<Result<QueueItemDTO>>;
+  /** What Fill the calendar would do right now. Writes nothing. */
+  queueFillPreview(includeUnapproved: boolean): Promise<Result<FillPlan>>;
+  /** Gives every video without a time one from the daily schedule. Approves and uploads nothing. */
+  queueFill(includeUnapproved: boolean): Promise<Result<{ filled: Array<{ id: number; at: string }>; refused: number }>>;
+  /** Takes back the times a fill gave, where they have not been moved since. */
+  queueUndoFill(entries: Array<{ id: number; at: string }>): Promise<Result<number>>;
   queueHold(id: number): Promise<Result<QueueItemDTO>>;
   queueCancelUpload(id: number): Promise<Result<QueueItemDTO>>;
   queueLinkVideo(id: number, urlOrId: string): Promise<Result<QueueItemDTO>>;
@@ -271,6 +278,9 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'queueReject',
   'queueRestore',
   'queueSchedule',
+  'queueFillPreview',
+  'queueFill',
+  'queueUndoFill',
   'queueHold',
   'queueCancelUpload',
   'queueLinkVideo',

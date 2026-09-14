@@ -43,6 +43,7 @@ import { isOtherPlatform, parsePostLink, type OtherPlatform, type PostEvent } fr
 import { PLATFORMS, type Platform } from '../shared/queue';
 import { findTools, renderForPlatforms, renderPath } from './media/renderRunner';
 import { setQueuePlatforms } from './db/queueRepo';
+import { applyFill, previewFill, undoFill } from './scheduler/fill';
 
 export interface IpcContext {
   db: Database.Database;
@@ -244,6 +245,31 @@ export function registerIpcHandlers(context: IpcContext): void {
     queueSchedule: async (id, publishAt) => {
       if (typeof publishAt !== 'string' || !Number.isFinite(Date.parse(publishAt))) return fail('invalid', 'That is not a valid time');
       return applyToOne(id, { type: 'schedule', at: publishAt });
+    },
+    queueFillPreview: async (includeUnapproved) => {
+      if (typeof includeUnapproved !== 'boolean') return fail('invalid', 'Expected yes or no');
+      return ok(previewFill(db, includeUnapproved, new Date()));
+    },
+    queueFill: async (includeUnapproved) => {
+      if (typeof includeUnapproved !== 'boolean') return fail('invalid', 'Expected yes or no');
+      const result = applyFill(db, includeUnapproved, eventContext());
+      if (result.filled.length > 0) {
+        changed();
+        void engine.kick();
+      }
+      return ok(result);
+    },
+    queueUndoFill: async (entries) => {
+      if (
+        !Array.isArray(entries) ||
+        entries.length > 1000 ||
+        entries.some((entry) => asId(entry?.id) === null || typeof entry?.at !== 'string' || !Number.isFinite(Date.parse(entry.at)))
+      ) {
+        return fail('invalid', 'Those times are not valid');
+      }
+      const undone = undoFill(db, entries, eventContext());
+      if (undone > 0) changed();
+      return ok(undone);
     },
     queueHold: async (id) => applyToOne(id, { type: 'hold' }),
     queueCancelUpload: async (id) => applyToOne(id, { type: 'upload_cancelled' }),

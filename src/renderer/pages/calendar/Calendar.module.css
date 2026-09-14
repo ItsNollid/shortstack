@@ -111,3 +111,17 @@
   font-size: var(--text-sm);
 }
 .legendItem { align-items: center; display: inline-flex; gap: 6px; }
+
+/* Fill the calendar */
+.fillText { color: var(--text-muted); font-size: var(--text-sm); }
+.fillSummary { font-size: var(--text-md); }
+.fillOption { display: flex; align-items: flex-start; gap: var(--space-2); cursor: pointer; }
+.fillOption input { margin: 3px 0 0; width: 16px; height: 16px; flex: none; }
+.fillHint { display: block; color: var(--text-faint); font-size: var(--text-sm); }
+.fillList { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-2); padding-right: var(--space-1); }
+.fillDayGroup { display: flex; flex-direction: column; gap: 2px; }
+.fillDay { font-size: var(--text-sm); font-weight: 500; color: var(--text-muted); }
+.fillRow { display: grid; grid-template-columns: 5.5em minmax(0, 1fr) auto; gap: var(--space-2); align-items: baseline; font-size: var(--text-sm); }
+.fillTime { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.fillTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fillTag { font-size: 11px; color: var(--amber, #f5b94a); white-space: nowrap; }
