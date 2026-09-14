@@ -18,6 +18,7 @@ import { descriptionProblem, tagsProblem, titleProblem, type QueueMetadataPatch 
 import { Banner, Button, Select, Switch, TagInput, TextArea, TextField } from '../components/ui';
 import { DescriptionCheck } from '../components/DescriptionCheck';
 import { GameField } from '../components/GameField';
+import { ScreenCheck } from '../components/ScreenCheck';
 import { useAppStatus } from '../app/status';
 import { useApiMutation, useApiQuery } from '../hooks/useApi';
 import { AiAssistPanel, type AiField } from './AiAssistPanel';
@@ -187,6 +188,7 @@ export function VideoDetails({ onApprove }: { onApprove: (item: QueueItemDTO) =>
             counterOver={charCount(draft.title) > TITLE_MAX_CHARS}
             problem={problems.title}
           />
+          <ScreenCheck queueId={loaded.id} title={draft.title} />
 
           <DescriptionCheck
             key={loaded.id}

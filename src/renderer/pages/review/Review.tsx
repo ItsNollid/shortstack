@@ -21,6 +21,7 @@ import { VideoPreview } from '../../components/VideoPreview';
 import { Banner, Button, EmptyState, Select, StatusPill, TagInput, TextArea, TextField } from '../../components/ui';
 import { DescriptionCheck } from '../../components/DescriptionCheck';
 import { GameField } from '../../components/GameField';
+import { ScreenCheck } from '../../components/ScreenCheck';
 import { useRequestApproval } from '../../app/approval';
 import { useAppStatus } from '../../app/status';
 import { useToast } from '../../app/toast';
@@ -259,6 +260,8 @@ export function Review(): React.JSX.Element {
               counterOver={charCount(draft.title) > TITLE_MAX_CHARS}
             />
           </div>
+          {/* Review has no panel of what the model saw, so the opening is mentioned here as well. */}
+          <ScreenCheck queueId={item.id} title={draft.title} withHook />
 
           <DescriptionCheck
             key={item.id}
@@ -285,7 +288,7 @@ export function Review(): React.JSX.Element {
             </div>
           </DescriptionCheck>
 
-<GameField queueId={item.id} value={item.game} />
+          <GameField queueId={item.id} value={item.game} />
           <SourceField queueId={item.id} title={item.source_title} url={item.source_url} />
 
           <TagInput

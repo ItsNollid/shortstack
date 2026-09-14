@@ -174,7 +174,7 @@ export interface ShortStackApi {
   aiGenerate(queueId: number): Promise<Result<MetadataSuggestionDTO>>;
   /** Loads a model and asks it one question, so a choice can be checked before it is relied on. */
   aiTest(model: string): Promise<Result<null>>;
-  /** What the local model saw in a video's stills last time, with the cover, opening and game drawn from it. */
+  /** What the local model saw in a video's stills last time, with the cover and the opening drawn from it. */
   videoReading(queueId: number): Promise<Result<VideoReport | null>>;
   /** Has the model look at each still now. Seconds per still, so only ever when asked. */
   videoLook(queueId: number): Promise<Result<VideoReport>>;

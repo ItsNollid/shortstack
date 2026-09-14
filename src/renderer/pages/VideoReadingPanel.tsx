@@ -1,35 +1,14 @@
 import React from 'react';
 import { Eye } from 'lucide-react';
 import type { AiStatus, Result } from '../../shared/ipc';
-import { COVER_SCENES, clipTime, type Scene, type StillReading, type VideoReport } from '../../shared/videoReading';
+import { SCENE_LABELS, SCENE_NOUNS } from '../../shared/sceneCopy';
+import { COVER_SCENES, clipTime, type StillReading, type VideoReport } from '../../shared/videoReading';
 import { Banner, Button } from '../components/ui';
 import { useApiMutation, useApiQuery } from '../hooks/useApi';
 import { stillUrl, useVideoReport } from '../hooks/useVideoReport';
 import styles from './VideoReadingPanel.module.css';
 
 const readAi = (): Promise<Result<AiStatus>> => window.api.aiStatus();
-
-const SCENE_LABELS: Record<Scene, string> = {
-  gameplay: 'Gameplay',
-  menu: 'Menu',
-  lobby: 'Lobby',
-  loading: 'Loading screen',
-  black: 'Black screen',
-  face: 'Face cam',
-  text: 'Text',
-  other: 'Other'
-};
-
-const SCENE_NOUNS: Record<Scene, string> = {
-  gameplay: 'gameplay',
-  menu: 'a menu',
-  lobby: 'a lobby',
-  loading: 'a loading screen',
-  black: 'a black screen',
-  face: 'a face cam',
-  text: 'text',
-  other: 'something else'
-};
 
 const byTime = (a: StillReading, b: StillReading): number => (a.time ?? Number.MAX_VALUE) - (b.time ?? Number.MAX_VALUE);
 
@@ -50,7 +29,7 @@ export function VideoReadingPanel({ queueId }: { queueId: number }): React.JSX.E
     ? `${ai.data === null ? 'Checking for a local model…' : ai.data.message}. Looking is optional; everything works without it.`
     : !canSee
       ? 'Looking at a video needs a model that can see images, such as qwen3-vl:8b.'
-      : 'The model describes each still from the video in turn, usually a second or two each. ShortStack then picks a cover frame and checks whether anything happens in the first second.';
+      : 'The model describes each still from the video in turn, usually a second or two each. ShortStack then picks a cover frame, checks whether anything happens in the first second, and whether the title promises play the clip does not show.';
 
   return (
     <section className={styles.panel} aria-label="What the model sees">
