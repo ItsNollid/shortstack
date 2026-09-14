@@ -15,6 +15,7 @@ import {
 } from '../../shared/queue';
 import type { ActivityEntryDTO, QueueItemDTO, UploadDTO, VideoDTO } from '../../shared/dto';
 import type { QueueStateFields } from '../domain/queueState';
+import { isTitleAngle } from '../../shared/titleAngles';
 
 export type SqlValue = string | number | null | Buffer;
 
@@ -102,6 +103,7 @@ export function toQueueItemDTO(row: Record<string, unknown>): QueueItemDTO {
     source_url: asNullableText(row.source_url),
     ai_drafted_at: asNullableText(row.ai_drafted_at),
     metadata_edited_at: asNullableText(row.metadata_edited_at),
+    title_angle: isTitleAngle(row.title_angle) ? row.title_angle : null,
     file_size: asNullableNumber(row.file_size),
     duration_s: asNullableNumber(row.duration_s),
     width: asNullableNumber(row.width),

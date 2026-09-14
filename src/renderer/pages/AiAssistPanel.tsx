@@ -1,6 +1,7 @@
 import React from 'react';
 import { Sparkles } from 'lucide-react';
 import type { AiStatus, MetadataSuggestionDTO, Result } from '../../shared/ipc';
+import { ANGLE_LABELS, type TitleAngle } from '../../shared/titleAngles';
 import { Banner, Button } from '../components/ui';
 import { useApiMutation, useApiQuery } from '../hooks/useApi';
 import styles from './AiAssistPanel.module.css';
@@ -10,30 +11,54 @@ export type AiField = 'title' | 'description' | 'tags';
 export interface AiAssistPanelProps {
   queueId: number;
   current: { title: string; description: string; tags: string[] };
-  onAccept: (field: AiField, value: string | string[]) => void;
+  /** A title taken from the offers comes with its kind, so the kind can be remembered with it. */
+  onAccept: (field: AiField, value: string | string[], angle?: TitleAngle) => void;
   disabled?: boolean;
 }
 
 const readAi = (): Promise<Result<AiStatus>> => window.api.aiStatus();
 
 interface Row {
+  key: string;
   field: AiField;
   label: string;
   suggested: string;
   value: string | string[];
+  angle?: TitleAngle;
   unchanged: boolean;
+}
+
+/** One row per kind of title when the model offered them, otherwise the single title as before. */
+function titleRows(suggestion: MetadataSuggestionDTO, current: AiAssistPanelProps['current']): Row[] {
+  const options = suggestion.titleOptions ?? [];
+  if (options.length === 0) {
+    return [
+      {
+        key: 'title',
+        field: 'title',
+        label: 'Title',
+        suggested: suggestion.title,
+        value: suggestion.title,
+        unchanged: suggestion.title === current.title
+      }
+    ];
+  }
+  return options.map((option) => ({
+    key: `title-${option.angle}`,
+    field: 'title',
+    label: `Title · ${ANGLE_LABELS[option.angle]}`,
+    suggested: option.title,
+    value: option.title,
+    angle: option.angle,
+    unchanged: option.title === current.title
+  }));
 }
 
 function rows(suggestion: MetadataSuggestionDTO, current: AiAssistPanelProps['current']): Row[] {
   const all: Row[] = [
+    ...titleRows(suggestion, current),
     {
-      field: 'title',
-      label: 'Title',
-      suggested: suggestion.title,
-      value: suggestion.title,
-      unchanged: suggestion.title === current.title
-    },
-    {
+      key: 'description',
       field: 'description',
       label: 'Description',
       suggested: suggestion.description,
@@ -41,6 +66,7 @@ function rows(suggestion: MetadataSuggestionDTO, current: AiAssistPanelProps['cu
       unchanged: suggestion.description === current.description
     },
     {
+      key: 'tags',
       field: 'tags',
       label: 'Tags',
       suggested: suggestion.tags.join(', '),
@@ -59,9 +85,10 @@ export function AiAssistPanel({ queueId, current, onAccept, disabled }: AiAssist
 
   const running = ai.data?.running === true && ai.data.models.length > 0;
   const suggestion = generate.data;
+  const offersKinds = (suggestion?.titleOptions ?? []).length > 1;
 
   return (
-    <section className={styles.panel}>
+    <section className={styles.panel} aria-label="Suggested details">
       <div className={styles.head}>
         <Sparkles size={16} />
         <span className={styles.title}>Suggested details</span>
@@ -87,9 +114,16 @@ export function AiAssistPanel({ queueId, current, onAccept, disabled }: AiAssist
         </Banner>
       )}
 
+      {offersKinds && (
+        <div className={styles.status}>
+          A title of each kind. Whichever you use is remembered, so Analytics can say which kind works once enough are
+          published.
+        </div>
+      )}
+
       {suggestion !== null &&
         rows(suggestion, current).map((row) => (
-          <div key={row.field} className={styles.suggestion}>
+          <div key={row.key} className={styles.suggestion} role="group" aria-label={row.label}>
             <div className={styles.body}>
               <div className={styles.field}>{row.label}</div>
               <div className={styles.text}>{row.suggested}</div>
@@ -97,7 +131,7 @@ export function AiAssistPanel({ queueId, current, onAccept, disabled }: AiAssist
             {row.unchanged ? (
               <span className={styles.same}>Already used</span>
             ) : (
-              <Button size="small" disabled={disabled === true} onClick={() => onAccept(row.field, row.value)}>
+              <Button size="small" disabled={disabled === true} onClick={() => onAccept(row.field, row.value, row.angle)}>
                 Use this
               </Button>
             )}

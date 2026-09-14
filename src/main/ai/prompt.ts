@@ -3,6 +3,7 @@
 // Everything here exists to replace guessing with evidence.
 import { tagVocabulary, withoutOneOffTags, type TagVocabulary } from '../../shared/channelTags';
 import type { PastUpload } from '../../shared/pastUploads';
+import { ANGLE_BRIEFS, TITLE_ANGLES } from '../../shared/titleAngles';
 
 export interface VideoFacts {
   /** The long video this Short was cut from, when the person has said. */
@@ -121,7 +122,7 @@ export function buildPrompt(input: PromptInput): string {
         ]
       : []),
     '--- What to write ---',
-    'Title: under 100 characters. Same voice as the examples. No surrounding quotes, no "Title:" prefix.',
+    `Titles: three, one of each kind — ${TITLE_ANGLES.map((angle) => `"${angle}": ${ANGLE_BRIEFS[angle]}`).join('; ')}. Each under 100 characters, in the same voice as the examples, with no surrounding quotes and no "Title:" prefix. Make the three genuinely different, not one title reworded.`,
     // No description. On this channel it is a block of hashtags for search and nothing else, and
     // asked to write one the model copied old hashtags, invented round numbers or wrote "#gaming".
     // It is assembled in code from the game, these topics and the channel's habits instead.
@@ -130,11 +131,12 @@ export function buildPrompt(input: PromptInput): string {
     // friend's gamertag as topics and tags. Visible, yes; searched for, never; and not ours to use.
     'Never use a name read off the screen — player names, gamertags, usernames, channel names, or anything typed in chat. They are visible, but nobody searches for them, and they belong to other people. This applies to topics and tags alike.',
     ...((input.blockedNames ?? []).length > 0
-      ? [`In particular, never use any of these names, in the title, the topics or the tags: ${(input.blockedNames ?? []).join(', ')}.`]
+      ? [`In particular, never use any of these names, in the titles, the topics or the tags: ${(input.blockedNames ?? []).join(', ')}.`]
       : []),
     'Tags: 10 to 20 search phrases someone would actually type. Specific beats broad: name the game and the mode rather than "gaming".',
     'Do not invent facts you cannot see: no round numbers, scores or map names unless they are on screen. If you are unsure which game it is, describe what is happening instead of naming the wrong one.',
     '',
-    'Reply with only a JSON object with the keys "title", "topics" and "tags", where "topics" is an array of 3 to 6 strings and "tags" is an array of at least 10 strings. No other text.'
+    // Measured: described in words, llama3.2 sent one title with the kind "0" in two replies of three.
+    'Reply with only a JSON object shaped like {"titles": [{"angle": "reaction", "title": "..."}, {"angle": "play", "title": "..."}, {"angle": "joke", "title": "..."}], "topics": ["..."], "tags": ["..."]}, using exactly those three angle names, with 3 to 6 topics and at least 10 tags. No other text.'
   ].join('\n');
 }

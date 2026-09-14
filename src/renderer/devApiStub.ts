@@ -34,6 +34,7 @@ const video = (over: Partial<QueueItemDTO> & Pick<QueueItemDTO, 'id' | 'title' |
   source_url: null,
   ai_drafted_at: null,
   metadata_edited_at: null,
+  title_angle: null,
   upload_session_uri: null,
   upload_bytes_confirmed: 0,
   attempts: 0,

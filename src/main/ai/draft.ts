@@ -3,7 +3,7 @@
 // same video, which would be baffling to anyone using both.
 import type Database from 'better-sqlite3';
 import { findModel } from '../../shared/aiModels';
-import { parseBrief, writingFacts } from '../../shared/insights';
+import { favouredAngle, parseBrief, writingFacts } from '../../shared/insights';
 import type { PastUpload } from '../../shared/pastUploads';
 import { readActiveChannel } from '../db/channelRepo';
 import { getQueueItem } from '../db/queueRepo';
@@ -13,9 +13,10 @@ import { readThumbnail } from '../media/thumbnails';
 import { tagVocabulary } from '../../shared/channelTags';
 import { hashtagNames, mentionedIn } from '../../shared/blockedNames';
 import { buildHashtagBlock, hashtagDescription } from '../../shared/hashtags';
-import type { MetadataSuggestion } from './metadataSuggestion';
+import type { MetadataSuggestion, TitleOption } from './metadataSuggestion';
 import { generateMetadata, listModels, type AiResult } from './ollamaClient';
 import { buildTags } from '../../shared/tags';
+import { orderAngles } from '../../shared/titleAngles';
 
 export interface DraftDeps {
   db: Database.Database;
@@ -127,8 +128,18 @@ export async function draftFor(deps: DraftDeps, queueId: number): Promise<AiResu
   // Built like the description: the game and this clip first, then what the model offered, once anything
   // generic, about another game or naming someone is taken out.
   const tags = buildTags({ game: item.game, topics, modelTags: suggestion.value.tags, names });
-  // A title is a sentence, and cutting a name out of one leaves it broken, so a title that names
-  // someone is not used at all: the video keeps the title it already had.
-  const title = mentionedIn(suggestion.value.title, names) ? item.title : suggestion.value.title;
-  return { ok: true, value: { ...suggestion.value, title, topics, tags, description: hashtagDescription(block) } };
+  // A title is a sentence, and cutting a name out of one leaves it broken, so an offer that names someone
+  // is left out whole. The rest go in the order this channel's numbers favour, and the first is the title;
+  // if every offer named someone, the video keeps the title it already had.
+  const offered = suggestion.value.titleOptions ?? [];
+  const titleOptions = orderAngles(favouredAngle(parseBrief(settings.insight_findings)))
+    .map((angle) => offered.find((option) => option.angle === angle))
+    .filter((option): option is TitleOption => option !== undefined && !mentionedIn(option.title, names));
+  const single = suggestion.value.title === '' || mentionedIn(suggestion.value.title, names) ? item.title : suggestion.value.title;
+  const title = titleOptions[0]?.title ?? (offered.length > 0 ? item.title : single);
+  const titleAngle = titleOptions[0]?.angle ?? null;
+  return {
+    ok: true,
+    value: { ...suggestion.value, title, titleOptions, titleAngle, topics, tags, description: hashtagDescription(block) }
+  };
 }

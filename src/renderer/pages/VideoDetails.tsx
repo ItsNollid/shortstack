@@ -27,6 +27,7 @@ import { AssistedUploadPanel } from './AssistedUploadPanel';
 import styles from './VideoDetails.module.css';
 import { VideoSidePanel } from './VideoSidePanel';
 import { SourceField } from '../components/SourceField';
+import { keepsAngle, type TitleAngle } from '../../shared/titleAngles';
 
 interface Draft {
   title: string;
@@ -36,6 +37,7 @@ interface Draft {
   privacy: Privacy;
   notify_subscribers: boolean;
   made_for_kids: boolean;
+  title_angle: TitleAngle | null;
 }
 
 const draftOf = (item: QueueItemDTO): Draft => ({
@@ -45,7 +47,8 @@ const draftOf = (item: QueueItemDTO): Draft => ({
   category_id: item.category_id === '' ? DEFAULT_CATEGORY_ID : item.category_id,
   privacy: item.privacy,
   notify_subscribers: item.notify_subscribers,
-  made_for_kids: item.made_for_kids
+  made_for_kids: item.made_for_kids,
+  title_angle: item.title_angle
 });
 
 const sameDraft = (a: Draft, b: Draft): boolean =>
@@ -55,6 +58,7 @@ const sameDraft = (a: Draft, b: Draft): boolean =>
   a.privacy === b.privacy &&
   a.notify_subscribers === b.notify_subscribers &&
   a.made_for_kids === b.made_for_kids &&
+  a.title_angle === b.title_angle &&
   a.tags.length === b.tags.length &&
   a.tags.every((tag, index) => tag === b.tags[index]);
 
@@ -71,6 +75,8 @@ export function VideoDetails({ onApprove }: { onApprove: (item: QueueItemDTO) =>
   const loaded = item.data;
   const [draft, setDraft] = useState<Draft | null>(null);
   const [baseline, setBaseline] = useState<QueueItemDTO | null>(null);
+  // The offer a kind of title was taken from, for the video it was taken on.
+  const [angleTitle, setAngleTitle] = useState<{ id: number; title: string } | null>(null);
 
   // Adopt fresh server data only while there is nothing unsaved to lose; otherwise say so and let
   // the user decide, rather than silently overwriting what they typed.
@@ -121,9 +127,18 @@ export function VideoDetails({ onApprove }: { onApprove: (item: QueueItemDTO) =>
   const blocked = loaded.state === 'uploading';
   const invalid = problems.title !== null || problems.description !== null || problems.tags !== null;
   const set = <K extends keyof Draft>(key: K, value: Draft[K]): void => setDraft({ ...draft, [key]: value });
-  const acceptSuggestion = (field: AiField, value: string | string[]): void => {
+  // The title the recorded kind belongs to: the offer that was taken here, or else the saved title.
+  const angleSource = angleTitle !== null && angleTitle.id === loaded.id ? angleTitle.title : baseline.title;
+  // Typing keeps the kind only while the title is still recognisably that one.
+  const angleAfterTyping = (value: string): TitleAngle | null =>
+    draft.title_angle !== null && keepsAngle(angleSource, value) ? draft.title_angle : null;
+  const acceptSuggestion = (field: AiField, value: string | string[], angle?: TitleAngle): void => {
     if (field === 'tags' && Array.isArray(value)) set('tags', value);
-    else if (field !== 'tags' && typeof value === 'string') set(field, value);
+    else if (field === 'title' && typeof value === 'string') {
+      // A title taken from the offers carries its kind, and later typing is measured against it.
+      setAngleTitle({ id: loaded.id, title: value });
+      setDraft({ ...draft, title: value, title_angle: angle ?? null });
+    } else if (field !== 'tags' && typeof value === 'string') set(field, value);
   };
 
   const assisted =
@@ -182,7 +197,7 @@ export function VideoDetails({ onApprove }: { onApprove: (item: QueueItemDTO) =>
           <TextField
             label="Title"
             value={draft.title}
-            onChange={(value) => set('title', value)}
+            onChange={(value) => setDraft({ ...draft, title: value, title_angle: angleAfterTyping(value) })}
             disabled={blocked}
             counter={`${charCount(draft.title)} / ${TITLE_MAX_CHARS}`}
             counterOver={charCount(draft.title) > TITLE_MAX_CHARS}
@@ -268,6 +283,7 @@ export function VideoDetails({ onApprove }: { onApprove: (item: QueueItemDTO) =>
                 onClick={() => {
                   setBaseline(loaded);
                   setDraft(draftOf(loaded));
+                  setAngleTitle(null);
                 }}
               >
                 Discard

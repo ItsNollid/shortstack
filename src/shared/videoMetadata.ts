@@ -1,6 +1,7 @@
 // Validation for the metadata a user can edit on a queue item, using YouTube's real limits.
 import { PLATFORMS, PRIVACIES, type Platform, type Privacy } from './queue';
 import { DESCRIPTION_MAX_BYTES, TAGS_MAX_CHARS, TITLE_MAX_CHARS, charCount, tagsCharCount, utf8Bytes } from './settings';
+import { isTitleAngle, type TitleAngle } from './titleAngles';
 
 export interface QueueMetadataPatch {
   title?: string;
@@ -11,6 +12,8 @@ export interface QueueMetadataPatch {
   notify_subscribers?: boolean;
   made_for_kids?: boolean;
   platforms?: Platform[];
+  /** Which kind of suggested title the title is. Null when it is not one. */
+  title_angle?: TitleAngle | null;
 }
 
 export const EDITABLE_METADATA_FIELDS: ReadonlyArray<keyof QueueMetadataPatch> = [
@@ -21,7 +24,8 @@ export const EDITABLE_METADATA_FIELDS: ReadonlyArray<keyof QueueMetadataPatch> =
   'privacy',
   'notify_subscribers',
   'made_for_kids',
-  'platforms'
+  'platforms',
+  'title_angle'
 ];
 
 const ANGLE_BRACKETS = /[<>]/;
@@ -72,6 +76,9 @@ export function validateMetadataPatch(patch: QueueMetadataPatch): string | null 
       return 'Pick platforms from the supported list';
     }
     if (!patch.platforms.includes('youtube')) return 'YouTube is the only platform ShortStack can upload to right now';
+  }
+  if (patch.title_angle !== undefined && patch.title_angle !== null && !isTitleAngle(patch.title_angle)) {
+    return 'That is not a kind of title ShortStack knows';
   }
   return null;
 }

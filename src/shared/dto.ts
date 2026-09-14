@@ -2,6 +2,7 @@
 // types are real: booleans are booleans and JSON columns arrive parsed.
 import type { AttentionCode, Platform, Privacy, QueueState, RemoteSync, ScheduleSource } from './queue';
 import type { PostingKind } from './rotation';
+import type { TitleAngle } from './titleAngles';
 
 export interface QueueItemDTO {
   id: number;
@@ -57,6 +58,8 @@ export interface QueueItemDTO {
   ai_drafted_at: string | null;
   /** When a person last changed them. Null means nobody has, so drafting is free to write here. */
   metadata_edited_at: string | null;
+  /** Which kind of suggested title this posting uses. Null for a title written by hand. */
+  title_angle: TitleAngle | null;
 }
 
 export interface VideoDTO {

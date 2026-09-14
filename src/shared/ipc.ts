@@ -14,6 +14,7 @@ import type { ActivityEntryDTO, QueueItemDTO, UploadDTO } from './dto';
 import type { AppSettings, IgnoredSetting } from './settings';
 import type { QueueMetadataPatch } from './videoMetadata';
 import type { VideoReport } from './videoReading';
+import type { TitleAngle } from './titleAngles';
 
 /** Failures are values, not thrown errors: Electron turns a rejection into an unreadable string. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
@@ -84,6 +85,10 @@ export interface MetadataSuggestionDTO {
   title: string;
   description: string;
   tags: string[];
+  /** A title of each kind, when the model offered them, in the order this channel favours. */
+  titleOptions?: Array<{ angle: TitleAngle; title: string }>;
+  /** The kind the title above is, when it is one of those. */
+  titleAngle?: TitleAngle | null;
 }
 
 export const APP_EVENTS = [

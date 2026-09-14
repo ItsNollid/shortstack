@@ -11,6 +11,7 @@
 // on two videos.
 
 import { detectGame } from './games';
+import { ANGLE_NOUNS, TITLE_ANGLES, isTitleAngle, type TitleAngle } from './titleAngles';
 
 export interface VideoStat {
   videoId: string;
@@ -24,6 +25,8 @@ export interface VideoStat {
   averageViewPercentage: number;
   likes: number;
   subscribersGained: number;
+  /** The kind of suggested title it went out under, from ShortStack's own records. Absent or null when none was. */
+  titleAngle?: TitleAngle | null;
 }
 
 export type Confidence = 'strong' | 'weak' | 'insufficient';
@@ -36,6 +39,8 @@ export interface Fact {
   /** How many videos this rests on. */
   sampleSize: number;
   confidence: Confidence;
+  /** The group that came out ahead by enough to act on, for code to use. The statement is for people. */
+  leader?: string;
 }
 
 /** Below this, a comparison is noise. Two videos beating three others is not a finding. */
@@ -461,6 +466,58 @@ export function cadenceFact(videos: readonly VideoStat[]): Fact {
   };
 }
 
+/**
+ * Which kind of title does best, among videos that went out under one the local model offered. Only
+ * those count: a title written by hand has no recorded kind, and having the model guess one afterwards
+ * would be the model marking its own homework.
+ */
+export function titleAngleFact(videos: readonly VideoStat[]): Fact {
+  const byAngle = new Map<TitleAngle, VideoStat[]>();
+  for (const video of videos) {
+    if (video.titleAngle === undefined || video.titleAngle === null) continue;
+    byAngle.set(video.titleAngle, [...(byAngle.get(video.titleAngle) ?? []), video]);
+  }
+  const counted = [...byAngle.values()].reduce((sum, list) => sum + list.length, 0);
+  const usable = [...byAngle.entries()].filter(([, list]) => list.length >= MIN_PER_GROUP);
+
+  if (usable.length < 2) {
+    const tally = TITLE_ANGLES.map((angle) => `${byAngle.get(angle)?.length ?? 0} ${angle}`).join(', ');
+    return {
+      id: 'title-angle',
+      // Kept short: it goes into the prompt for advice along with every other finding still missing.
+      statement:
+        counted === 0
+          ? 'No published video went out under a suggested title yet.'
+          : `Too few videos under each kind of suggested title to compare: ${tally}; each kind needs ${MIN_PER_GROUP}.`,
+      sampleSize: counted,
+      confidence: 'insufficient'
+    };
+  }
+
+  const ranked = usable
+    .map(([angle, list]) => ({ angle, views: median(list.map((video) => video.views)), count: list.length }))
+    .sort((left, right) => right.views - left.views);
+  const best = ranked[0] as (typeof ranked)[number];
+  const next = ranked[1] as (typeof ranked)[number];
+  const lift = next.views === 0 ? 0 : (best.views - next.views) / next.views;
+  const others = ranked
+    .slice(1)
+    .map((entry) => `${Math.round(entry.views)} for titles about ${ANGLE_NOUNS[entry.angle]} (${entry.count} videos)`)
+    .join(' and ');
+  const confidence = confidenceFor(Math.min(...usable.map(([, list]) => list.length)));
+  const lead = `titles about ${ANGLE_NOUNS[best.angle]} get a median of ${Math.round(best.views)} views across ${best.count} videos, against ${others}.`;
+
+  return lift < MEANINGFUL_LIFT
+    ? { id: 'title-angle', statement: `The kind of title makes no real difference yet: ${lead}`, sampleSize: counted, confidence }
+    : {
+        id: 'title-angle',
+        statement: `${lead.charAt(0).toUpperCase()}${lead.slice(1)}`,
+        sampleSize: counted,
+        confidence,
+        leader: best.angle
+      };
+}
+
 /** Everything measurable, in the order a person would want to read it. */
 export function allFacts(videos: readonly VideoStat[]): Fact[] {
   return [
@@ -472,6 +529,7 @@ export function allFacts(videos: readonly VideoStat[]): Fact[] {
     cadenceFact(videos),
     questionTitleFact(videos),
     shoutedTitleFact(videos),
+    titleAngleFact(videos),
     tagFact(videos)
   ];
 }
@@ -497,10 +555,20 @@ export function buildBrief(videos: readonly VideoStat[]): Brief {
 }
 
 /** Findings that bear on what a title or description should look like, rather than when to post. */
-export const WRITING_FACT_IDS: readonly string[] = ['shouted-title', 'question-title', 'tags', 'game'];
+export const WRITING_FACT_IDS: readonly string[] = ['shouted-title', 'question-title', 'title-angle', 'tags', 'game'];
 
 export const writingFacts = (brief: Brief): Fact[] =>
   brief.usable.filter((fact) => WRITING_FACT_IDS.includes(fact.id));
+
+/** The kind of title this channel's numbers favour, when they favour one by enough to act on. */
+export function favouredAngle(brief: Brief | null): TitleAngle | null {
+  const leader = brief?.usable.find((fact) => fact.id === 'title-angle')?.leader;
+  return isTitleAngle(leader) ? leader : null;
+}
+
+/** YouTube's numbers with the kind of title each video went out under, from ShortStack's own records. */
+export const withTitleAngles = (videos: readonly VideoStat[], angles: ReadonlyMap<string, TitleAngle>): VideoStat[] =>
+  videos.map((video) => ({ ...video, titleAngle: angles.get(video.videoId) ?? null }));
 
 /** Reads a cached brief back, tolerating anything that is not one rather than throwing mid-draft. */
 export function parseBrief(raw: string): Brief | null {

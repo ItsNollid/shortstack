@@ -14,7 +14,7 @@ const video = {
 describe('names never to use, in the prompt', () => {
   it('lists them for the model when there are some', () => {
     const prompt = buildPrompt({ video, channelName: 'Nollid', examples: [], hasFrames: true, blockedNames: ['Dr Phuckass', 'xX_Sniper_Xx'] });
-    expect(prompt).toContain('never use any of these names, in the title, the topics or the tags: Dr Phuckass, xX_Sniper_Xx.');
+    expect(prompt).toContain('never use any of these names, in the titles, the topics or the tags: Dr Phuckass, xX_Sniper_Xx.');
   });
 
   it('adds nothing when the list is empty', () => {

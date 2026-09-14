@@ -4,6 +4,7 @@ import type { QueueState, UploadMethod } from '../../shared/queue';
 import { formatDescription, formatTags, formatTitle } from '../../shared/formatting';
 import { formattingRules } from '../../shared/settings';
 import { validateMetadataPatch, type QueueMetadataPatch } from '../../shared/videoMetadata';
+import { isTitleAngle, keepsAngle, type TitleAngle } from '../../shared/titleAngles';
 import { transition, type QueueEvent, type QueueStateFields } from '../domain/queueState';
 import { appendActivity } from './activityRepo';
 import { readSettings } from './settingsRepo';
@@ -44,7 +45,8 @@ const METADATA_COLUMNS: readonly string[] = [
   'privacy',
   'notify_subscribers',
   'made_for_kids',
-  'platforms'
+  'platforms',
+  'title_angle'
 ];
 
 /** Only ever written alongside a metadata write, never on its own. */
@@ -195,7 +197,7 @@ export function recordUploadSession(db: Database.Database, id: number, sessionUr
 }
 
 /** Any of the three: which details the worker may write is the person's choice, not all or nothing. */
-export type DraftedMetadata = Partial<{ title: string; description: string; tags: string[] }>;
+export type DraftedMetadata = Partial<{ title: string; description: string; tags: string[]; titleAngle: TitleAngle | null }>;
 
 /** "Title and tags", "Description" — for the activity record, in the order the fields appear. */
 function draftedWords(fields: readonly string[]): string {
@@ -219,6 +221,8 @@ export function applyDraft(db: Database.Database, id: number, draft: DraftedMeta
   const fields = Object.keys(chosen);
   // Marking a video drafted when nothing was written would stop the worker ever coming back to it.
   if (fields.length === 0) return { ok: false, reason: 'Nothing was chosen for the model to write' };
+  // The kind goes with the title, so a drafted title is counted in Analytics like one picked by hand.
+  if (draft.title !== undefined) chosen.title_angle = draft.titleAngle ?? null;
 
   const patch = formatted(db, chosen);
   const problem = validateMetadataPatch(patch);
@@ -272,6 +276,11 @@ export function updateQueueMetadata(
     if (ctx.expectedUpdatedAt !== undefined && ctx.expectedUpdatedAt !== current) return { ok: false, reason: CONFLICT };
     // Stamped here and nowhere else: this is the one path a person's own edit comes through, and
     // it is what stops the drafting worker from overwriting it later.
+    // A title changed without saying which kind it is — typed in Review, say — keeps its kind only while it
+    // is still recognisably the same title.
+    if (shaped.title !== undefined && shaped.title_angle === undefined && isTitleAngle(row.title_angle)) {
+      shaped.title_angle = keepsAngle(typeof row.title === 'string' ? row.title : '', shaped.title) ? row.title_angle : null;
+    }
     const combined = { ...result.patch, ...shaped, metadata_edited_at: ctx.now.toISOString() } as Record<string, unknown>;
     if (!writePatch(db, id, combined, [...STATE_COLUMNS, ...METADATA_COLUMNS, ...PROVENANCE_COLUMNS], ctx.now, current)) {
       return { ok: false, reason: CONFLICT };
@@ -355,4 +364,14 @@ export function applyRestyle(db: Database.Database, ids: readonly number[], ctx:
     }
   })();
   return { changed, skipped };
+}
+
+/** The kind of title each video on YouTube went out under, where one was recorded, by YouTube video id. */
+export function listTitleAngles(db: Database.Database): Map<string, TitleAngle> {
+  const rows = db
+    .prepare('SELECT youtube_video_id, title_angle FROM queue WHERE youtube_video_id IS NOT NULL AND title_angle IS NOT NULL')
+    .all() as Array<{ youtube_video_id: string; title_angle: unknown }>;
+  const angles = new Map<string, TitleAngle>();
+  for (const row of rows) if (isTitleAngle(row.title_angle)) angles.set(row.youtube_video_id, row.title_angle);
+  return angles;
 }

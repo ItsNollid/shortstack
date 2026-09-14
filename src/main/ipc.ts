@@ -10,7 +10,7 @@ import { parseVideoId } from '../shared/youtubeUrl';
 import { generateMetadata, listModels, testModel } from './ai/ollamaClient';
 import { listActivity } from './db/activityRepo';
 import { clearChannels, readActiveChannel, upsertChannel } from './db/channelRepo';
-import { applyQueueEvent, getQueueItem, listQueueItems, updateQueueMetadata, applyRestyle, previewRestyle } from './db/queueRepo';
+import { applyQueueEvent, getQueueItem, listQueueItems, listTitleAngles, updateQueueMetadata, applyRestyle, previewRestyle } from './db/queueRepo';
 import { readSettings, writeSetting } from './db/settingsRepo';
 import { listUploads } from './db/uploadRepo';
 import type { QueueEvent } from './domain/queueState';
@@ -21,7 +21,7 @@ import { linkNamedSource, listKnownGames, listKnownSources, setVideoGame, setVid
 import { clearPastUploadsCache, draftFor } from './ai/draft';
 import { lookAtVideo, storedReport } from './ai/lookAtVideo';
 import { buildInsightPrompt, sanitizeAdvice } from './ai/insightPrompt';
-import { buildBrief } from '../shared/insights';
+import { buildBrief, withTitleAngles } from '../shared/insights';
 import { moodFor, quotaState, whatIsLeft } from '../shared/quota';
 import { listSpendSince, pruneSpend } from './db/spendRepo';
 import { changeFor, parseAction } from '../shared/channelActions';
@@ -506,7 +506,8 @@ export function registerIpcHandlers(context: IpcContext): void {
       if (!stats.ok) return fail(stats.code ?? 'error', stats.reason);
       if (stats.value === null) return ok(null);
 
-      const brief = buildBrief(stats.value.value);
+      // With the kind of title each video went out under, which only ShortStack knows.
+      const brief = buildBrief(withTitleAngles(stats.value.value, listTitleAngles(db)));
       // Kept so writing a title can use it without two YouTube calls per video.
       writeSetting(db, 'insight_findings', JSON.stringify(brief).slice(0, 8000));
       return ok(brief);
@@ -524,7 +525,7 @@ export function registerIpcHandlers(context: IpcContext): void {
 
       const { settings } = readSettings(db);
       const channel = readActiveChannel(db);
-      const brief = buildBrief(stats.value.value);
+      const brief = buildBrief(withTitleAngles(stats.value.value, listTitleAngles(db)));
       const prompt = buildInsightPrompt({
         brief,
         channelName: channel?.title ?? null,

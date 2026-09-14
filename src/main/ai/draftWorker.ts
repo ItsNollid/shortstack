@@ -86,7 +86,7 @@ export class DraftWorker {
           this.db,
           item.id,
           {
-            ...(chosen.has('title') ? { title: suggestion.value.title } : {}),
+            ...(chosen.has('title') ? { title: suggestion.value.title, titleAngle: suggestion.value.titleAngle ?? null } : {}),
             ...(chosen.has('description') ? { description: suggestion.value.description } : {}),
             ...(chosen.has('tags') ? { tags: suggestion.value.tags } : {})
           },

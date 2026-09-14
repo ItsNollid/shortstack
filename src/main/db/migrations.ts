@@ -532,6 +532,18 @@ const v10VideoReadings: Migration = {
   }
 };
 
+/**
+ * Which kind of suggested title a posting went out under, so Analytics can compare the kinds. On the
+ * posting rather than the video: a re-run can go out under a different title from the first.
+ */
+const v11TitleAngle: Migration = {
+  version: 11,
+  name: 'remember which kind of suggested title a posting uses',
+  up(db) {
+    addColumn(db, 'queue', 'title_angle', 'TEXT');
+  }
+};
+
 export const MIGRATIONS: readonly Migration[] = [
   v1Baseline,
   v2Lifecycle,
@@ -542,7 +554,8 @@ export const MIGRATIONS: readonly Migration[] = [
   v7ApiSpend,
   v8GameGuess,
   v9SourceVideo,
-  v10VideoReadings
+  v10VideoReadings,
+  v11TitleAngle
 ];
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
 

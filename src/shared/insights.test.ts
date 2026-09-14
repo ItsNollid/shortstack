@@ -195,7 +195,7 @@ describe('allFacts', () => {
   it('always answers for every measure, even on an empty channel', () => {
     const facts = allFacts([]);
     expect(facts.map((fact) => fact.id).sort()).toEqual(
-      ['cadence', 'conversion', 'game', 'question-title', 'retention', 'shouted-title', 'tags', 'time-of-day', 'weekday'].sort()
+      ['cadence', 'conversion', 'game', 'question-title', 'retention', 'shouted-title', 'tags', 'time-of-day', 'title-angle', 'weekday'].sort()
     );
     for (const fact of facts) {
       expect(fact.confidence).toBe('insufficient');

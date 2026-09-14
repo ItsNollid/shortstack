@@ -173,7 +173,7 @@ export function createPosting(
     const previous = db
       .prepare(
         `SELECT title, description, tags, category_id, privacy, made_for_kids, platforms, channel_id,
-                ai_drafted_at, metadata_edited_at
+                ai_drafted_at, metadata_edited_at, title_angle
          FROM queue WHERE video_id = ? ORDER BY id DESC LIMIT 1`
       )
       .get(videoId) as Record<string, unknown> | undefined;
@@ -186,8 +186,8 @@ export function createPosting(
         `INSERT INTO queue (
            video_id, channel_id, title, description, tags, category_id, privacy, notify_subscribers,
            made_for_kids, platforms, state, posting_kind, approved, attempts, upload_bytes_confirmed,
-           remote_tombstone, ai_drafted_at, metadata_edited_at, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 0, 0, 0, 0, ?, ?, ?, ?)`
+           remote_tombstone, ai_drafted_at, metadata_edited_at, title_angle, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 0, 0, 0, 0, ?, ?, ?, ?, ?)`
       )
       .run(
         videoId,
@@ -206,6 +206,7 @@ export function createPosting(
         // details someone wrote by hand would look untouched and be drafted over.
         previous.ai_drafted_at ?? null,
         previous.metadata_edited_at ?? null,
+        previous.title_angle ?? null,
         nowIso,
         nowIso
       );
