@@ -63,6 +63,8 @@ export type GatewayResult<T> = { ok: true; value: T } | GatewayFailure;
 export interface YouTubeGateway {
   fetchChannelProfile(): Promise<GatewayResult<ChannelProfile>>;
   fetchVideoStatus(videoId: string): Promise<GatewayResult<VideoStatusSnapshot>>;
+  /** A video's title, for naming a long video from its link. */
+  fetchVideoTitle(videoId: string): Promise<GatewayResult<{ title: string }>>;
   setPublishPlan(videoId: string, plan: { privacyStatus: Privacy; publishAt: string | null }): Promise<GatewayResult<VideoStatusSnapshot>>;
   listRecentUploads(playlistId: string, limit?: number): Promise<GatewayResult<RecentUpload[]>>;
   fetchChannelAnalytics(days: number, now?: Date): Promise<GatewayResult<ChannelAnalytics>>;
@@ -172,6 +174,20 @@ export class HttpYouTubeGateway implements YouTubeGateway {
         rejectionReason: typeof status.rejectionReason === 'string' ? status.rejectionReason : null
       }
     };
+  }
+
+  /** One unit, and it reads private and unlisted videos on this channel, which a public lookup would not. */
+  async fetchVideoTitle(videoId: string): Promise<GatewayResult<{ title: string }>> {
+    const response = await this.request(`/videos?part=snippet&id=${encodeURIComponent(videoId)}`);
+    const body = await response.text();
+    if (!response.ok) return failure(response.status, body, 'Looking the video up');
+
+    const parsed = JSON.parse(body) as { items?: Array<{ snippet?: { title?: unknown } }> };
+    const title = parsed.items?.[0]?.snippet?.title;
+    if (typeof title !== 'string' || title.trim() === '') {
+      return { ok: false, reason: 'YouTube has no video at that link', code: 'not_found', retryable: false };
+    }
+    return { ok: true, value: { title } };
   }
 
   /**
@@ -512,6 +528,10 @@ export class DryRunYouTubeGateway implements YouTubeGateway {
   }
 
   async fetchVideoStatus(): Promise<GatewayResult<VideoStatusSnapshot>> {
+    return this.refusal;
+  }
+
+  async fetchVideoTitle(): Promise<GatewayResult<{ title: string }>> {
     return this.refusal;
   }
 

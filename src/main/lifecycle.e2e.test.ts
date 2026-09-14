@@ -62,7 +62,8 @@ function stubGateway(state: StubState): YouTubeGateway {
     listRecentUploads: async (): Promise<GatewayResult<RecentUpload[]>> => ({ ok: true, value: state.uploads }),
     fetchChannelAnalytics: async () => REFUSED,
     fetchVideoPerformance: async () => ({ ok: false, reason: 'not part of this test', code: null, retryable: false }),
-    listPastUploads: async () => REFUSED
+    listPastUploads: async () => REFUSED,
+    fetchVideoTitle: async () => REFUSED
   };
 }
 

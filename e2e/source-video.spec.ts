@@ -1,4 +1,5 @@
-// The long video a Short was cut from, set on one video and offered, link and all, for the next.
+// The long video a Short was cut from: named for now while it is not up, then linked, which links the
+// whole batch. The test app never talks to YouTube, so a pasted link on its own cannot be named here.
 import { expect, test } from '@playwright/test';
 import Database from 'better-sqlite3';
 import * as path from 'path';
@@ -16,26 +17,49 @@ const storedSource = (userData: string, videoId: number): { source_title: string
   }
 };
 
-const KINO = { source_title: 'Round 50 attempt on Kino', source_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' };
+const NAME = 'Round 50 attempt on Kino';
+const LINK = 'https://youtu.be/EfaSgECW4CY?si=2qmO9qvxR5ijR4P-';
+const URL = 'https://www.youtube.com/watch?v=EfaSgECW4CY';
 
-test('the long video is kept on the Short, and the next one cut from it is offered it with its link', async () => {
+test('Shorts named after a long video that is not up yet are all linked once one of them is', async () => {
   const harness = await launch([{ filename: 'first.mov' }, { filename: 'second.mov' }]);
   try {
     const page = harness.page;
-    await goTo(page, '#/video/1');
-    await page.getByLabel('From long video', { exact: true }).fill('Round 50 attempt on Kino');
-    const link = page.getByLabel('Its YouTube link', { exact: true });
-    await link.fill('https://youtu.be/dQw4w9WgXcQ');
-    await link.blur();
-    await expect.poll(() => storedSource(harness.userData, 1)).toEqual(KINO);
 
-    await goTo(page, '#/video/2');
-    const title = page.getByLabel('From long video', { exact: true });
-    await expect(title).toHaveValue('');
-    await title.fill('Round 50 attempt on Kino');
-    await expect(page.getByLabel('Its YouTube link', { exact: true })).toHaveValue(KINO.source_url);
-    await title.blur();
-    await expect.poll(() => storedSource(harness.userData, 2)).toEqual(KINO);
+    for (const id of [1, 2]) {
+      await goTo(page, `#/video/${id}`);
+      await page.getByRole('button', { name: 'Not on YouTube yet? Name it for now' }).click();
+      const name = page.getByLabel('Name for now', { exact: true });
+      await name.fill(NAME);
+      await name.blur();
+      await expect.poll(() => storedSource(harness.userData, id)).toEqual({ source_title: NAME, source_url: null });
+    }
+
+    await goTo(page, '#/video/1');
+    const link = page.getByLabel('Long video on YouTube', { exact: true });
+    await link.fill(LINK);
+    await link.blur();
+    await expect.poll(() => storedSource(harness.userData, 1)).toEqual({ source_title: NAME, source_url: URL });
+    await expect.poll(() => storedSource(harness.userData, 2)).toEqual({ source_title: NAME, source_url: URL });
+  } finally {
+    await harness.close();
+  }
+});
+
+test('a pasted link with no name, which cannot be looked up, asks for a name instead of failing silently', async () => {
+  const harness = await launch([{ filename: 'first.mov' }]);
+  try {
+    const page = harness.page;
+    await goTo(page, '#/video/1');
+    const link = page.getByLabel('Long video on YouTube', { exact: true });
+    await link.fill(LINK);
+    await link.blur();
+
+    await expect(page.getByText('Name it yourself for now', { exact: false })).toBeVisible();
+    const name = page.getByLabel('Name for now', { exact: true });
+    await name.fill(NAME);
+    await name.blur();
+    await expect.poll(() => storedSource(harness.userData, 1)).toEqual({ source_title: NAME, source_url: URL });
   } finally {
     await harness.close();
   }

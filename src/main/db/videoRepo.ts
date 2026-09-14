@@ -206,3 +206,17 @@ export function listKnownSources(db: Database.Database): SourceVideo[] {
     .all() as Array<{ title: string; url: string | null }>;
   return rows.map((row) => ({ title: row.title, url: row.url ?? null }));
 }
+
+/**
+ * Shorts are often cut before their long video is up, and named by hand until it is. Once one of them
+ * is linked, every Short still carrying one of these names without a link gets the link and the real
+ * title, so the batch stays together. Returns how many were linked.
+ */
+export function linkNamedSource(db: Database.Database, names: readonly string[], source: SourceVideo): number {
+  if (source.url === null) return 0;
+  const keys = [...new Set(names.map((name) => name.trim().toLowerCase()).filter((key) => key !== ''))];
+  const link = db.prepare('UPDATE videos SET source_title = ?, source_url = ? WHERE source_url IS NULL AND lower(trim(source_title)) = ?');
+  let linked = 0;
+  for (const key of keys) linked += link.run(source.title, source.url, key).changes;
+  return linked;
+}

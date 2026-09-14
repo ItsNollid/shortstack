@@ -17,7 +17,7 @@ import type { QueueEvent } from './domain/queueState';
 import { scanFolder } from './files/scanner';
 import type { SchedulerEngine } from './scheduler/engine';
 import { createPosting, markPublishedBefore, setRotationPaused } from './db/rotationRepo';
-import { listKnownGames, listKnownSources, setVideoGame, setVideoSource } from './db/videoRepo';
+import { linkNamedSource, listKnownGames, listKnownSources, setVideoGame, setVideoSource } from './db/videoRepo';
 import { clearPastUploadsCache, draftFor } from './ai/draft';
 import { buildInsightPrompt, sanitizeAdvice } from './ai/insightPrompt';
 import { buildBrief } from '../shared/insights';
@@ -34,7 +34,7 @@ import type { AuthService } from './youtube/authService';
 import type { YouTubeGateway } from './youtube/gateway';
 import { awaitAuthorizationCode } from './youtube/loopbackServer';
 import { REQUIRED_SCOPES, buildAuthUrl, parseClientSecret } from './youtube/oauthFlow';
-import { checkSource } from '../shared/sourceVideo';
+import { resolveSource } from './sources';
 
 export interface IpcContext {
   db: Database.Database;
@@ -313,10 +313,17 @@ export function registerIpcHandlers(context: IpcContext): void {
         if (typeof source !== 'object' || typeof source.title !== 'string' || typeof source.link !== 'string') {
           return fail('invalid', 'That is not a long video');
         }
-        // Checked here as well as in the window: what the renderer sends is not what decides it is valid.
-        const checked = checkSource(source);
-        if (!checked.ok) return fail('invalid', checked.problem);
-        setVideoSource(db, item.video_id, checked.source);
+        // A link is named by YouTube, which already knows the title. Checked here rather than trusted from the window.
+        const resolved = await resolveSource(
+          source,
+          { title: item.source_title, url: item.source_url },
+          listKnownSources(db),
+          (videoId) => context.gateway.fetchVideoTitle(videoId)
+        );
+        if (!resolved.ok) return fail('invalid', resolved.problem);
+        setVideoSource(db, item.video_id, resolved.source);
+        // Shorts named after this long video before it was up are linked along with it.
+        linkNamedSource(db, [item.source_title ?? '', source.title], resolved.source);
       }
       changed();
       const updated = getQueueItem(db, parsed);

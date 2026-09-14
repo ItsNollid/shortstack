@@ -20,6 +20,7 @@ export const gatewayStub = (overrides: Partial<YouTubeGateway> = {}): YouTubeGat
   fetchChannelAnalytics: async () => ({ ok: false, reason: 'not used', code: null, retryable: false }),
   fetchVideoPerformance: async () => ({ ok: false, reason: 'not part of this test', code: null, retryable: false }),
   listPastUploads: async () => ({ ok: false, reason: 'not used', code: null, retryable: false }),
+  fetchVideoTitle: async () => ({ ok: false, reason: 'not used', code: null, retryable: false }),
   ...overrides
 });
 
