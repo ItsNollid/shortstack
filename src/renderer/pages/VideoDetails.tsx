@@ -29,6 +29,7 @@ import { VideoSidePanel } from './VideoSidePanel';
 import { SourceField } from '../components/SourceField';
 import { keepsAngle, type TitleAngle } from '../../shared/titleAngles';
 import { HeardPanel } from './HeardPanel';
+import { PlatformPostsPanel } from './PlatformPostsPanel';
 
 interface Draft {
   title: string;
@@ -185,6 +186,8 @@ export function VideoDetails({ onApprove }: { onApprove: (item: QueueItemDTO) =>
           )}
 
           {assisted && <AssistedUploadPanel item={loaded} />}
+
+          <PlatformPostsPanel item={loaded} />
 
           <AiAssistPanel
             queueId={loaded.id}

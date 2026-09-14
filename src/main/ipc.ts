@@ -38,6 +38,11 @@ import { REQUIRED_SCOPES, buildAuthUrl, parseClientSecret } from './youtube/oaut
 import { resolveSource } from './sources';
 import type { ListeningService } from './listening/service';
 import { checkModelFile } from './listening/install';
+import { applyPlatformPost, listPlatformPosts } from './db/platformPostRepo';
+import { isOtherPlatform, parsePostLink, type OtherPlatform, type PostEvent } from '../shared/platformPosts';
+import { PLATFORMS, type Platform } from '../shared/queue';
+import { findTools, renderForPlatforms, renderPath } from './media/renderRunner';
+import { setQueuePlatforms } from './db/queueRepo';
 
 export interface IpcContext {
   db: Database.Database;
@@ -56,6 +61,8 @@ export interface IpcContext {
   getWindow(): BrowserWindow | null;
   /** Listening to what is said in videos. Absent where the app is run without it, such as in some tests. */
   listening?: ListeningService;
+  /** Where files made for TikTok and Instagram are kept. */
+  rendersDir?: string;
   /** The app's icon follows the connected channel's picture. */
   appIcon: { refresh(avatarUrl: string | null): Promise<boolean>; clear(): Promise<void> };
 }
@@ -72,6 +79,17 @@ const asListeningRequest = (value: unknown): { engine: 'cpu' | 'gpu' } | { model
   if (record.engine === 'cpu' || record.engine === 'gpu') return { engine: record.engine };
   if (typeof record.model === 'string' && record.model.length > 0 && record.model.length <= 64) return { model: record.model };
   return null;
+};
+
+const asPostEvent = (platform: OtherPlatform, value: unknown): PostEvent | null => {
+  if (typeof value !== 'object' || value === null) return null;
+  const record = value as Record<string, unknown>;
+  if (record.type === 'skip' || record.type === 'restore') return { type: record.type };
+  if (record.type !== 'posted') return null;
+  if (record.link === null || record.link === undefined || record.link === '') return { type: 'posted', url: null };
+  if (typeof record.link !== 'string' || record.link.length > 2048) return null;
+  const url = parsePostLink(platform, record.link);
+  return url === null ? null : { type: 'posted', url };
 };
 
 const asIds = (value: unknown): number[] | null => {
@@ -624,6 +642,65 @@ export function registerIpcHandlers(context: IpcContext): void {
 
       const suggestion = await draftFor(draftDeps, parsed);
       return suggestion.ok ? ok(suggestion.value) : fail(suggestion.code, suggestion.reason);
+    },
+    platformPostsList: async (queueId) => {
+      const parsed = asId(queueId);
+      if (parsed === null) return fail('invalid', 'That video id is not valid');
+      const posts = listPlatformPosts(db, parsed);
+      return posts === null ? fail('not_found', 'That video is no longer in the queue') : ok(posts);
+    },
+    platformPostApply: async (queueId, platform, event) => {
+      const parsed = asId(queueId);
+      if (parsed === null) return fail('invalid', 'That video id is not valid');
+      if (!isOtherPlatform(platform)) return fail('invalid', 'That is not a platform ShortStack posts to');
+      // The link is checked here, whatever the screen already checked: the renderer is not what decides it is one.
+      const request = asPostEvent(platform, event);
+      if (request === null) {
+        return fail('invalid', platform === 'tiktok' ? 'That is not a link to a TikTok video' : 'That is not a link to an Instagram reel or post');
+      }
+      const result = applyPlatformPost(db, parsed, platform, request, new Date());
+      if (!result.ok) return fail('refused', result.reason);
+      changed();
+      return ok(result.post);
+    },
+    platformPrepareFile: async (queueId) => {
+      const parsed = asId(queueId);
+      if (parsed === null) return fail('invalid', 'That video id is not valid');
+      const item = getQueueItem(db, parsed);
+      if (item === undefined) return fail('not_found', 'That video is no longer in the queue');
+      if (context.rendersDir === undefined) return fail('unavailable', 'Making files for other platforms is not available in this build');
+      const tools = await findTools();
+      if (tools === null) return fail('missing_tool', 'Making the file needs ffmpeg, and it is not installed anywhere ShortStack can find it');
+      const rendered = await renderForPlatforms({ tools, dir: context.rendersDir }, { videoId: item.video_id, filePath: item.filepath });
+      if (!rendered.ok) return fail('refused', rendered.reason);
+      return ok({ sizeBytes: rendered.info.sizeBytes, reused: rendered.reused, problems: rendered.problems });
+    },
+    platformRevealFile: async (queueId) => {
+      const parsed = asId(queueId);
+      if (parsed === null) return fail('invalid', 'That video id is not valid');
+      const item = getQueueItem(db, parsed);
+      if (item === undefined) return fail('not_found', 'That video is no longer in the queue');
+      if (context.rendersDir === undefined) return fail('unavailable', 'Making files for other platforms is not available in this build');
+      const file = renderPath(context.rendersDir, item.video_id);
+      const made = await fs.access(file).then(
+        () => true,
+        () => false
+      );
+      if (!made) return fail('not_found', 'Make the file first');
+      shell.showItemInFolder(file);
+      return ok(null);
+    },
+    queueSetPlatforms: async (queueId, platforms) => {
+      const parsed = asId(queueId);
+      if (parsed === null) return fail('invalid', 'That video id is not valid');
+      if (!Array.isArray(platforms) || platforms.some((entry) => !(PLATFORMS as readonly unknown[]).includes(entry))) {
+        return fail('invalid', 'Pick platforms from the supported list');
+      }
+      if (!platforms.includes('youtube')) return fail('invalid', 'YouTube is always one of them');
+      const updated = setQueuePlatforms(db, parsed, [...new Set(platforms)] as Platform[], new Date());
+      if (updated === null) return fail('not_found', 'That video is no longer in the queue');
+      changed();
+      return ok(updated);
     },
     videoHeard: async (queueId) => {
       const parsed = asId(queueId);

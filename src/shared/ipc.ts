@@ -17,6 +17,8 @@ import type { VideoReport } from './videoReading';
 import type { TitleAngle } from './titleAngles';
 import type { ListeningStatus } from './listening';
 import type { HeardDTO } from './transcript';
+import type { PlatformPostDTO, PreparedFileDTO } from './platformPosts';
+import type { Platform } from './queue';
 
 /** Failures are values, not thrown errors: Electron turns a rejection into an unreadable string. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
@@ -200,6 +202,20 @@ export interface ShortStackApi {
   /** Picks a whisper.cpp model already on this computer. Null when the person closes the dialog. */
   listeningChooseModelFile(): Promise<Result<string | null>>;
 
+  /** Where a video goes besides YouTube, and what has happened there. */
+  platformPostsList(queueId: number): Promise<Result<PlatformPostDTO[]>>;
+  /** Marks a video as posted to TikTok or Instagram, with its link when given; skips it there; or undoes either. */
+  platformPostApply(
+    queueId: number,
+    platform: 'tiktok' | 'instagram',
+    event: { type: 'posted'; link: string | null } | { type: 'skip' } | { type: 'restore' }
+  ): Promise<Result<PlatformPostDTO>>;
+  /** Makes the file TikTok and Instagram take, or reuses the one made from this file as it is now. */
+  platformPrepareFile(queueId: number): Promise<Result<PreparedFileDTO>>;
+  platformRevealFile(queueId: number): Promise<Result<null>>;
+  /** Which platforms a posting goes to. YouTube is always one of them. */
+  queueSetPlatforms(queueId: number, platforms: Platform[]): Promise<Result<QueueItemDTO>>;
+
   /** What the app knows about newer versions right now, without going and looking. */
   updateStatus(): Promise<Result<UpdateStatus>>;
   /** Goes and looks. Both channels: the release feed, and how far the source has moved. */
@@ -294,6 +310,11 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'listeningCancel',
   'listeningRemove',
   'listeningChooseModelFile',
+  'platformPostsList',
+  'platformPostApply',
+  'platformPrepareFile',
+  'platformRevealFile',
+  'queueSetPlatforms',
   'aiTest',
   'updateStatus',
   'updateCheck',

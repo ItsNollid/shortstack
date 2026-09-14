@@ -54,6 +54,10 @@ export interface AppSettings {
   listen_model: string;
   /** Or a model file already on this computer, which is used instead when set. */
   listen_model_file: string;
+  /** New videos go to TikTok too, posted by the person with ShortStack's help. */
+  post_to_tiktok: boolean;
+  /** New videos go to Instagram too, the same way. */
+  post_to_instagram: boolean;
   /** Names drafting must never use: friends' gamertags, mostly. The channel's own name is always kept out. */
   ai_blocked_names: string[];
 
@@ -289,6 +293,8 @@ export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> 
   listen_engine: oneOf<'auto' | 'cpu' | 'gpu'>('auto', ['auto', 'cpu', 'gpu']),
   listen_model: text('', (value) => (value === '' || MODELS.some((model) => model.id === value) ? null : 'That is not one of the listening models')),
   listen_model_file: text('', (value) => (value === '' || (value.length < 1024 && /\.bin$/i.test(value)) ? null : 'Choose a whisper.cpp model file')),
+  post_to_tiktok: bool(false),
+  post_to_instagram: bool(false),
   ai_blocked_names: stringList([], checkBlockedNames),
 
   insight_goal: oneOf<InsightGoal>('reach_and_subscribers', ['reach_and_subscribers', 'views', 'subscribers', 'watch_time']),

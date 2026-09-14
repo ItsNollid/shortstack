@@ -566,6 +566,28 @@ const v12VideoTranscripts: Migration = {
   }
 };
 
+/**
+ * What went to TikTok and Instagram, per posting: waiting, posted (with its link, when given) or skipped. YouTube's
+ * own state stays on the posting; these sit beside it, one row per platform once something has happened.
+ */
+const v13PlatformPosts: Migration = {
+  version: 13,
+  name: 'keep what was posted to TikTok and Instagram',
+  up(db) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS platform_posts (
+        queue_id INTEGER NOT NULL REFERENCES queue(id) ON DELETE CASCADE,
+        platform TEXT NOT NULL,
+        state TEXT NOT NULL,
+        url TEXT,
+        posted_at TEXT,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (queue_id, platform)
+      )
+    `);
+  }
+};
+
 export const MIGRATIONS: readonly Migration[] = [
   v1Baseline,
   v2Lifecycle,
@@ -578,7 +600,8 @@ export const MIGRATIONS: readonly Migration[] = [
   v9SourceVideo,
   v10VideoReadings,
   v11TitleAngle,
-  v12VideoTranscripts
+  v12VideoTranscripts,
+  v13PlatformPosts
 ];
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
 

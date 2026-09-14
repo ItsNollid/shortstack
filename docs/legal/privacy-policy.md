@@ -18,6 +18,8 @@ It reads the video files in the folder you choose, along with their names, sizes
 
 If you switch on listening, ShortStack also reads the sound of the videos it drafts details for and turns what is said into text with whisper.cpp, on your computer. What was said is kept with the video, on this computer.
 
+If you post a video to TikTok or Instagram, ShortStack makes a copy of it in a format those platforms take, kept on this computer, and opens their websites in your browser for you to post it. It does not sign in to TikTok or Instagram or send them anything itself. The links you paste to your posts are kept with the video.
+
 ## Where your data is kept
 
 Everything ShortStack stores is kept on your computer: a local database file, your video details, your settings, and your Google sign-in tokens, which are encrypted using the operating system’s own secure storage.

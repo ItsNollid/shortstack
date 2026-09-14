@@ -33,7 +33,10 @@ export const ACTIVITY_ACTIONS = [
   'posting_created',
   'posting_rotated',
   'ai_drafted',
-  'house_style'
+  'house_style',
+  'platform_posted',
+  'platform_skipped',
+  'platform_restored'
 ] as const;
 export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number];
 
@@ -91,7 +94,10 @@ const LABELS: Record<ActivityAction, string> = {
   rotation_paused: 'Taken out of rotation',
   rotation_resumed: 'Put back into rotation',
   posting_created: 'Queued to post again',
-  posting_rotated: 'Queued for another run'
+  posting_rotated: 'Queued for another run',
+  platform_posted: 'Posted to another platform',
+  platform_skipped: 'Not posting to another platform',
+  platform_restored: 'Waiting to be posted elsewhere again'
 };
 
 const isKnown = (action: string): action is ActivityAction =>

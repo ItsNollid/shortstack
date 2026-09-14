@@ -10,6 +10,8 @@ import { appendActivity } from './activityRepo';
 import { readSettings } from './settingsRepo';
 import type { RestyleChange, RestyleResult } from '../../shared/restyle';
 import { toDbValue, toQueueItemDTO, toStateFields } from './rows';
+import type { Platform } from '../../shared/queue';
+import { PLATFORM_NAMES } from '../../shared/platformPosts';
 
 const SELECT_ITEM = `
   SELECT q.*, v.filename, v.filepath, v.file_size, v.duration_s, v.width, v.height, v.missing,
@@ -382,4 +384,15 @@ export function listOtherPostingTitles(db: Database.Database, videoId: number, e
     .prepare("SELECT title FROM queue WHERE video_id = ? AND id <> ? AND trim(title) <> '' ORDER BY id DESC LIMIT 10")
     .all(videoId, exceptQueueId) as Array<{ title: string }>;
   return [...new Set(rows.map((row) => row.title.trim()))].slice(0, 5);
+}
+
+/**
+ * Which platforms a posting goes to. Not a detail of the video, so it is not recorded as an edit that the drafting
+ * worker has to leave alone; it is recorded in the history, because it decides where the video is posted.
+ */
+export function setQueuePlatforms(db: Database.Database, id: number, platforms: readonly Platform[], now: Date): QueueItemDTO | null {
+  const changed = db.prepare('UPDATE queue SET platforms = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(platforms), now.toISOString(), id).changes;
+  if (changed === 0) return null;
+  appendActivity(db, { queueId: id, action: 'edit_metadata', detail: `Goes to ${platforms.map((platform) => PLATFORM_NAMES[platform]).join(', ')}`, now });
+  return getQueueItem(db, id) ?? null;
 }

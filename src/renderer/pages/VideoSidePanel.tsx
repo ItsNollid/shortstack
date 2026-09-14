@@ -8,6 +8,7 @@ import { VideoPreview } from '../components/VideoPreview';
 import { Banner, Button, StatusPill } from '../components/ui';
 import styles from './VideoDetails.module.css';
 import { ScheduleEditor } from '../components/ScheduleEditor';
+import { PlatformChoice } from '../components/PlatformChoice';
 
 export interface VideoSidePanelProps {
   item: QueueItemDTO;
@@ -71,6 +72,8 @@ export function VideoSidePanel({ item, busy, onAction }: VideoSidePanelProps): R
         <div className={styles.cardTitle}>Schedule</div>
         <ScheduleEditor key={item.id} item={item} />
       </div>
+
+      <PlatformChoice item={item} />
 
       {notAShort !== null && (
         <Banner kind="warning" title="Not a Short">

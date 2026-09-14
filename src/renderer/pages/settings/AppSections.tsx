@@ -230,11 +230,32 @@ export function UpdatesSection(): React.JSX.Element {
   );
 }
 
-export function PlatformsSection(): React.JSX.Element {
+export function PlatformsSection({ writer }: { writer: SettingsWriter }): React.JSX.Element {
+  const { settings } = writer;
+  if (settings === null) return <Section title="TikTok and Instagram">Loading…</Section>;
+
   return (
-    <Section title="Other platforms" text="ShortStack uploads to YouTube today.">
-      <Switch label="TikTok" hint="Coming soon." checked={false} onChange={() => undefined} disabled />
-      <Switch label="Instagram" hint="Coming soon." checked={false} onChange={() => undefined} disabled />
+    <Section
+      id="platforms"
+      title="TikTok and Instagram"
+      text="Post the same videos to TikTok and Instagram. For now you post them yourself, in each app or website, with ShortStack's help: it makes a file they take, writes the caption and keeps track of what went where."
+    >
+      <Switch
+        label="Post new videos to TikTok too"
+        hint="Each new video is set to go to TikTok as well. You can change that on any video."
+        checked={settings.post_to_tiktok}
+        onChange={(value) => writer.set('post_to_tiktok', value)}
+      />
+      <Switch
+        label="Post new videos to Instagram too"
+        hint="Each new video is set to go to Instagram as a Reel as well. Instagram needs a Creator or Business account for this."
+        checked={settings.post_to_instagram}
+        onChange={(value) => writer.set('post_to_instagram', value)}
+      />
+      <div className={styles.sectionText}>
+        Posting for you arrives once each platform approves ShortStack's app: TikTok after its app review and Content Posting
+        audit, Instagram once your Meta app is set up.
+      </div>
     </Section>
   );
 }

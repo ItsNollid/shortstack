@@ -204,6 +204,7 @@ async function start(): Promise<void> {
     credentialsDir,
     thumbnailDir,
     listening,
+    rendersDir: path.join(app.getPath('userData'), 'renders'),
     onSchedulerChanged: refreshStatusBadge,
     draftWorker,
     updates,

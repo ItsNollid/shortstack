@@ -22,6 +22,8 @@ You are responsible for the content you publish and for complying with YouTubeâ€
 
 You supply your own Google Cloud credentials, and any API quota or audit requirements attached to them are yours to manage.
 
+When you post to TikTok or Instagram, you do so under their own terms, and following them is your responsibility.
+
 ---
 
 _This page is generated from the text bundled in the app. Edit `src/shared/legal.ts`._

@@ -25,7 +25,8 @@ export const PRIVACY_POLICY: LegalDocument = {
       paragraphs: [
         'With your permission, ShortStack asks Google for access to: uploading videos to your channel, reading your channel’s videos and details, changing videos it uploaded or that you linked to it, and reading your channel’s analytics.',
         'It reads the video files in the folder you choose, along with their names, sizes and durations.',
-        'If you switch on listening, ShortStack also reads the sound of the videos it drafts details for and turns what is said into text with whisper.cpp, on your computer. What was said is kept with the video, on this computer.'
+        'If you switch on listening, ShortStack also reads the sound of the videos it drafts details for and turns what is said into text with whisper.cpp, on your computer. What was said is kept with the video, on this computer.',
+        'If you post a video to TikTok or Instagram, ShortStack makes a copy of it in a format those platforms take, kept on this computer, and opens their websites in your browser for you to post it. It does not sign in to TikTok or Instagram or send them anything itself. The links you paste to your posts are kept with the video.'
       ]
     },
     {
@@ -80,7 +81,8 @@ export const TERMS: LegalDocument = {
       heading: 'Your responsibilities',
       paragraphs: [
         'You are responsible for the content you publish and for complying with YouTube’s policies, including its rules on copyright, spam and deceptive practices.',
-        'You supply your own Google Cloud credentials, and any API quota or audit requirements attached to them are yours to manage.'
+        'You supply your own Google Cloud credentials, and any API quota or audit requirements attached to them are yours to manage.',
+        'When you post to TikTok or Instagram, you do so under their own terms, and following them is your responsibility.'
       ]
     }
   ]

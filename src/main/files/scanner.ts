@@ -169,7 +169,7 @@ export async function scanFolder(db: Database.Database, deps: ScanDeps = {}): Pr
           privacy: settings.default_privacy,
           notifySubscribers: settings.notify_subscribers,
           madeForKids: settings.made_for_kids,
-          platforms: ['youtube']
+          platforms: ['youtube', ...(settings.post_to_tiktok ? (['tiktok'] as const) : []), ...(settings.post_to_instagram ? (['instagram'] as const) : [])]
         },
         ctx.now
       );

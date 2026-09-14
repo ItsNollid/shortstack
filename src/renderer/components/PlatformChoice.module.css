@@ -1,0 +1,15 @@
+.card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--raised);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.title { font-size: var(--text-md); font-weight: 500; }
+.option { display: flex; align-items: center; gap: var(--space-2); cursor: pointer; }
+.option input { margin: 0; width: 16px; height: 16px; accent-color: var(--blue, #3ea6ff); }
+.option input:disabled { cursor: default; }
+.hint { color: var(--text-faint); font-size: var(--text-sm); }
+.problem { color: var(--red, #ff4e45); font-size: var(--text-sm); }

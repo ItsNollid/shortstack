@@ -45,7 +45,7 @@ export function SettingsPage(): React.JSX.Element {
         <InsightsSection writer={writer} />
         <AppSection writer={writer} />
         <UpdatesSection />
-        <PlatformsSection />
+        <PlatformsSection writer={writer} />
         <LegalSection onDisconnect={() => setDialog('disconnect')} />
         <VersionNote />
       </div>
