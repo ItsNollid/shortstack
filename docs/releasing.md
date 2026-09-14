@@ -37,7 +37,11 @@ built into the app.
    refresh the hosted copies.
 3. Set the same version in `package.json`. The changelog entry and the package version have to
    match, or the app will not announce the release it is running.
-4. `npm run release` — verifies, regenerates the docs, builds, and uploads to GitHub.
+4. `npm run release` — verifies, regenerates the docs, creates the draft release with those notes, builds,
+   and uploads to it. The draft is created first on purpose: electron-builder uploads the installer and
+   its blockmap at once, and each would otherwise create a release of its own, leaving two drafts.
+   If the app is running from `dist`, it holds those files open; build somewhere else by adding
+   `-c.directories.output=dist/release-<version>` to the electron-builder step.
 5. Publish the draft release on GitHub. Until it is published nobody's app can see it — drafts are
    not readable without a token, which is exactly what makes the draft a safe place to check the
    notes and the installer before anyone gets them.
