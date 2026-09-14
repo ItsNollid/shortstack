@@ -63,7 +63,7 @@ test('a title promising play on a clip that shows none is pointed out as it is t
     await expect(harness.page.getByText('The title promises “1v4”')).toBeVisible();
     await harness.page.getByRole('button', { name: 'Discard' }).click();
 
-    // Review has no panel of what the model saw, so it says both things itself.
+    // Review says both too: the title under the title, and the opening in its panel of what the model saw, once.
     await goTo(harness.page, '#/review');
     await expect(harness.page.getByText('The title promises “CLUTCH”')).toBeVisible({ timeout: 10_000 });
     await expect(harness.page.getByText('Nothing happens in the first second')).toBeVisible();

@@ -5,7 +5,7 @@ import type { Result } from '../../../shared/ipc';
 import { VIDEO_CATEGORIES } from '../../../shared/categories';
 import { PRIVACY_OPTIONS, privacyHint } from '../../../shared/privacyCopy';
 import type { Privacy } from '../../../shared/queue';
-import { formatFileSize, formatRelativeTime, shortsWarning } from '../../../shared/presentation';
+import { formatDuration, formatFileSize, formatRelativeTime, shortsWarning } from '../../../shared/presentation';
 import { needsReview, positionAfterChange, progress, step } from '../../../shared/review';
 import {
   DESCRIPTION_MAX_BYTES,
@@ -18,7 +18,7 @@ import {
 import { nextFreeSlot } from '../../../shared/slots';
 import { PastUploadPicker } from '../../components/PastUploadPicker';
 import { VideoPreview } from '../../components/VideoPreview';
-import { Banner, Button, EmptyState, Select, StatusPill, TagInput, TextArea, TextField } from '../../components/ui';
+import { Banner, Button, EmptyState, Select, StatusPill, Switch, TagInput, TextArea, TextField } from '../../components/ui';
 import { DescriptionCheck } from '../../components/DescriptionCheck';
 import { GameField } from '../../components/GameField';
 import { ScreenCheck } from '../../components/ScreenCheck';
@@ -29,6 +29,11 @@ import { useApiMutation, useApiQuery } from '../../hooks/useApi';
 import styles from './Review.module.css';
 import { SourceField } from '../../components/SourceField';
 import { ScheduleEditor } from '../../components/ScheduleEditor';
+import type { TitleAngle } from '../../../shared/titleAngles';
+import { AiAssistPanel, type AiField } from '../AiAssistPanel';
+import { VideoReadingPanel } from '../VideoReadingPanel';
+import { HeardPanel } from '../HeardPanel';
+import { PlatformChoice } from '../../components/PlatformChoice';
 
 const readQueue = (): Promise<Result<QueueItemDTO[]>> => window.api.queueList();
 
@@ -38,6 +43,9 @@ interface Draft {
   tags: string[];
   privacy: Privacy;
   category_id: string;
+  notify_subscribers: boolean;
+  made_for_kids: boolean;
+  title_angle: TitleAngle | null;
 }
 
 const draftOf = (item: QueueItemDTO): Draft => ({
@@ -45,7 +53,10 @@ const draftOf = (item: QueueItemDTO): Draft => ({
   description: item.description,
   tags: item.tags,
   privacy: item.privacy,
-  category_id: item.category_id === '' ? '22' : item.category_id
+  category_id: item.category_id === '' ? '22' : item.category_id,
+  notify_subscribers: item.notify_subscribers,
+  made_for_kids: item.made_for_kids,
+  title_angle: item.title_angle
 });
 
 export function Review(): React.JSX.Element {
@@ -94,6 +105,21 @@ export function Review(): React.JSX.Element {
     void save.run(item.id, patch, item.updated_at).then((done) => {
       if (done !== null) setJustSaved(true);
     });
+  };
+
+  /** A suggestion taken here is saved at once, like every other field on this screen. */
+  const acceptSuggestion = (field: AiField, value: string | string[], angle?: TitleAngle): void => {
+    if (draft === null) return;
+    if (field === 'tags' && Array.isArray(value)) {
+      setDraft({ ...draft, tags: value });
+      commit({ tags: value });
+    } else if (field === 'title' && typeof value === 'string') {
+      setDraft({ ...draft, title: value, title_angle: angle ?? null });
+      commit({ title: value, title_angle: angle ?? null });
+    } else if (field === 'description' && typeof value === 'string') {
+      setDraft({ ...draft, description: value });
+      commit({ description: value });
+    }
   };
 
   useEffect(() => {
@@ -246,8 +272,19 @@ export function Review(): React.JSX.Element {
               {item.width === null || item.height === null ? 'Unknown' : `${item.width}×${item.height}`} ·{' '}
               {formatFileSize(item.file_size)}
             </span>
+            <span className={styles.factLabel}>Length</span>
+            <span className={styles.factValue}>{formatDuration(item.duration_s)}</span>
+            {(item.ai_drafted_at !== null || item.metadata_edited_at !== null) && (
+              <>
+                <span className={styles.factLabel}>Details</span>
+                <span className={styles.factValue}>
+                  {item.metadata_edited_at !== null ? 'Written by you' : 'Drafted by the local model'}
+                </span>
+              </>
+            )}
           </div>
           {warning !== null && <Banner kind="warning" title="Not a Short">{warning}</Banner>}
+          <PlatformChoice item={item} />
         </div>
 
         <div className={styles.right}>
@@ -260,8 +297,7 @@ export function Review(): React.JSX.Element {
               counterOver={charCount(draft.title) > TITLE_MAX_CHARS}
             />
           </div>
-          {/* Review has no panel of what the model saw, so the opening is mentioned here as well. */}
-          <ScreenCheck queueId={item.id} title={draft.title} withHook />
+          <ScreenCheck queueId={item.id} title={draft.title} />
 
           <DescriptionCheck
             key={item.id}
@@ -324,6 +360,27 @@ export function Review(): React.JSX.Element {
             />
           </div>
 
+          <div className={styles.pair}>
+            <Switch
+              label="Tell subscribers"
+              hint={item.posting_kind === 'rotation' ? 'Re-runs never notify subscribers.' : 'Sends the usual notification when the video goes live.'}
+              checked={draft.notify_subscribers}
+              onChange={(notify_subscribers) => {
+                setDraft({ ...draft, notify_subscribers });
+                commit({ notify_subscribers });
+              }}
+            />
+            <Switch
+              label="Made for kids"
+              hint="YouTube turns off comments and some features on videos marked for kids."
+              checked={draft.made_for_kids}
+              onChange={(made_for_kids) => {
+                setDraft({ ...draft, made_for_kids });
+                commit({ made_for_kids });
+              }}
+            />
+          </div>
+
           <ScheduleEditor key={item.id} item={item} label="Publishes" />
 
           <div className={styles.tools}>
@@ -358,6 +415,19 @@ export function Review(): React.JSX.Element {
               Reuse past details
             </Button>
           </div>
+        </div>
+
+        {/* Beside the fields they fill, so a suggestion is taken without scrolling away from what it changes. */}
+        <div className={styles.assist}>
+          <AiAssistPanel
+            key={`assist-${item.id}`}
+            queueId={item.id}
+            current={{ title: draft.title, description: draft.description, tags: draft.tags }}
+            onAccept={acceptSuggestion}
+            disabled={save.pending}
+          />
+          <VideoReadingPanel key={`reading-${item.id}`} queueId={item.id} />
+          <HeardPanel key={`heard-${item.id}`} queueId={item.id} enabled={settings?.listen_enabled === true} />
         </div>
       </div>
 
