@@ -27,6 +27,7 @@ import { useToast } from '../../app/toast';
 import { useApiMutation, useApiQuery } from '../../hooks/useApi';
 import styles from './Review.module.css';
 import { SourceField } from '../../components/SourceField';
+import { ScheduleEditor } from '../../components/ScheduleEditor';
 
 const readQueue = (): Promise<Result<QueueItemDTO[]>> => window.api.queueList();
 
@@ -184,20 +185,25 @@ export function Review(): React.JSX.Element {
 
   const warning = shortsWarning(item.duration_s, item.width, item.height);
   const lane = item.posting_kind === 'rotation' ? settings?.rotation_upload_times : settings?.upload_times;
+  // A time picked on the video wins; one kept off the schedule gets none; otherwise the next free slot.
+  const held = item.scheduled_for === null && item.schedule_source === 'hold';
   const wouldPublishAt =
-    draft.privacy !== 'public' || settings === null
+    draft.privacy !== 'public' || settings === null || held
       ? null
-      : nextFreeSlot({
+      : (item.scheduled_for ??
+        nextFreeSlot({
           uploadTimes: lane ?? [],
           taken: (queue.data ?? []).map((entry) => entry.scheduled_for).filter((at): at is string => at !== null),
           now: new Date(),
           horizonDays: settings.auto_schedule_days
-        });
+        }));
 
   const outcome =
     draft.privacy !== 'public'
       ? `Approving uploads this as ${draft.privacy}, with no publish time.`
-      : wouldPublishAt === null
+      : held
+        ? 'Approving leaves it without a time: it is kept off the schedule until you give it one.'
+        : wouldPublishAt === null
         ? 'Approving leaves it without a time: the schedule is full as far ahead as it books.'
         : `Approving publishes this ${new Date(wouldPublishAt).toLocaleString()}, ${formatRelativeTime(wouldPublishAt)}.`;
 
@@ -314,6 +320,8 @@ export function Review(): React.JSX.Element {
               options={VIDEO_CATEGORIES.map((category) => ({ value: category.id, label: category.label }))}
             />
           </div>
+
+          <ScheduleEditor key={item.id} item={item} label="Publishes" />
 
           <div className={styles.tools}>
             <Button
