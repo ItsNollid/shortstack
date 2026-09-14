@@ -15,6 +15,8 @@ import type { AppSettings, IgnoredSetting } from './settings';
 import type { QueueMetadataPatch } from './videoMetadata';
 import type { VideoReport } from './videoReading';
 import type { TitleAngle } from './titleAngles';
+import type { ListeningStatus } from './listening';
+import type { HeardDTO } from './transcript';
 
 /** Failures are values, not thrown errors: Electron turns a rejection into an unreadable string. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
@@ -98,7 +100,8 @@ export const APP_EVENTS = [
   'upload:progress',
   'toast',
   'update:changed',
-  'reading:changed'
+  'reading:changed',
+  'listening:changed'
 ] as const;
 
 /**
@@ -183,6 +186,19 @@ export interface ShortStackApi {
   videoReading(queueId: number): Promise<Result<VideoReport | null>>;
   /** Has the model look at each still now. Seconds per still, so only ever when asked. */
   videoLook(queueId: number): Promise<Result<VideoReport>>;
+  /** What was said in a video, from last time it was listened to. Never listens. */
+  videoHeard(queueId: number): Promise<Result<HeardDTO | null>>;
+  /** Listens now, unless it already has. Takes seconds to minutes, depending on the model and the computer. */
+  videoListen(queueId: number): Promise<Result<HeardDTO>>;
+
+  /** What is installed for listening, what is recommended for this computer, and any download in progress. */
+  listeningStatus(): Promise<Result<ListeningStatus>>;
+  /** Starts downloading an engine or a model from its official source. Progress arrives as listening:changed. */
+  listeningDownload(request: { engine: 'cpu' | 'gpu' } | { model: string }): Promise<Result<null>>;
+  listeningCancel(): Promise<Result<null>>;
+  listeningRemove(request: { engine: 'cpu' | 'gpu' } | { model: string }): Promise<Result<null>>;
+  /** Picks a whisper.cpp model already on this computer. Null when the person closes the dialog. */
+  listeningChooseModelFile(): Promise<Result<string | null>>;
 
   /** What the app knows about newer versions right now, without going and looking. */
   updateStatus(): Promise<Result<UpdateStatus>>;
@@ -271,6 +287,13 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'aiGenerate',
   'videoReading',
   'videoLook',
+  'videoHeard',
+  'videoListen',
+  'listeningStatus',
+  'listeningDownload',
+  'listeningCancel',
+  'listeningRemove',
+  'listeningChooseModelFile',
   'aiTest',
   'updateStatus',
   'updateCheck',

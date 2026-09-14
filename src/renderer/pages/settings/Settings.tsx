@@ -13,6 +13,7 @@ import { DefaultsSection, UploadMethodSection } from './UploadSections';
 import { useIgnoredSettings } from './useIgnoredSettings';
 import { useSettings } from './useSettings';
 import styles from './Settings.module.css';
+import { ListeningSection } from './ListeningSection';
 
 export function SettingsPage(): React.JSX.Element {
   const writer = useSettings();
@@ -39,6 +40,7 @@ export function SettingsPage(): React.JSX.Element {
         <ScheduleSection writer={writer} onRequestAutoApprove={() => setDialog('auto-approve')} />
         <RotationSection writer={writer} />
         <AiSection writer={writer} />
+        <ListeningSection writer={writer} />
         <FormattingSection writer={writer} ignored={ignored} />
         <InsightsSection writer={writer} />
         <AppSection writer={writer} />

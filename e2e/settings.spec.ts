@@ -12,7 +12,7 @@ test.describe('choosing a model', () => {
       const select = harness.page.locator('select').filter({ has: harness.page.locator('option') }).first();
       await expect(harness.page.getByText('Suggestions from a local model')).toBeVisible();
 
-      const picker = harness.page.getByLabel('Model');
+      const picker = harness.page.getByLabel('Model', { exact: true });
       await expect(picker).toBeVisible();
       expect(await picker.evaluate((node) => node.tagName)).toBe('SELECT');
       await expect(harness.page.getByRole('button', { name: /check this model/i })).toBeVisible();

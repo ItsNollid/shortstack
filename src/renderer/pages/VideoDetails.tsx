@@ -28,6 +28,7 @@ import styles from './VideoDetails.module.css';
 import { VideoSidePanel } from './VideoSidePanel';
 import { SourceField } from '../components/SourceField';
 import { keepsAngle, type TitleAngle } from '../../shared/titleAngles';
+import { HeardPanel } from './HeardPanel';
 
 interface Draft {
   title: string;
@@ -193,6 +194,7 @@ export function VideoDetails({ onApprove }: { onApprove: (item: QueueItemDTO) =>
           />
 
           <VideoReadingPanel key={`reading-${loaded.id}`} queueId={loaded.id} />
+          <HeardPanel key={`heard-${loaded.id}`} queueId={loaded.id} enabled={settings?.listen_enabled === true} />
 
           <TextField
             label="Title"

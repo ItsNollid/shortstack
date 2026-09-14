@@ -23,6 +23,8 @@ export interface DraftDeps {
   thumbnailDir: string;
   /** Only needed for the examples, and a failure there is never fatal. */
   listPastUploads(playlistId: string, options: { limit: number }): Promise<{ ok: boolean; value?: { items: PastUpload[] } }>;
+  /** What is said in a video, listened to first if need be. Only asked when listening is switched on. */
+  hear?(queueId: number): Promise<string | null>;
 }
 
 /**
@@ -83,6 +85,9 @@ export async function draftFor(deps: DraftDeps, queueId: number): Promise<AiResu
   const strip = await readFrames({ db, dir: deps.thumbnailDir }, queueId);
   const stills = strip.length > 0 ? strip : [await readThumbnail({ db, dir: deps.thumbnailDir }, queueId)];
 
+  // Listening takes a while, so it only happens when switched on, and once per video: what was said is kept.
+  const speech = settings.listen_enabled && deps.hear !== undefined ? await deps.hear(queueId).catch(() => null) : null;
+
   // A re-run should not go out under a title it already has, so the model is told what those were.
   const previousTitles = listOtherPostingTitles(db, item.video_id, item.id);
 
@@ -106,7 +111,8 @@ export async function draftFor(deps: DraftDeps, queueId: number): Promise<AiResu
         height: item.height,
         currentTitle: item.title,
         currentDescription: item.description,
-        previousTitles
+        previousTitles,
+        speech
       }
     },
     { host: settings.ai_host }

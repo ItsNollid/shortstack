@@ -1,6 +1,6 @@
 # ShortStack Terms of Use
 
-_Last updated 2026-09-12_
+_Last updated 2026-09-13_
 
 ## Using ShortStack
 

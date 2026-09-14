@@ -1,0 +1,32 @@
+.group { display: flex; flex-direction: column; gap: var(--space-2); }
+.groupTitle { font-size: var(--text-sm); font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.rowBody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rowTitle { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); font-weight: 500; }
+.rowText { color: var(--text-faint); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.rowActions { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+
+.chip {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 8px;
+  border-radius: 999px;
+  color: var(--blue, #3ea6ff);
+  border: 1px solid currentColor;
+}
+.tag { font-size: 11px; color: var(--text-faint); }
+.have { font-size: var(--text-sm); color: var(--green, #3fcf8e); }
+
+.progress { display: flex; flex-direction: column; gap: var(--space-2); }
+.progressHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+
+.ready { font-size: var(--text-sm); color: var(--text-muted); }

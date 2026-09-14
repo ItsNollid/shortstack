@@ -1,7 +1,7 @@
 // Typed IPC handlers. Every argument is validated here: the renderer is the least trusted part
 // of the app, and the previous version let it choose SQL column names.
 import type Database from 'better-sqlite3';
-import { BrowserWindow, app, clipboard, dialog, ipcMain, shell } from 'electron';
+import { BrowserWindow, app, clipboard, dialog, ipcMain, shell, type OpenDialogOptions } from 'electron';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { findModel } from '../shared/aiModels';
@@ -36,6 +36,8 @@ import type { YouTubeGateway } from './youtube/gateway';
 import { awaitAuthorizationCode } from './youtube/loopbackServer';
 import { REQUIRED_SCOPES, buildAuthUrl, parseClientSecret } from './youtube/oauthFlow';
 import { resolveSource } from './sources';
+import type { ListeningService } from './listening/service';
+import { checkModelFile } from './listening/install';
 
 export interface IpcContext {
   db: Database.Database;
@@ -52,6 +54,8 @@ export interface IpcContext {
   draftWorker?: { kick(): void };
   updates: UpdateService;
   getWindow(): BrowserWindow | null;
+  /** Listening to what is said in videos. Absent where the app is run without it, such as in some tests. */
+  listening?: ListeningService;
   /** The app's icon follows the connected channel's picture. */
   appIcon: { refresh(avatarUrl: string | null): Promise<boolean>; clear(): Promise<void> };
 }
@@ -62,6 +66,14 @@ const ok = <T>(data: T): Result<T> => ({ ok: true, data });
 const fail = (code: string, message: string): Result<never> => ({ ok: false, error: { code, message } });
 
 const asId = (value: unknown): number | null => (typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : null);
+const asListeningRequest = (value: unknown): { engine: 'cpu' | 'gpu' } | { model: string } | null => {
+  if (typeof value !== 'object' || value === null) return null;
+  const record = value as Record<string, unknown>;
+  if (record.engine === 'cpu' || record.engine === 'gpu') return { engine: record.engine };
+  if (typeof record.model === 'string' && record.model.length > 0 && record.model.length <= 64) return { model: record.model };
+  return null;
+};
+
 const asIds = (value: unknown): number[] | null => {
   if (!Array.isArray(value) || value.length === 0 || value.length > 500) return null;
   const ids = value.map(asId);
@@ -90,7 +102,8 @@ export function registerIpcHandlers(context: IpcContext): void {
   const draftDeps = {
     db,
     thumbnailDir: context.thumbnailDir,
-    listPastUploads: (playlistId: string, options: { limit: number }) => context.gateway.listPastUploads(playlistId, options)
+    listPastUploads: (playlistId: string, options: { limit: number }) => context.gateway.listPastUploads(playlistId, options),
+    ...(context.listening !== undefined ? { hear: (queueId: number) => (context.listening as ListeningService).speechFor(queueId) } : {})
   };
   let signInAbort: AbortController | null = null;
 
@@ -611,6 +624,54 @@ export function registerIpcHandlers(context: IpcContext): void {
 
       const suggestion = await draftFor(draftDeps, parsed);
       return suggestion.ok ? ok(suggestion.value) : fail(suggestion.code, suggestion.reason);
+    },
+    videoHeard: async (queueId) => {
+      const parsed = asId(queueId);
+      if (parsed === null) return fail('invalid', 'That video id is not valid');
+      if (context.listening === undefined) return fail('unavailable', 'Listening is not available in this build');
+      const heard = await context.listening.transcriptFor(parsed, false);
+      return heard.ok ? ok(heard.transcript) : fail('refused', heard.reason);
+    },
+    videoListen: async (queueId) => {
+      const parsed = asId(queueId);
+      if (parsed === null) return fail('invalid', 'That video id is not valid');
+      if (context.listening === undefined) return fail('unavailable', 'Listening is not available in this build');
+      const heard = await context.listening.transcriptFor(parsed, true);
+      if (!heard.ok) return fail('refused', heard.reason);
+      return heard.transcript === null ? fail('refused', 'Nothing was heard') : ok(heard.transcript);
+    },
+    listeningStatus: async () =>
+      context.listening === undefined ? fail('unavailable', 'Listening is not available in this build') : ok(await context.listening.status()),
+    listeningDownload: async (request) => {
+      const parsed = asListeningRequest(request);
+      if (parsed === null) return fail('invalid', 'That is not something ShortStack can download');
+      if (context.listening === undefined) return fail('unavailable', 'Listening is not available in this build');
+      const started = context.listening.start(parsed);
+      return started.ok ? ok(null) : fail('refused', started.reason);
+    },
+    listeningCancel: async () => {
+      context.listening?.cancel();
+      return ok(null);
+    },
+    listeningRemove: async (request) => {
+      const parsed = asListeningRequest(request);
+      if (parsed === null) return fail('invalid', 'That is not something ShortStack can remove');
+      if (context.listening === undefined) return fail('unavailable', 'Listening is not available in this build');
+      await context.listening.remove(parsed);
+      return ok(null);
+    },
+    listeningChooseModelFile: async () => {
+      const window = context.getWindow();
+      const options: OpenDialogOptions = { properties: ['openFile'], filters: [{ name: 'whisper.cpp model', extensions: ['bin'] }] };
+      const picked = window === null ? await dialog.showOpenDialog(options) : await dialog.showOpenDialog(window, options);
+      const file = picked.canceled ? undefined : picked.filePaths[0];
+      if (file === undefined) return ok(null);
+      const checked = await checkModelFile(file);
+      if (!checked.ok) return fail('invalid', checked.reason);
+      const written = writeSetting(db, 'listen_model_file', file);
+      if (!written.ok) return fail('refused', written.reason);
+      broadcast(context.getWindow(), 'listening:changed');
+      return ok(file);
     },
     videoReading: async (queueId) => {
       const parsed = asId(queueId);

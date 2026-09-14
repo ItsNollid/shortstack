@@ -16,6 +16,8 @@ export interface VideoFacts {
   game?: string | null;
   /** Titles this video already went out under on other postings. A re-run should not repeat them. */
   previousTitles?: readonly string[];
+  /** What is said in the clip, as a speech model heard it, when listening is switched on. */
+  speech?: string | null;
   /** Whatever is already in the form, which is often the best clue about the subject. */
   currentTitle?: string;
   currentDescription?: string;
@@ -89,6 +91,11 @@ function renderVideo(video: VideoFacts, hasFrames: boolean): string[] {
   if (video.currentDescription !== undefined && video.currentDescription.trim() !== '') {
     lines.push(`Existing description: ${truncate(video.currentDescription.trim(), EXAMPLE_DESCRIPTION_CHARS)}`);
   }
+  if (video.speech !== undefined && video.speech !== null && video.speech.trim() !== '') {
+    // Heard, not read: the speech model can mishear, and these clips are people talking over a game.
+    lines.push(`What is said in the clip, as a speech model heard it (it can mishear words): "${video.speech.trim()}"`);
+    lines.push('When something said is the funny or striking part, a title can quote it or build on it.');
+  }
   const previous = (video.previousTitles ?? []).map((title) => title.trim()).filter((title) => title !== '');
   if (previous.length > 0) {
     lines.push('It has gone out before, under these titles. Write new ones that are clearly different from each:');
@@ -136,7 +143,7 @@ export function buildPrompt(input: PromptInput): string {
     'Topics: 3 to 6 things someone would actually search for about this clip, one or two words each — a play, a mode, a map, a weapon, a joke. They become hashtags, so keep them short and specific. Leave out the name of the game, which is added separately, and leave out anything generic like "gaming", "funny moments" or "epic", and filler like "moment", "scene" or "clip".',
     // Measured: shown a lobby with a player list, the model offered the channel's own name and a
     // friend's gamertag as topics and tags. Visible, yes; searched for, never; and not ours to use.
-    'Never use a name read off the screen — player names, gamertags, usernames, channel names, or anything typed in chat. They are visible, but nobody searches for them, and they belong to other people. This applies to topics and tags alike.',
+    'Never use a name read off the screen or heard in the clip — player names, gamertags, usernames, channel names, or anything typed in chat. They are visible, but nobody searches for them, and they belong to other people. This applies to topics and tags alike.',
     ...((input.blockedNames ?? []).length > 0
       ? [`In particular, never use any of these names, in the titles, the topics or the tags: ${(input.blockedNames ?? []).join(', ')}.`]
       : []),

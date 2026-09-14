@@ -544,6 +544,28 @@ const v11TitleAngle: Migration = {
   }
 };
 
+/**
+ * What was said in each video, when the person has switched listening on. Kept with the size and time of the file
+ * it was heard from, so a re-rendered clip is listened to again rather than described by its old words.
+ */
+const v12VideoTranscripts: Migration = {
+  version: 12,
+  name: 'keep what was said in each video',
+  up(db) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS video_transcripts (
+        video_id INTEGER PRIMARY KEY REFERENCES videos(id) ON DELETE CASCADE,
+        model TEXT NOT NULL,
+        backend TEXT NOT NULL,
+        made_at TEXT NOT NULL,
+        source_size INTEGER,
+        source_mtime_ms REAL,
+        segments TEXT NOT NULL
+      )
+    `);
+  }
+};
+
 export const MIGRATIONS: readonly Migration[] = [
   v1Baseline,
   v2Lifecycle,
@@ -555,7 +577,8 @@ export const MIGRATIONS: readonly Migration[] = [
   v8GameGuess,
   v9SourceVideo,
   v10VideoReadings,
-  v11TitleAngle
+  v11TitleAngle,
+  v12VideoTranscripts
 ];
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
 

@@ -6,6 +6,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { migrate } from '../src/main/db/migrations';
+import { LEGAL_VERSION } from '../src/shared/legal';
 
 /**
  * A real video file to seed from. Some tests need one that actually plays — a made-up path makes the
@@ -93,7 +94,7 @@ function seed(userData: string, videos: readonly SeededVideo[], settings: Record
     'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
   );
   // Past the first-run gate, so a test starts on the screen it is about.
-  write.run('legal_accepted_version', JSON.stringify('2026-09-12').slice(1, -1));
+  write.run('legal_accepted_version', LEGAL_VERSION);
   write.run('setup_complete', 'true');
   write.run('shorts_folder', 'E:/Shorts');
   for (const [key, value] of Object.entries(settings)) write.run(key, value);

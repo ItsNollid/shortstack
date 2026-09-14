@@ -6,6 +6,7 @@ import { DRAFT_FIELDS, checkDraftFields, type DraftField } from './draftFields';
 import type { FormattingRules, TitleCase } from './formatting';
 import type { InsightGoal } from './insightGoal';
 import type { Privacy, UploadMethod } from './queue';
+import { MODELS } from './listening';
 
 export interface AppSettings {
   setup_complete: boolean;
@@ -45,6 +46,14 @@ export interface AppSettings {
   ai_auto_draft_fields: DraftField[];
   /** Re-runs drafted afresh, so they do not go out under the same title again. Off unless chosen: it replaces details written by hand. */
   ai_refresh_reruns: boolean;
+  /** Listening to what is said in a video before drafting. Off unless chosen: it keeps the processor or graphics card busy for a while. */
+  listen_enabled: boolean;
+  /** Which engine listens: the graphics card build when it is installed, unless one is chosen. */
+  listen_engine: 'auto' | 'cpu' | 'gpu';
+  /** A downloaded model, by its id in the list. */
+  listen_model: string;
+  /** Or a model file already on this computer, which is used instead when set. */
+  listen_model_file: string;
   /** Names drafting must never use: friends' gamertags, mostly. The channel's own name is always kept out. */
   ai_blocked_names: string[];
 
@@ -276,6 +285,10 @@ export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> 
   // All three by default, which is what drafting did before there was a choice.
   ai_auto_draft_fields: stringList([...DRAFT_FIELDS], checkDraftFields) as unknown as SettingCodec<DraftField[]>,
   ai_refresh_reruns: bool(false),
+  listen_enabled: bool(false),
+  listen_engine: oneOf<'auto' | 'cpu' | 'gpu'>('auto', ['auto', 'cpu', 'gpu']),
+  listen_model: text('', (value) => (value === '' || MODELS.some((model) => model.id === value) ? null : 'That is not one of the listening models')),
+  listen_model_file: text('', (value) => (value === '' || (value.length < 1024 && /\.bin$/i.test(value)) ? null : 'Choose a whisper.cpp model file')),
   ai_blocked_names: stringList([], checkBlockedNames),
 
   insight_goal: oneOf<InsightGoal>('reach_and_subscribers', ['reach_and_subscribers', 'views', 'subscribers', 'watch_time']),

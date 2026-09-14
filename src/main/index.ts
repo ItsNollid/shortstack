@@ -23,6 +23,7 @@ import { readActiveChannel } from './db/channelRepo';
 import { applyStartWithWindows } from './startup';
 import { createTray } from './tray';
 import { createMainWindow } from './window';
+import { ListeningService } from './listening/service';
 
 let mainWindow: BrowserWindow | null = null;
 let tray: (Tray & { refresh?(): void }) | null = null;
@@ -146,12 +147,19 @@ async function start(): Promise<void> {
       notice.show();
     }
   });
+  // Listening lives beside the database, in the app's own folder, and only downloads what the person asks for.
+  const listening = new ListeningService({
+    db,
+    root: path.join(app.getPath('userData'), 'listening'),
+    onChange: () => broadcast(mainWindow, 'listening:changed')
+  });
   draftWorker = new DraftWorker({
     db,
     draftDeps: {
       db,
       thumbnailDir,
-      listPastUploads: (playlistId, options) => gateway.listPastUploads(playlistId, options)
+      listPastUploads: (playlistId, options) => gateway.listPastUploads(playlistId, options),
+      hear: (queueId) => listening.speechFor(queueId)
     },
     onChange: () => broadcast(mainWindow, 'queue:changed')
   });
@@ -195,6 +203,7 @@ async function start(): Promise<void> {
     profile: { profile: runtimeProfile.profile, uploads: runtimeProfile.uploads },
     credentialsDir,
     thumbnailDir,
+    listening,
     onSchedulerChanged: refreshStatusBadge,
     draftWorker,
     updates,
