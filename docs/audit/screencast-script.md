@@ -1,6 +1,6 @@
 # Screencast script
 
-A single unbroken recording, roughly four minutes. Record with the dev profile or a real channel,
+A single unbroken recording, roughly five minutes. Record with the dev profile or a real channel,
 but do not show credentials on screen. Say what you are doing as you do it.
 
 ---
@@ -29,23 +29,39 @@ Choose the videos folder, press **Scan**. Open one video. Show the title and des
 and that the description limit is measured in bytes. Change the visibility and point out it can
 always be changed.
 
-**4. Suggestions stay under the user's control (~25s)**
+**4. Suggestions stay under the user's control (~35s)**
 
-Press **Suggest**. Show that nothing changed in the form. Press **Use this** on the title only, and
-point out the other two are still untouched. Press **Save**.
+Press **Suggest**. Show that nothing changed in the form. Several titles are offered; take one with
+**Use this** and point out the description and tags are still untouched. On the description, show the
+three choices — replace it, add to the start, add to the end — and take one. Press **Save**.
 
-> "Suggestions come from a model running on this computer, and they are never applied on their own."
+> "Suggestions come from a model running on this computer, and they are never applied on their own.
+> Each one is a choice I make, field by field."
+
+**4b. Choosing where a video goes (~20s)**
+
+On the same video, show the platform switches: YouTube, TikTok, Instagram. Turn TikTok on, then off
+again.
+
+> "Each platform is its own switch, per video, and off unless I turn it on. ShortStack holds no
+> account with TikTok or Instagram — it prepares the file and opens their site for me to post."
 
 **5. Approval names what will happen (~30s)**
 
 Press **Approve**. Read the dialog aloud: the channel, what will happen without asking again, and
 each video's visibility and publish time. Confirm.
 
-**6. Scheduling (~30s)**
+**6. Scheduling (~45s)**
 
 Open the Calendar. Drag the video onto a day; show the time that gets picked and the Undo. Drag one
-onto a past day to show the refusal. Open **History** and show the entries, including which ones
-ShortStack did on its own.
+onto a past day to show the refusal.
+
+Press **Fill the calendar**. Read the list of times it offers before anything changes, point out that
+a video still waiting for approval is marked as such, then confirm, and undo it from the message.
+
+> "Giving a video a time is not approving it. Nothing on this screen uploads or publishes anything."
+
+Open **History** and show the entries, including which ones ShortStack did on its own.
 
 **7. Assisted upload (~30s)**
 

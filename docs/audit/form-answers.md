@@ -14,13 +14,31 @@ computer to queue, approve and schedule their own YouTube Shorts. It is not a se
 ShortStack server, no account, and no multi-tenant component. Each user supplies credentials from
 their own Google Cloud project.
 
+It also helps the same creator post the same video to TikTok and Instagram, by preparing a copy in
+the format those platforms accept and opening their websites for the user to post it themselves. It
+holds no credentials for either and calls neither one's API. Which platforms a video goes to is a
+per-video choice, off unless the user turns it on.
+
+Suggested titles, descriptions and tags come from a model running on the same computer (Ollama), and
+the user may switch on listening, which turns the audio of their own video into text with
+whisper.cpp locally. Neither sends anything to any server.
+
 **Who uses it** — The owner of the channel, on their own machine. _State here whether you intend to
 distribute it to others or use it only yourself._
 
 **Where the data goes** — Nowhere. Queue, settings, tokens and cached channel details live in a
 local SQLite database and files under `%APPDATA%\ShortStack`. OAuth tokens are encrypted with the
-operating system's secure storage. The only hosts contacted are Google's own APIs, plus an
-optional Ollama model running on the same computer.
+operating system's secure storage. Transcripts, when listening is used, are kept in the same place.
+The hosts ShortStack contacts are:
+
+- Google's own APIs, for everything in the table below.
+- An Ollama model on the same computer, for suggestions, if the user switches them on.
+- GitHub and Hugging Face, and only when the user asks to download the listening engine or a model.
+  Nothing from their videos is sent with that request.
+- GitHub Releases, to see whether a newer version of ShortStack exists.
+
+TikTok and Instagram are opened in the user's own browser for them to post. ShortStack sends those
+platforms nothing itself.
 
 ---
 
@@ -45,6 +63,8 @@ Estimates for one creator posting up to a handful of Shorts a day.
 |---|---|---|---|---|
 | `videos.insert` | Upload an approved video (automatic mode only) | 1600 | 0–5 | 0–8000 |
 | `videos.list` (part=status) | Confirm what YouTube holds before changing it, and check whether a scheduled video went public | 1 | ~40 | ~40 |
+| `videos.list` (part=fileDetails,snippet) | Recognise a video the user uploaded in Studio themselves, by file name and size, and link it to its queue entry | 1 | ~20 | ~20 |
+| `videos.list` (part=snippet) | Read the title of a long video the user pasted a link to, confirm it is their own, and name the videos shown in Analytics | 1 | ~10 | ~10 |
 | `videos.update` (part=status) | Set or change the publish time and visibility | 50 | 0–10 | 0–500 |
 | `channels.list` (snippet, statistics, contentDetails) | Identify the connected channel and refresh its details | 1 | ~2 | ~2 |
 | `playlistItems.list` | Find recently uploaded videos, to link a Studio upload back to its queue entry | 1 | ~30 | ~30 |
@@ -79,6 +99,12 @@ set the publish time and visibility of videos the user approved.
   videos keep a local marker so they can never be uploaded a second time.
 - **Retention** — Channel details and the channel picture are refreshed on every launch and are
   deleted if they cannot be refreshed for 30 days.
+- **Other platforms** — TikTok and Instagram are each their own switch, per video, off by default,
+  and can be switched off again at any time before the user posts. Nothing reaches any platform
+  without the user posting it themselves.
+- **Listening and suggestions** — Both are off until switched on, both run on the user's own
+  computer, and neither sends anything anywhere. A suggestion is a draft the user accepts field by
+  field, and can be added to what they wrote rather than replacing it.
 - **Branding** — The name contains no YouTube mark. The interface is inspired by dark-mode creator
   tools but uses ShortStack's own mark and colours, and is never labelled as YouTube Studio. The
   app icon is three stacked bars, deliberately nothing like a play button.
