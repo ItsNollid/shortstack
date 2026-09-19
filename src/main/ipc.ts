@@ -567,7 +567,8 @@ export function registerIpcHandlers(context: IpcContext): void {
       // With the kind of title each video went out under, which only ShortStack knows.
       const brief = buildBrief(withTitleAngles(stats.value.value, listTitleAngles(db)));
       // Kept so writing a title can use it without two YouTube calls per video.
-      writeSetting(db, 'insight_findings', JSON.stringify(brief).slice(0, 8000));
+      // Dated, so the assistant can say when findings are too old to lean on.
+      writeSetting(db, 'insight_findings', JSON.stringify({ ...brief, madeAt: new Date().toISOString() }).slice(0, 8000));
       return ok(brief);
     },
 
