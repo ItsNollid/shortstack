@@ -2,10 +2,10 @@ import React from 'react';
 import { Lightbulb, Sparkles } from 'lucide-react';
 import type { MaxAge } from '../../../shared/analyticsRefresh';
 import type { Brief, Fact } from '../../../shared/insights';
-import { describeChange, type SettingChange } from '../../../shared/channelActions';
 import type { AdviceItemDTO, ChannelAdvice, Result } from '../../../shared/ipc';
 import { Banner, Button, Skeleton } from '../../components/ui';
 import { useApiMutation, useApiQuery } from '../../hooks/useApi';
+import { SettingChangeRow } from '../../components/SettingChangeRow';
 import styles from '../Analytics.module.css';
 
 /**
@@ -108,46 +108,17 @@ export function Insights({ days, pullId, maxAge }: { days: number; pullId: numbe
 }
 
 /**
- * One recommendation, with a button only when it carries a change ShortStack can actually make and
- * that would actually change something. The button says what it will do before it does it: nobody
- * should have to trust a sentence to know what pressing it means.
+ * One recommendation, with a button only when it carries a change ShortStack can actually make and that would
+ * actually change something.
  */
 function Recommendation({ item, findings }: { item: AdviceItemDTO; findings: readonly Fact[] }): React.JSX.Element {
-  const change = item.change;
-  const preview = useApiQuery(
-    (): Promise<Result<SettingChange | null>> =>
-      change === undefined
-        ? Promise.resolve({ ok: true, data: null })
-        : window.api.actionPreview(change),
-    { key: `preview:${JSON.stringify(change ?? null)}` }
-  );
-  const apply = useApiMutation(() => window.api.actionApply(change as NonNullable<typeof change>), {
-    onDone: preview.refresh
-  });
-
-  const proposed = preview.data;
-
   return (
     <div className={styles.recommendation}>
       <div className={styles.action}>{item.action}</div>
       {/* The finding itself, word for word. Asked to restate one, the model produced a single
           percentage and put it on three unrelated recommendations. */}
-      <div className={styles.because}>{findings.find((fact) => fact.id === item.basedOn)?.statement ?? ""}</div>
-
-      {apply.data !== null ? (
-        <div className={styles.applied}>Done — {describeChange(apply.data)}</div>
-      ) : (
-        proposed !== null &&
-        proposed !== undefined && (
-          <div className={styles.changeRow}>
-            <code className={styles.diff}>{describeChange(proposed)}</code>
-            <Button size="small" disabled={apply.pending} onClick={() => void apply.run()}>
-              {apply.pending ? 'Changing…' : 'Make this change'}
-            </Button>
-          </div>
-        )
-      )}
-      {apply.error !== null && <div className={styles.because}>{apply.error}</div>}
+      <div className={styles.because}>{findings.find((fact) => fact.id === item.basedOn)?.statement ?? ''}</div>
+      {item.change !== undefined && <SettingChangeRow change={item.change} />}
     </div>
   );
 }
