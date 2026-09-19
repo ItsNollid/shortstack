@@ -7,6 +7,7 @@ import { Banner, Button, Skeleton } from '../../components/ui';
 import { useApiMutation, useApiQuery } from '../../hooks/useApi';
 import { SettingChangeRow } from '../../components/SettingChangeRow';
 import styles from '../Analytics.module.css';
+import { useAssistant } from '../../components/assistant/AssistantProvider';
 
 /**
  * Two halves, deliberately in this order. What was measured comes first and is always shown; the
@@ -125,10 +126,18 @@ function Recommendation({ item, findings }: { item: AdviceItemDTO; findings: rea
 
 /** A weak finding is marked as one: acting on three videos is a different decision from thirty. */
 function Finding({ fact }: { fact: Fact }): React.JSX.Element {
+  const { openPanel } = useAssistant();
   return (
     <li className={styles.finding}>
       <span>{fact.statement}</span>
       {fact.confidence === 'weak' && <span className={styles.weak}>few videos</span>}
+      <button
+        type="button"
+        className={styles.askAbout}
+        onClick={() => openPanel({ kind: 'channel' }, `What should I do about this: ${fact.statement}`)}
+      >
+        Ask about this
+      </button>
     </li>
   );
 }

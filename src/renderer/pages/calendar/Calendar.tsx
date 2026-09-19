@@ -15,6 +15,7 @@ import { Chip } from './Chip';
 import { DropChoice } from './DropChoice';
 import { FillDialog } from './FillDialog';
 import styles from './Calendar.module.css';
+import { usePageScope } from '../../components/assistant/AssistantProvider';
 
 const readQueue = (): Promise<Result<QueueItemDTO[]>> => window.api.queueList();
 
@@ -35,6 +36,7 @@ function gridDays(year: number, month: number): Date[] {
 }
 
 export function Calendar(): React.JSX.Element {
+  usePageScope({ kind: 'plan' });
   const navigate = useNavigate();
   const toast = useToast();
   const { settings } = useAppStatus();

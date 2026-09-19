@@ -143,3 +143,6 @@
 
 /* Whose numbers these are, as YouTube requires for derived metrics. */
 .ownWork { font-size: var(--text-sm); color: var(--text-muted); }
+
+.askAbout { background: none; border: 0; color: var(--accent); cursor: pointer; font: inherit; font-size: var(--text-sm); margin-left: var(--space-2); padding: 0; }
+.askAbout:hover { text-decoration: underline; }

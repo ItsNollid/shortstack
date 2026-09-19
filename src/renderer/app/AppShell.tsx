@@ -9,6 +9,8 @@ import { Review } from '../pages/review/Review';
 import { SettingsPage } from '../pages/settings/Settings';
 import { FirstRun } from '../pages/setup/FirstRun';
 import { WhatsNew } from '../components/WhatsNew';
+import { AssistantPanel } from '../components/assistant/AssistantPanel';
+import { AssistantProvider } from '../components/assistant/AssistantProvider';
 import { VideoDetails } from '../pages/VideoDetails';
 import { Banners } from './Banners';
 import { Sidebar } from './Sidebar';
@@ -52,30 +54,34 @@ export function AppShell(): React.JSX.Element {
           <WhatsNew />
           {/* Hash routing: a packaged app loads from file://, where path routing has no server. */}
           <HashRouter>
-            <div className={styles.shell}>
-              <TitleBar />
-              <div className={styles.body}>
-                <Sidebar />
-                <main className={styles.main}>
-                  <div className={styles.banners}>
-                    <Banners />
-                  </div>
-                  <div className={styles.page}>
-                    <Routes>
-                      <Route path="/queue" element={<Queue />} />
-                    <Route path="/review" element={<Review />} />
-                      <Route path="/calendar" element={<Calendar />} />
-                      <Route path="/history" element={<History />} />
-                      <Route path="/analytics" element={<Analytics />} />
-                      <Route path="/settings" element={<SettingsPage />} />
-                      <Route path="/video/:id" element={<VideoDetailsRoute />} />
-                      <Route path="/diagnostics" element={<Diagnostics />} />
-                      <Route path="*" element={<Navigate to="/queue" replace />} />
-                    </Routes>
-                  </div>
-                </main>
+            <AssistantProvider>
+              <div className={styles.shell}>
+                <TitleBar />
+                <div className={styles.body}>
+                  <Sidebar />
+                  <main className={styles.main}>
+                    <div className={styles.banners}>
+                      <Banners />
+                    </div>
+                    <div className={styles.page}>
+                      <Routes>
+                        <Route path="/queue" element={<Queue />} />
+                        <Route path="/review" element={<Review />} />
+                        <Route path="/calendar" element={<Calendar />} />
+                        <Route path="/history" element={<History />} />
+                        <Route path="/analytics" element={<Analytics />} />
+                        <Route path="/settings" element={<SettingsPage />} />
+                        <Route path="/video/:id" element={<VideoDetailsRoute />} />
+                        <Route path="/diagnostics" element={<Diagnostics />} />
+                        <Route path="*" element={<Navigate to="/queue" replace />} />
+                      </Routes>
+                    </div>
+                  </main>
+                </div>
               </div>
-            </div>
+              {/* Outside the shell's layout: it floats over the right edge of whatever page is open. */}
+              <AssistantPanel />
+            </AssistantProvider>
           </HashRouter>
         </ApprovalProvider>
       </ToastProvider>

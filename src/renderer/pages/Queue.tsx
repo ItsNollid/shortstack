@@ -24,10 +24,12 @@ import { useRequestApproval } from '../app/approval';
 import { useAppStatus } from '../app/status';
 import styles from './Queue.module.css';
 import { QueueRow } from './QueueRow';
+import { usePageScope } from '../components/assistant/AssistantProvider';
 
 const readQueue = (): Promise<Result<QueueItemDTO[]>> => window.api.queueList();
 
 export function Queue(): React.JSX.Element {
+  usePageScope({ kind: 'plan' });
   const { settings } = useAppStatus();
   const navigate = useNavigate();
   const requestApproval = useRequestApproval();
