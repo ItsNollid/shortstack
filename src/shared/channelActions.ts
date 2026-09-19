@@ -36,6 +36,18 @@ export type ChannelAction =
   | { kind: 'set_max_hashtags'; value: number }
   | { kind: 'enable_auto_draft' };
 
+/** How each change is written, for a model to copy. Shared by the Analytics advice and the assistant. */
+export const CHANGE_FORMATS: readonly string[] = [
+  '{"kind":"set_upload_time","lane":"new"|"rotation","from":"HH:MM","to":"HH:MM"} — move one daily posting time. "from" has to be one of the times listed above and "to" has to be one that is not, or there is nothing to change.',
+  '{"kind":"add_upload_time","lane":"new"|"rotation","at":"HH:MM"} — add one',
+  '{"kind":"remove_upload_time","lane":"new"|"rotation","at":"HH:MM"} — remove one',
+  '{"kind":"set_title_case","value":"upper"|"title"|"as_written"} — how every title is capitalised',
+  '{"kind":"set_title_suffix","value":"..."} — text added to the end of every title',
+  '{"kind":"set_description_footer","value":"..."} — text added under every description',
+  '{"kind":"set_max_hashtags","value":0-60} — 0 means no limit',
+  '{"kind":"enable_auto_draft"} — draft details for new videos automatically'
+];
+
 export const ACTION_KINDS: readonly ActionKind[] = [
   'set_upload_time',
   'add_upload_time',

@@ -41,6 +41,8 @@ export interface AppSettings {
   auto_retry_max: number;
   ai_host: string;
   ai_model: string;
+  /** The model the assistant uses. Empty means the same one as suggestions. */
+  assistant_model: string;
   ai_auto_draft: boolean;
   /** Which details automatic drafting writes. At least one. */
   ai_auto_draft_fields: DraftField[];
@@ -294,6 +296,7 @@ export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> 
   auto_retry_max: integer(3, 0, 10),
   ai_host: text('http://127.0.0.1:11434', checkLocalOllamaUrl),
   ai_model: text('', (value) => (value.length > 200 ? 'That model name is too long' : null)),
+  assistant_model: text('', (value) => (value.length > 200 ? 'That model name is too long' : null)),
   ai_auto_draft: bool(false),
   // All three by default, which is what drafting did before there was a choice.
   ai_auto_draft_fields: stringList([...DRAFT_FIELDS], checkDraftFields) as unknown as SettingCodec<DraftField[]>,

@@ -90,7 +90,7 @@ async function withTimeout<T>(timeoutMs: number, run: (signal: AbortSignal) => P
   }
 }
 
-const unreachable = (error: unknown): AiResult<never> => ({
+export const unreachable = (error: unknown): AiResult<never> => ({
   ok: false,
   code: 'not_running',
   reason: `Ollama is not answering: ${error instanceof Error ? error.message : String(error)}`

@@ -27,6 +27,9 @@ so it reaches people who missed it the first time — without notifying your sub
   either, and each platform is a per-video choice.
 - **Fills the calendar in one click**, giving every video without a time the next free one from your
   daily times — shown as a list first, undone from the message, and never an approval.
+- **Answers questions about your channel, a video or your plan** in a panel on every page (Ctrl+K), using only
+  what ShortStack measured. Any number it cannot find in your data is pointed out, and changes are buttons you
+  press — it cannot approve, schedule or upload anything.
 - **Uploads either way**: through YouTube Studio with ShortStack walking you through it, or
   directly through the API once your Google Cloud project passes YouTube's audit.
 

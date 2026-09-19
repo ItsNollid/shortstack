@@ -47,6 +47,19 @@ export class PulledCache {
     return started;
   }
 
+  /**
+   * The most recently pulled answer kept under any key starting with `prefix`, or null. Never fetches: the assistant
+   * reads what the Analytics page already pulled, and answering a question must not spend YouTube quota.
+   */
+  newest<T>(prefix: string): Pulled<T> | null {
+    let found: Pulled<unknown> | null = null;
+    for (const [key, pulled] of this.kept) {
+      if (!key.startsWith(prefix)) continue;
+      if (found === null || Date.parse(pulled.pulledAt) > Date.parse(found.pulledAt)) found = pulled;
+    }
+    return found as Pulled<T> | null;
+  }
+
   clear(): void {
     this.generation += 1;
     this.kept.clear();

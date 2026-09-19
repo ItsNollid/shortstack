@@ -8,7 +8,7 @@
 // So its job is narrow: take findings it cannot check and turn them into things to do. The
 // instructions are mostly about what it may not do — invent a number, add a fact, or pad the answer
 // when the findings are thin.
-import { parseAction, type ChannelAction } from '../../shared/channelActions';
+import { CHANGE_FORMATS, parseAction, type ChannelAction } from '../../shared/channelActions';
 import { GOAL_WORDS, type InsightGoal } from '../../shared/insightGoal';
 import type { Brief } from '../../shared/insights';
 
@@ -70,14 +70,7 @@ export function buildInsightPrompt(input: InsightPromptInput): string {
     '',
     '--- Changes you may ask for ---',
     'A recommendation may carry a "change", which ShortStack will offer as a button. It has to be one of these exactly, and nothing else is accepted:',
-    '{"kind":"set_upload_time","lane":"new"|"rotation","from":"HH:MM","to":"HH:MM"} — move one daily posting time. "from" has to be one of the times listed above and "to" has to be one that is not, or there is nothing to change.',
-    '{"kind":"add_upload_time","lane":"new"|"rotation","at":"HH:MM"} — add one',
-    '{"kind":"remove_upload_time","lane":"new"|"rotation","at":"HH:MM"} — remove one',
-    '{"kind":"set_title_case","value":"upper"|"title"|"as_written"} — how every title is capitalised',
-    '{"kind":"set_title_suffix","value":"..."} — text added to the end of every title',
-    '{"kind":"set_description_footer","value":"..."} — text added under every description',
-    '{"kind":"set_max_hashtags","value":0-60} — 0 means no limit',
-    '{"kind":"enable_auto_draft"} — draft details for new videos automatically',
+    ...CHANGE_FORMATS,
     'The "new" lane is first postings; "rotation" is videos posted again. Their current times are above.',
     'Leave "change" out entirely when a recommendation is not one of these. Most good advice is not — "record more of the game that converts" is a real recommendation with no change attached, and inventing one to fill the field is worse than leaving it empty.',
     '',

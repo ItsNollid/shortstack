@@ -144,6 +144,10 @@ const emit = (event: AppEvent): void => {
   for (const listener of listeners.get(event) ?? []) listener(null);
 };
 
+const emitWith = (event: AppEvent, payload: unknown): void => {
+  for (const listener of listeners.get(event) ?? []) listener(structuredClone(payload));
+};
+
 const ok = <T>(data: T): Promise<{ ok: true; data: T }> =>
   // Structured-cloned the way IPC would, so the preview cannot hand out live references.
   Promise.resolve({ ok: true as const, data: structuredClone(data) });
@@ -279,6 +283,28 @@ export function installDevApiStub(): void {
       emit('queue:changed');
       return ok(undone);
     },
+    assistantAsk: (requestId: string, scope: { kind: string }, question: string) => {
+      const answer = `This is the preview, with no model behind it. You asked about the ${scope.kind}: "${question}".`;
+      setTimeout(() => emitWith('assistant:stream', { requestId, type: 'text', text: answer }), 50);
+      setTimeout(
+        () =>
+          emitWith('assistant:stream', {
+            requestId,
+            type: 'done',
+            prose: answer,
+            changes: [],
+            unsupportedNumbers: [],
+            basedOn: 'sample data',
+            ownCalculations: true,
+            needsRefresh: false,
+            finished: true
+          }),
+        100
+      );
+      return ok(null);
+    },
+    assistantStop: () => ok(null),
+    assistantWarm: () => ok(null),
     settingsIgnored: () => ok([]),
     queueRestylePreview: () => ok([]),
     queueRestyle: () => ok({ changed: 0, skipped: 0 }),

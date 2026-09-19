@@ -26,6 +26,16 @@ function canSee(models: readonly AiModel[], name: string): boolean {
   return findModel(models, name)?.vision ?? isVisionModel(name);
 }
 
+/** "Same as suggestions" first, then what is installed, keeping a saved choice that is no longer installed visible. */
+function assistantModelOptions(models: readonly AiModel[], current: string): Array<{ value: string; label: string }> {
+  const installed = models.map((model) => ({
+    value: model.name,
+    label: model.vision ? `${model.name} — can see images, which the assistant does not need` : model.name
+  }));
+  const gone = current !== '' && findModel(models, current) === undefined ? [{ value: current, label: `${current} — not installed` }] : [];
+  return [{ value: '', label: 'Same as suggestions' }, ...installed, ...gone];
+}
+
 export function AiSection({ writer }: { writer: SettingsWriter }): React.JSX.Element {
   const ai = useApiQuery(readAi, { key: 'ai-settings' });
   const { settings } = writer;
@@ -58,6 +68,13 @@ export function AiSection({ writer }: { writer: SettingsWriter }): React.JSX.Ele
       />
 
       <ModelPicker models={models} value={settings.ai_model} onChange={(model) => writer.set('ai_model', model)} />
+      <Select
+        label="Model for the assistant"
+        value={settings.assistant_model}
+        onChange={(model) => writer.set('assistant_model', model)}
+        options={assistantModelOptions(models, settings.assistant_model)}
+        hint="The assistant only reads text, so a model that cannot see images usually answers it faster."
+      />
 
       <Switch
         label="Draft details for new videos automatically"

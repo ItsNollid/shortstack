@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, MessageCircleQuestion } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import type { QueueItemDTO } from '../../shared/dto';
 import { DEFAULT_CATEGORY_ID, VIDEO_CATEGORIES } from '../../shared/categories';
@@ -30,6 +30,7 @@ import { SourceField } from '../components/SourceField';
 import { keepsAngle, type TitleAngle } from '../../shared/titleAngles';
 import { HeardPanel } from './HeardPanel';
 import { PlatformPostsPanel } from './PlatformPostsPanel';
+import { useAssistant, usePageScope } from '../components/assistant/AssistantProvider';
 
 interface Draft {
   title: string;
@@ -68,6 +69,8 @@ export function VideoDetails({ onApprove }: { onApprove: (item: QueueItemDTO) =>
   const { settings } = useAppStatus();
   const { id = '' } = useParams();
   const queueId = Number(id);
+  usePageScope(Number.isInteger(queueId) && queueId > 0 ? { kind: 'video', queueId } : null);
+  const { openPanel } = useAssistant();
   const item = useApiQuery(() => window.api.queueGet(queueId), {
     key: `video:${queueId}`,
     invalidateOn: ['queue:changed'],
@@ -158,9 +161,14 @@ export function VideoDetails({ onApprove }: { onApprove: (item: QueueItemDTO) =>
 
   return (
     <>
-      <Link to="/queue" className={styles.back}>
-        <ArrowLeft size={15} /> Queue
-      </Link>
+      <div className={styles.topRow}>
+        <Link to="/queue" className={styles.back}>
+          <ArrowLeft size={15} /> Queue
+        </Link>
+        <Button size="small" icon={<MessageCircleQuestion size={14} />} onClick={() => openPanel({ kind: 'video', queueId })}>
+          Ask about this video
+        </Button>
+      </div>
 
       <div className={styles.columns}>
         <div className={styles.form}>

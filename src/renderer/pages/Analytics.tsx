@@ -19,6 +19,7 @@ import { Insights } from './analytics/Insights';
 import { AudienceSection, CountriesSection, DepthKpis, ReachSection, SourcesSection, TopVideosSection } from './analytics/Sections';
 import { useSettings } from './settings/useSettings';
 import styles from './Analytics.module.css';
+import { usePageScope } from '../components/assistant/AssistantProvider';
 
 const RANGES = ['7', '28', '90'] as const;
 type Range = (typeof RANGES)[number];
@@ -127,6 +128,7 @@ function RefreshControls({
 }
 
 export function Analytics(): React.JSX.Element {
+  usePageScope({ kind: 'channel' });
   const { auth, settings } = useAppStatus();
   const [range, setRange] = useState<Range>('28');
   const [pull, setPull] = useState<PullRequest | null>(null);

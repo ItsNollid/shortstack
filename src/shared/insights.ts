@@ -541,6 +541,8 @@ export interface Brief {
   videoCount: number;
   /** True when there is so little to go on that advice would be invention. */
   tooEarly: boolean;
+  /** When these findings were worked out. Absent on findings saved before it was recorded. */
+  madeAt?: string;
 }
 
 export function buildBrief(videos: readonly VideoStat[]): Brief {
@@ -584,7 +586,8 @@ export function parseBrief(raw: string): Brief | null {
       usable: parsed.usable,
       missing: Array.isArray(parsed.missing) && parsed.missing.every(isFact) ? parsed.missing : [],
       videoCount: typeof parsed.videoCount === 'number' ? parsed.videoCount : 0,
-      tooEarly: parsed.tooEarly === true
+      tooEarly: parsed.tooEarly === true,
+      ...(typeof parsed.madeAt === 'string' ? { madeAt: parsed.madeAt } : {})
     };
   } catch {
     return null;

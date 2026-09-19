@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, CircleSlash, FolderOpen, History, Repeat, RotateCw, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, CircleSlash, FolderOpen, History, MessageCircleQuestion, Repeat, RotateCw, X } from 'lucide-react';
 import type { QueueItemDTO } from '../../../shared/dto';
 import type { Result } from '../../../shared/ipc';
 import { VIDEO_CATEGORIES } from '../../../shared/categories';
@@ -34,6 +34,7 @@ import { AiAssistPanel, type AiField } from '../AiAssistPanel';
 import { VideoReadingPanel } from '../VideoReadingPanel';
 import { HeardPanel } from '../HeardPanel';
 import { PlatformChoice } from '../../components/PlatformChoice';
+import { useAssistant, usePageScope } from '../../components/assistant/AssistantProvider';
 
 const readQueue = (): Promise<Result<QueueItemDTO[]>> => window.api.queueList();
 
@@ -78,6 +79,8 @@ export function Review(): React.JSX.Element {
   }, [pending.length]);
 
   const item = pending[index] ?? null;
+  usePageScope(item === null ? null : { kind: 'video', queueId: item.id });
+  const { openPanel } = useAssistant();
 
   // Editing follows the card: moving to another video loads its details, not the last one's.
   useEffect(() => {
@@ -246,6 +249,9 @@ export function Review(): React.JSX.Element {
         {save.pending && <span className={styles.saving}>Saving…</span>}
         {!save.pending && justSaved && <span className={styles.saved}>Saved</span>}
         <div className={styles.nav}>
+          <Button size="small" icon={<MessageCircleQuestion size={14} />} onClick={() => openPanel({ kind: 'video', queueId: item.id })}>
+            Ask
+          </Button>
           <Button size="small" icon={<ChevronLeft size={14} />} aria-label="Previous video" onClick={() => move(-1)} />
           <Button size="small" icon={<ChevronRight size={14} />} aria-label="Next video" onClick={() => move(1)} />
         </div>

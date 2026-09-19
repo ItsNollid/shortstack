@@ -1,7 +1,8 @@
 import React from 'react';
-import { Activity, CalendarDays, ChartColumn, LayoutGrid, ListVideo, Pause, Play, ScrollText, Settings } from 'lucide-react';
+import { Activity, CalendarDays, ChartColumn, LayoutGrid, ListVideo, MessageCircleQuestion, Pause, Play, ScrollText, Settings } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { Avatar, Button } from '../components/ui';
+import { useAssistant } from '../components/assistant/AssistantProvider';
 import { useApiMutation } from '../hooks/useApi';
 import { connectionStage, describeConnection } from '../../shared/connection';
 import { useAppStatus } from './status';
@@ -24,6 +25,7 @@ const subscriberLabel = (count: number | null): string =>
   count === null ? 'connected' : `${count.toLocaleString()} subscriber${count === 1 ? '' : 's'}`;
 
 export function Sidebar(): React.JSX.Element {
+  const { openPanel } = useAssistant();
   const { auth, info, scheduler, refreshScheduler } = useAppStatus();
   const channel = auth?.channel ?? null;
   const connection =
@@ -67,6 +69,11 @@ export function Sidebar(): React.JSX.Element {
             {link.to === '/queue' && waiting > 0 && <span className={styles.badge}>{waiting}</span>}
           </NavLink>
         ))}
+        <button type="button" className={`${styles.link} ${styles.linkButton}`} onClick={() => openPanel()}>
+          <MessageCircleQuestion size={ICON} />
+          Assistant
+          <kbd className={styles.kbd}>Ctrl K</kbd>
+        </button>
       </div>
 
       <div className={styles.spacer} />
