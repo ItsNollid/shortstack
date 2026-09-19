@@ -40,8 +40,13 @@ built into the app.
 4. `npm run release` — verifies, regenerates the docs, creates the draft release with those notes, builds,
    and uploads to it. The draft is created first on purpose: electron-builder uploads the installer and
    its blockmap at once, and each would otherwise create a release of its own, leaving two drafts.
+   Run it again after changing the notes and it updates the draft rather than making another.
    If the app is running from `dist`, it holds those files open; build somewhere else by adding
    `-c.directories.output=dist/release-<version>` to the electron-builder step.
+
+   Never edit a draft through the API by hand with only a body: a `PATCH` that leaves out `tag_name`
+   clears the draft tag, electron-builder then finds no release for the version, and you get the two
+   drafts this step exists to prevent. Measured the hard way on 1.3.0.
 5. Publish the draft release on GitHub. Until it is published nobody's app can see it — drafts are
    not readable without a token, which is exactly what makes the draft a safe place to check the
    notes and the installer before anyone gets them.
