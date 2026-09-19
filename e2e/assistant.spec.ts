@@ -70,7 +70,8 @@ test('the assistant answers about a video from what ShortStack found, and a sugg
     await expect(panel.getByText('About: INSANE CLUTCH')).toBeVisible();
     await panel.getByRole('button', { name: 'Is this title good?' }).click();
 
-    await expect(panel.getByText('The title promises a clutch')).toBeVisible();
+    // Twice over: the answer itself, and again in the hidden line screen readers announce once it is finished.
+    await expect(panel.getByText('The title promises a clutch').first()).toBeVisible();
     await expect(panel.getByText(/^Based on this video/)).toBeVisible();
 
     await panel.getByRole('button', { name: 'Use this' }).click();
