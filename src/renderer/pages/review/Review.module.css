@@ -26,6 +26,10 @@
 }
 @media (max-width: 1000px) {
   .body { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'left' 'right' 'assist'; }
+  /* In one column the preview sits above the fields, and at its usual height it fills the window, leaving the
+     title and description — what this screen is for — below the fold. Height first, as the preview itself
+     insists: capping its width instead stops it being 9:16. */
+  .left > :first-child { height: min(30vh, 260px); }
 }
 
 .assist { grid-area: assist; display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
