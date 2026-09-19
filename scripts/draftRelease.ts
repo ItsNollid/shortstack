@@ -34,7 +34,14 @@ async function main(): Promise<void> {
   const releases = (await listed.json()) as Array<{ id: number; tag_name: string; draft: boolean; html_url: string }>;
   const notes = readFileSync(path.join(root, 'docs', 'releases', `${version}.md`), 'utf8');
 
-  const existing = releases.find((release) => release.tag_name === tag);
+  const matching = releases.filter((release) => release.tag_name === tag);
+  // More than one release claiming a version is the mess this script exists to prevent, and picking one would be
+  // a guess: on 1.3.0 the guess put the new notes on a duplicate and left the real draft with the old ones.
+  if (matching.length > 1) {
+    const where = matching.map((release) => release.html_url).join(', ');
+    throw new Error(`${matching.length} releases claim ${tag} (${where}). Delete or retag the extras first.`);
+  }
+  const existing = matching[0];
   if (existing !== undefined) {
     if (!existing.draft) throw new Error(`${tag} is already published. Bump the version before releasing again.`);
     // The notes usually moved on since the draft was made, so they are sent again. The tag goes with them and
