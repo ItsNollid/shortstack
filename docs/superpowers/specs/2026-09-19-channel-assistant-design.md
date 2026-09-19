@@ -35,7 +35,8 @@ A short channel summary is included in every scope, so "and how's the channel ov
 - **Answers stream** as they are written. While a thinking model is still thinking, it says so.
 - **Under each answer:**
   - suggested changes as buttons (below);
-  - **Based on** — what the answer drew from, e.g. "34 videos over 90 days; time of day: strong";
+  - **Based on** — what the answer drew from, e.g. "34 videos over 90 days; time of day: strong", with the
+    "ShortStack's own calculations — not YouTube data" label whenever findings or comparisons were used;
   - **follow-up questions**, chosen by code from what was just asked.
 - **When it does not know**, it says so and offers what would help ("Refresh Analytics").
 - **Stop** ends a long answer; what already arrived stays, marked unfinished. **Clear** empties the chat.
@@ -113,8 +114,14 @@ briefs without it.
 
 ## Safety and privacy
 
-- Nothing leaves the computer: it is the same local Ollama as suggestions, and nothing is written to disk.
-  The privacy policy needs no change, so `LEGAL_VERSION` does not move.
+- **YouTube's derived-metrics rules apply** (Developer Policies III.E.4.h and Section L). Every answer that
+  draws on findings or comparisons worked out from YouTube data carries the label "ShortStack's own
+  calculations — not YouTube data" in its Based on line, as the Analytics findings card already does. The
+  comparisons it makes (a video against the channel's typical, as a median) are the ones declared on the
+  audit form; it must not introduce new kinds of derived figure without the form being updated first.
+- Nothing leaves the computer. It is the same local Ollama as suggestions, and Settings refuses any model
+  address that is not this computer's own. Nothing is written to disk. The privacy policy already covers
+  this use as of `LEGAL_VERSION` 2026-09-19, so the assistant does not move it.
 - The creator's own text in the facts — titles, descriptions, what was said — is quoted and labelled as
   their content, and what was said is cut to an excerpt. A title reading "ignore your instructions" can at
   worst produce an odd sentence: every change still has to be a known kind and still needs a button press.
@@ -135,6 +142,8 @@ briefs without it.
 
 - **Facts:** each scope from fixed data — the right sentences; weak findings called weak; "twice your
   usual" correct at its boundaries; excerpts cut to length.
+- **Labelling:** every answer built on findings or comparisons shows the own-calculations label; one built
+  only on a video's own checks does not need it.
 - **Reply:** changes outside the known kinds rejected, including attempts at approve, schedule and upload;
   an unreadable block leaves the prose intact; the number check flags invented numbers and passes ones
   found in the facts.
