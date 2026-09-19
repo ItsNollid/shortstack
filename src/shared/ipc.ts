@@ -19,6 +19,7 @@ import type { ListeningStatus } from './listening';
 import type { HeardDTO } from './transcript';
 import type { PlatformPostDTO, PreparedFileDTO } from './platformPosts';
 import type { Platform } from './queue';
+import type { AssistantScope, AssistantTurn } from './assistant/types';
 import type { FillPlan } from './fillSchedule';
 
 /** Failures are values, not thrown errors: Electron turns a rejection into an unreadable string. */
@@ -104,7 +105,8 @@ export const APP_EVENTS = [
   'toast',
   'update:changed',
   'reading:changed',
-  'listening:changed'
+  'listening:changed',
+  'assistant:stream'
 ] as const;
 
 /**
@@ -249,6 +251,12 @@ export interface ShortStackApi {
   actionPreview(action: ChannelAction): Promise<Result<SettingChange | null>>;
   /** Makes it. Validated again here: the renderer is not what decides an action is allowed. */
   actionApply(action: ChannelAction): Promise<Result<SettingChange>>;
+  /** Starts an answer under the panel's own id; the words arrive as assistant:stream events carrying it. */
+  assistantAsk(requestId: string, scope: AssistantScope, question: string, history: AssistantTurn[]): Promise<Result<null>>;
+  /** Ends an answer early. What arrived stays, marked unfinished. */
+  assistantStop(requestId: string): Promise<Result<null>>;
+  /** Loads the assistant's model in the background, so the first answer is not also a cold start. */
+  assistantWarm(): Promise<Result<null>>;
   /** Previously published videos, so their details can be reused on a new posting. */
   pastUploadsList(pageToken?: string): Promise<Result<PastUploadPage>>;
   uploadsList(): Promise<Result<UploadDTO[]>>;
@@ -337,6 +345,9 @@ export const IPC_METHODS: ReadonlyArray<Exclude<keyof ShortStackApi, 'on'>> = [
   'quotaGet',
   'actionPreview',
   'actionApply',
+  'assistantAsk',
+  'assistantStop',
+  'assistantWarm',
   'pastUploadsList',
   'uploadsList',
   'activityList',

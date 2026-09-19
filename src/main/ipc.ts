@@ -44,6 +44,8 @@ import { PLATFORMS, type Platform } from '../shared/queue';
 import { findTools, renderForPlatforms, renderPath } from './media/renderRunner';
 import { setQueuePlatforms } from './db/queueRepo';
 import { forgetChannelData } from './youtube/channelData';
+import { isAssistantHistory, isAssistantScope, isRequestId, MAX_QUESTION_CHARS } from '../shared/assistant/types';
+import type { AssistantService } from './assistant/service';
 import { applyFill, previewFill, undoFill } from './scheduler/fill';
 
 export interface IpcContext {
@@ -69,6 +71,8 @@ export interface IpcContext {
   appIcon: { refresh(avatarUrl: string | null): Promise<boolean>; clear(): Promise<void> };
   /** The analytics kept for the page, shared so retention can clear them too. */
   analytics: PulledCache;
+  /** The channel assistant. Absent where the app runs without it, such as in some tests. */
+  assistant?: AssistantService;
 }
 
 type Handlers = { [K in Exclude<keyof ShortStackApi, 'on'>]: ShortStackApi[K] };
@@ -802,6 +806,26 @@ export function registerIpcHandlers(context: IpcContext): void {
       if (item === undefined) return fail('not_found', 'That video is no longer in the queue');
       // Only paths already recorded in the database are ever revealed.
       shell.showItemInFolder(item.filepath);
+      return ok(null);
+    },
+    assistantAsk: async (requestId, scope, question, history) => {
+      if (context.assistant === undefined) return fail('unavailable', 'The assistant is not available in this build');
+      if (!isRequestId(requestId)) return fail('invalid', 'That answer id is not valid');
+      if (!isAssistantScope(scope)) return fail('invalid', 'That is not something the assistant can look at');
+      if (typeof question !== 'string' || question.trim() === '' || question.length > MAX_QUESTION_CHARS) {
+        return fail('invalid', 'Ask a question of up to 1,000 characters');
+      }
+      if (!isAssistantHistory(history)) return fail('invalid', 'That conversation is not valid');
+      context.assistant.ask(requestId, scope, question.trim(), history);
+      return ok(null);
+    },
+    assistantStop: async (requestId) => {
+      if (!isRequestId(requestId)) return fail('invalid', 'That answer id is not valid');
+      context.assistant?.stop(requestId);
+      return ok(null);
+    },
+    assistantWarm: async () => {
+      void context.assistant?.warm();
       return ok(null);
     },
     openExternal: async (url) => {

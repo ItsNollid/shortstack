@@ -9,6 +9,8 @@ import { readSettings, writeSetting } from './db/settingsRepo';
 import { broadcast, registerIpcHandlers } from './ipc';
 import { PulledCache } from './youtube/pulledCache';
 import { checkChannelRetention } from './youtube/retention';
+import type { VideoStat } from '../shared/insights';
+import { AssistantService } from './assistant/service';
 import { createSchedulerEffects } from './scheduler/effects';
 import { DraftWorker } from './ai/draftWorker';
 import { UpdateService } from './updates/updateService';
@@ -128,6 +130,12 @@ async function start(): Promise<void> {
   const thumbnailDir = path.join(app.getPath('userData'), 'thumbs');
   // Shared with the retention check, which clears it when the channel details go.
   const analytics = new PulledCache();
+  // Reads the newest Analytics pull and never makes one: a question must not spend YouTube quota.
+  const assistant = new AssistantService({
+    db,
+    videoStats: () => analytics.newest<VideoStat[]>('videos:'),
+    emit: (event) => broadcast(mainWindow, 'assistant:stream', event)
+  });
   handleMediaRequests({ db, thumbnailDir });
 
   appIcon = new AppIcon({
@@ -215,7 +223,8 @@ async function start(): Promise<void> {
     updates,
     getWindow: () => mainWindow,
     appIcon,
-    analytics
+    analytics,
+    assistant
   });
 
   mainWindow = createMainWindow({
