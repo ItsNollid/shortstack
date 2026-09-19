@@ -5,6 +5,7 @@ import type Database from 'better-sqlite3';
 import type { UploadMethod } from '../../shared/queue';
 import { clearPastUploadsCache } from '../ai/draft';
 import { clearChannels } from '../db/channelRepo';
+import { writeSetting } from '../db/settingsRepo';
 import { applyQueueEvent, listQueueItems } from '../db/queueRepo';
 import { clearThumbnails } from '../media/thumbnails';
 
@@ -31,6 +32,12 @@ export async function forgetChannelData(deps: ForgetChannelDeps, reason: ForgetR
   await deps.appIcon.clear();
   deps.analytics.clear();
   clearPastUploadsCache();
+  // Findings are worked out from the channel’s analytics, so they go with them: on a disconnect, and when
+  // authorisation has gone a month unconfirmed.
+  writeSetting(deps.db, 'insight_findings', '');
+  // Tables from the first version of the app. Nothing writes them now; they are emptied anyway, in case an
+  // old build ever put figures in them.
+  deps.db.exec('DELETE FROM analytics; DELETE FROM channel_analytics;');
   if (reason === 'unconfirmed') return;
 
   // Poster frames are drawn from the person's own videos, so they go with the rest of it.

@@ -1,6 +1,6 @@
 # ShortStack Privacy Policy
 
-_Last updated 2026-09-13_
+_Last updated 2026-09-19_
 
 ## What ShortStack is
 
@@ -20,6 +20,14 @@ If you switch on listening, ShortStack also reads the sound of the videos it dra
 
 If you post a video to TikTok or Instagram, ShortStack makes a copy of it in a format those platforms take, kept on this computer, and opens their websites in your browser for you to post it. It does not sign in to TikTok or Instagram or send them anything itself. The links you paste to your posts are kept with the video.
 
+## How it uses your data
+
+Your channel’s analytics are shown to you on the Analytics page. ShortStack also works out findings from them about your own videos — for example which posting times, title styles and games do best, and how one video compares with your usual. These findings are ShortStack’s own calculations, not figures published or approved by YouTube, and they are labelled that way wherever they appear.
+
+If you switch suggestions on, those findings, together with your videos’ titles, descriptions and tags and what ShortStack saw and heard in them, are given to the Ollama model on your computer so it can write suggestions and advice. ShortStack only accepts an Ollama model running on this computer, so none of it is sent anywhere else.
+
+Your YouTube data is used only for these things, and only for you. It is never sold or shared, never used for advertising, and never used to train any AI model.
+
 ## Where your data is kept
 
 Everything ShortStack stores is kept on your computer: a local database file, your video details, your settings, and your Google sign-in tokens, which are encrypted using the operating system’s own secure storage.
@@ -28,13 +36,13 @@ There is no ShortStack server. Your data is never sent to the developer or to an
 
 ## How long it is kept
 
-Channel details and your channel picture are refreshed while ShortStack is connected. If they cannot be refreshed for 30 days, they are deleted.
+Channel details and your channel picture are refreshed while ShortStack is connected. If they cannot be refreshed for 30 days, they are deleted, together with the findings worked out from your analytics.
 
 Your queue, settings and activity record stay on your computer until you delete them or uninstall the app.
 
 ## Removing your data
 
-Settings, then Legal and data, has “Disconnect and delete YouTube data”. It revokes ShortStack’s access with Google straight away and deletes the stored tokens, channel details, channel picture and analytics from this computer.
+Settings, then Legal and data, has “Disconnect and delete YouTube data”. It revokes ShortStack’s access with Google straight away and deletes the stored tokens, channel details, channel picture, analytics, and the findings worked out from them from this computer.
 
 You can also remove ShortStack’s access at any time from the Google security settings page at https://myaccount.google.com/permissions. If you do, ShortStack deletes the same data the next time it runs, and within 30 days at the latest.
 

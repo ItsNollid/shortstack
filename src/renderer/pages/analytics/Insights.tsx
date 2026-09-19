@@ -41,6 +41,10 @@ export function Insights({ days, pullId, maxAge }: { days: number; pullId: numbe
         <span className={styles.cardTitle}>What your own videos say</span>
         <span className={styles.range}>measured across {videoCount} videos</span>
       </div>
+      {/* Required by YouTube for anything worked out from its data: say plainly whose numbers these are. */}
+      <div className={styles.ownWork}>
+        ShortStack’s own calculations from your YouTube figures — estimates, not data published or approved by YouTube.
+      </div>
 
       {tooEarly ? (
         <Banner kind="info" title="Not enough to go on yet">

@@ -140,3 +140,6 @@
   font: inherit;
   font-size: var(--text-sm);
 }
+
+/* Whose numbers these are, as YouTube requires for derived metrics. */
+.ownWork { font-size: var(--text-sm); color: var(--text-muted); }

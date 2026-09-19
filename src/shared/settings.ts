@@ -249,13 +249,22 @@ function checkRotationTimes(times: string[]): string | null {
   return new Set(times).size === times.length ? null : 'Rotation times must all be different';
 }
 
-function checkHttpUrl(value: string): string | null {
+/**
+ * The model is given titles, descriptions and findings worked out from YouTube data, and the privacy policy
+ * promises all of that stays on this computer. Another machine’s address would quietly break the promise, and
+ * YouTube’s policies do not allow its data to reach anyone but the person who authorised it.
+ */
+const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(['127.0.0.1', 'localhost', '[::1]']);
+
+function checkLocalOllamaUrl(value: string): string | null {
+  let url: URL;
   try {
-    const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:' ? null : 'Use an http:// or https:// address';
+    url = new URL(value);
   } catch {
     return 'Enter an address like http://127.0.0.1:11434';
   }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return 'Use an http:// or https:// address';
+  return LOOPBACK_HOSTS.has(url.hostname) ? null : 'Ollama has to run on this computer: use 127.0.0.1 or localhost';
 }
 
 export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> } = {
@@ -283,7 +292,7 @@ export const SETTINGS_SCHEMA: { [K in SettingKey]: SettingCodec<AppSettings[K]> 
   auto_approve: bool(false),
   auto_approve_consented_at: isoDateOrNull(),
   auto_retry_max: integer(3, 0, 10),
-  ai_host: text('http://127.0.0.1:11434', checkHttpUrl),
+  ai_host: text('http://127.0.0.1:11434', checkLocalOllamaUrl),
   ai_model: text('', (value) => (value.length > 200 ? 'That model name is too long' : null)),
   ai_auto_draft: bool(false),
   // All three by default, which is what drafting did before there was a choice.

@@ -32,7 +32,8 @@ operating system's secure storage. Transcripts, when listening is used, are kept
 The hosts ShortStack contacts are:
 
 - Google's own APIs, for everything in the table below.
-- An Ollama model on the same computer, for suggestions, if the user switches them on.
+- An Ollama model on the same computer, for suggestions, if the user switches them on. Settings refuses
+  any address that is not this computer’s own.
 - GitHub and Hugging Face, and only when the user asks to download the listening engine or a model.
   Nothing from their videos is sent with that request.
 - GitHub Releases, to see whether a newer version of ShortStack exists.
@@ -77,6 +78,34 @@ Scopes requested:
 `youtube.upload`, `youtube.readonly`, `youtube.force-ssl`, `yt-analytics.readonly`.
 `youtube.force-ssl` is needed because `videos.update` accepts no narrower scope; it is used only to
 set the publish time and visibility of videos the user approved.
+
+---
+
+## Derived metrics (Section L)
+
+ShortStack works out findings from the channel’s own analytics, so it needs the derived-metrics
+amendment. **When submitting, choose Section 5, "Analytics & Reporting", as the use case, and accept
+the amendment to the Developer Policies.**
+
+What it derives — from the authorising user’s own channel, shown to that user only:
+
+- Typical views by the hour and by the weekday a video went public.
+- The typical share of each video watched, from `averageViewPercentage`.
+- Subscribers gained per 1,000 views.
+- How videos compare by title style, title kind, game, tags and posting cadence.
+- Planned: one video’s figures against the channel’s typical ones, in an assistant panel.
+
+"Typical" means the **median**, not the mean, so a single viral video does not skew it. It is said here
+so it can be approved knowingly, since the amendment names averages, sums and ratios. A group is only
+compared when it holds at least three videos, and each finding is marked strong, weak, or not enough
+data.
+
+Every finding is shown under the label "ShortStack’s own calculations from your YouTube figures —
+estimates, not data published or approved by YouTube". Figures YouTube itself reports carry the
+YouTube Analytics attribution instead.
+
+Storage: findings are kept as sentences in the local database until the next refresh, or until the
+user disconnects. Per-video figures are held in memory only and never written to disk.
 
 ---
 
