@@ -2,6 +2,27 @@
 
 _Generated from `src/shared/changelog.ts`, which is what the app shows after an update. Edit that._
 
+## 1.3.0 — Suggestions that have watched and listened, a Review page that finishes a video, and posting to TikTok and Instagram
+
+_Released 2026-09-18_
+
+- ShortStack looks at stills from across a video: it offers a cover frame from the moments that are actually play rather than a menu, and says whether the first second shows anything worth staying for.
+- A title that promises a kill, a clutch or a fail is checked against what those stills show, so a title the video does not deliver is pointed out before you publish it.
+- Titles are offered as options of different kinds — a question, a number, a plain claim — and Analytics works out which kind your channel does best with, so later suggestions lean that way.
+- Re-runs can be drafted afresh, under a title that posting has never gone out with before, instead of repeating the one that already ran.
+- ShortStack can listen to what is said in a video and use it for titles, all on this computer. It stays off until you switch it on, and the engine and the model are downloaded from Settings, which says which one suits your computer.
+- Post to TikTok and Instagram with the same help YouTube gets: a copy of the video in the format each one takes, the details laid out to paste, their site opened for you, and the link to your post kept with the video afterwards. Choose per video, or switch it on for everything new.
+- The Review page now holds everything the queue does — title, description, tags, visibility, publish time, platforms and every check — so a video can be finished there and never opened again.
+- A suggested description or set of tags can be added to the start or the end of what you already wrote, instead of only replacing it.
+- One button fills the calendar: every video without a time gets the next free one from your daily times, listed before anything changes and undone from the message afterwards. It never approves or uploads anything.
+- An update arrives as one release rather than two half-finished ones.
+
+**This release changed the privacy policy or terms of use.** ShortStack asks you to agree again before it will run.
+
+- Listening is new. With it switched on, the sound of a video is turned into text by whisper.cpp on this computer, and what was said is kept here with the video. None of it is uploaded anywhere.
+- Posting to TikTok and Instagram is new. ShortStack makes a copy of the video in the format those platforms take, keeps it on this computer, and opens their sites in your browser for you to post. It never signs in to them or sends them anything itself.
+- Downloading a listening engine or model contacts GitHub and Hugging Face, and only when you ask for that download. Nothing from your videos goes with it.
+
 ## 1.2.0 — Descriptions, tags and titles you can trust, and a schedule you can change from anywhere
 
 _Released 2026-09-13_
