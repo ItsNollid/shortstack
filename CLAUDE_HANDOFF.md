@@ -69,6 +69,8 @@ user-facing wording work this way.
 | `shared/suggestionMerge.ts` | Adding a suggestion to what is already written instead of replacing it. |
 | `shared/platformPosts.ts` | Captions for TikTok and Instagram, what a post link looks like, and what counts as posted. |
 | `shared/listening.ts` | Which whisper engines and models are offered, and which suit this computer. |
+| `shared/assistant/` | The channel assistant’s facts, prompt, reply parsing and number check. Code writes every fact; the model only phrases. |
+| `main/assistant/service.ts` | One assistant question at a time, streamed from Ollama and checked before it is shown. |
 
 Several of those have tests that cross-check them **against the state machine itself**, so the UI
 cannot offer an action the backend will refuse.

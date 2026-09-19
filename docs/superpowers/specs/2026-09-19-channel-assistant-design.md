@@ -47,7 +47,7 @@ A short channel summary is included in every scope, so "and how's the channel ov
 1. **Facts (code).** For the scope, code produces finished sentences, each with a short id:
    - *Channel* — the findings Analytics saved, with confidence, and how old they are.
    - *Video* — its state and the reason (from `presentation.ts`); the cover and first-second check; the
-     title-vs-screen check; the description check; what was said, if listened to (an excerpt); its title
+     title-vs-screen check; what was said, if listened to (an excerpt); its title
      kind; file warnings such as "not a Short".
    - *Published video* — its numbers against the channel's usual, computed in code: "about twice your
      usual views", "people watch 12 points less of it than usual", "subscribers per thousand views: above
@@ -56,6 +56,9 @@ A short channel summary is included in every scope, so "and how's the channel ov
    - *Plan* — counts by state; the next seven days; empty days; the same game or long video back to back;
      new against re-runs; what Fill the calendar would do.
    - *Stuck* — the attention reason, the last error in plain words, when it will try again.
+
+   The description check is left out: it needs the spelling word list, which only the screen loads, and its
+   findings already show directly under the description.
 2. **Answer (model, streamed).** The prompt carries the facts, the last six turns, and the rules: use only
    these facts; never give a number that is not in them; say "not measured" when the facts do not cover
    it; keep it short; propose changes only in the fixed format at the end.
@@ -98,16 +101,20 @@ answer faster.
 
 | Unit | Does | Depends on |
 |---|---|---|
-| `shared/assistant/facts.ts` | Fact sentences for each scope; pure | insights, presentation, videoReading, titlePromise, queue types |
+| `shared/assistant/channelFacts.ts` | The channel’s saved findings as facts, and how old they are; pure | insights |
+| `shared/assistant/videoFacts.ts` | One video’s state and checks as facts, and why it is stuck; pure | presentation, videoReading, titlePromise |
 | `shared/assistant/compare.ts` | A published video against the channel's usual | `insights.median` |
 | `shared/assistant/plan.ts` | Plan balance: gaps, runs of one game or long video | queue DTOs, `fillSchedule` |
 | `shared/assistant/prompt.ts` | The prompt from facts, history and scope | facts |
 | `shared/assistant/reply.ts` | Splits prose from the change block; parses changes; the number check | `channelActions` |
 | `shared/assistant/followUps.ts` | Follow-up questions for a scope and the last question | — |
 | `main/ai/ollamaChat.ts` | Streaming `/api/chat`: reads NDJSON, separates thinking from content, aborts, warms | settings |
-| `main/assistant/service.ts` | Gathers facts from the database for a scope; one request at a time; emits stream events | the above, repos |
-| IPC | `assistantAsk(scope, question, history)`, `assistantStop(id)`, `assistantWarm()`; event `assistant:stream` | `shared/ipc.ts` |
-| `src/renderer/components/assistant/AssistantPanel.tsx`, `useAssistant.ts` | The panel, chips, streaming view, change buttons | IPC, existing apply paths |
+| `main/assistant/gather.ts` | Gathers the facts for a scope from the database and the last Analytics pull; reads only | the fact builders, repos |
+| `main/assistant/service.ts` | One request at a time; streams, then checks; emits stream events | gather, prompt, reply, ollamaChat |
+| IPC | `assistantAsk(requestId, scope, question, history)`, `assistantStop(requestId)`, `assistantWarm()`; event `assistant:stream` | `shared/ipc.ts` |
+| `src/renderer/components/assistant/AssistantProvider.tsx` | Open or closed, the scope, Ctrl+K, and each page’s scope | — |
+| `src/renderer/components/assistant/useAssistantChat.ts` | The conversation and its stream | IPC |
+| `src/renderer/components/assistant/AssistantPanel.tsx`, `VideoDraftRow.tsx` | The panel, chips, streaming view, change buttons | IPC, `SettingChangeRow`, suggestionMerge |
 
 `insight_findings` stays the store for findings. The Brief gains `madeAt`, and `parseBrief` accepts
 briefs without it.
