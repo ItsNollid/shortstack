@@ -17,6 +17,16 @@ so it reaches people who missed it the first time — without notifying your sub
   [Ollama](https://ollama.com). A model that can see images is shown stills from the video, so it
   can name the game rather than guess from the file name. Nothing is sent anywhere else.
 - **Reuses details from videos you published before**, from a searchable list of your uploads.
+- **Looks at the video.** Stills from across the clip offer a cover frame from the play rather than
+  a menu, say whether the first second shows anything worth staying for, and flag a title that
+  promises something the picture does not show.
+- **Listens, if you switch it on.** whisper.cpp turns what is said into text on this computer, and
+  the titles get written from it. Off by default; the engine and model are downloaded from Settings.
+- **Posts to TikTok and Instagram too**, the same way: it makes a copy in the format each one takes,
+  hands you the caption, opens their site, and keeps the link to your post. It holds no account with
+  either, and each platform is a per-video choice.
+- **Fills the calendar in one click**, giving every video without a time the next free one from your
+  daily times — shown as a list first, undone from the message, and never an approval.
 - **Uploads either way**: through YouTube Studio with ShortStack walking you through it, or
   directly through the API once your Google Cloud project passes YouTube's audit.
 
@@ -54,10 +64,12 @@ something newer, and downloads only when you ask. See [docs/releasing.md](docs/r
 
 ## Privacy
 
-Everything is kept on your computer: the database, your settings, and your Google tokens, which are
-encrypted with Windows' own secure storage. The only services it contacts are Google's YouTube APIs
-and — only if you switch it on — Ollama on `127.0.0.1`. The full text is in
-[docs/legal](docs/legal), and reachable inside the app at any time.
+Everything is kept on your computer: the database, your settings, transcripts, and your Google tokens,
+which are encrypted with Windows' own secure storage. What it contacts, and nothing else: Google's
+YouTube APIs; Ollama on `127.0.0.1`, if you switch suggestions on; GitHub and Hugging Face, only when
+you ask it to download listening software; and GitHub Releases, to see whether a newer version exists.
+TikTok and Instagram are opened in your browser for you to post — ShortStack sends them nothing itself.
+The full text is in [docs/legal](docs/legal), and reachable inside the app at any time.
 
 ShortStack is not affiliated with, endorsed by, or sponsored by YouTube or Google.
 

@@ -13,7 +13,7 @@ finished. It was not. What follows is meant to be accurate, including about what
 ```bash
 npm install
 npm run dev            # the app, dev profile, dry-run
-npm test               # 548 tests
+npm test               # 1238 tests
 npm run typecheck      # main + renderer
 npm run build          # electron-vite build
 npm run preview:ui     # the interface in a browser, with stubbed data, for design work
@@ -64,6 +64,11 @@ user-facing wording work this way.
 | `shared/queueActions.ts` | Which bulk actions a selection can take. |
 | `shared/consent.ts` | What the approval dialog promises, per upload mode. |
 | `shared/presentation.ts` | Every state's label, tone and explanation. One place. |
+| `shared/slotBooking.ts` | Booking the next free publish time. The scheduler and Fill the calendar share it, so they cannot disagree. |
+| `shared/fillSchedule.ts` | Which videos Fill the calendar offers times to, and in what order. |
+| `shared/suggestionMerge.ts` | Adding a suggestion to what is already written instead of replacing it. |
+| `shared/platformPosts.ts` | Captions for TikTok and Instagram, what a post link looks like, and what counts as posted. |
+| `shared/listening.ts` | Which whisper engines and models are offered, and which suit this computer. |
 
 Several of those have tests that cross-check them **against the state machine itself**, so the UI
 cannot offer an action the backend will refuse.
@@ -146,7 +151,10 @@ reaches the same people and is the pattern YouTube’s repetitious content rules
 be switched off; the Settings hint says why it is there.
 
 **Review** (`/review`) is the screen for deciding at volume: one card, single-key actions, and a
-cursor that stays put as the list shrinks under it.
+cursor that stays put as the list shrinks under it. It now holds everything the queue does — every
+field, the schedule, the platforms and the checks — so a video can be finished there and not opened
+again. Approving from it goes through the same consent dialog as everywhere else: `app/approval.tsx`
+is the only path to `queueApprove`.
 
 ---
 
@@ -161,6 +169,12 @@ Being specific about this, because the last handoff was not.
   YouTube refuses, the item is flagged "set the schedule in Studio" with the exact time.
 - **Whether `fileDetails` is returned for private videos**, which is how assisted uploads are
   detected. The paste-the-link fallback exists for when it is not.
+- **No post has been made to TikTok or Instagram through ShortStack.** Only assisted posting exists:
+  it makes the file, writes the caption and opens their site. Neither API is called, and neither
+  developer app has been created yet.
+- **Listening has never run on a graphics card here.** The processor build is what has been used. The
+  CUDA 11.8 build was measured falling back to the processor with no cuBLAS library, so the installer
+  refuses a graphics build without one and the catalog offers 12.4 instead, which nobody has run yet.
 
 Answered since: **Windows does repaint the taskbar button** when `setIcon` is called on an
 installed build — confirmed by a person looking at their own taskbar. The channel picture goes
