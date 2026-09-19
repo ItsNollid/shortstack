@@ -43,6 +43,7 @@ import { isOtherPlatform, parsePostLink, type OtherPlatform, type PostEvent } fr
 import { PLATFORMS, type Platform } from '../shared/queue';
 import { findTools, renderForPlatforms, renderPath } from './media/renderRunner';
 import { setQueuePlatforms } from './db/queueRepo';
+import { forgetChannelData } from './youtube/channelData';
 import { applyFill, previewFill, undoFill } from './scheduler/fill';
 
 export interface IpcContext {
@@ -66,6 +67,8 @@ export interface IpcContext {
   rendersDir?: string;
   /** The app's icon follows the connected channel's picture. */
   appIcon: { refresh(avatarUrl: string | null): Promise<boolean>; clear(): Promise<void> };
+  /** The analytics kept for the page, shared so retention can clear them too. */
+  analytics: PulledCache;
 }
 
 type Handlers = { [K in Exclude<keyof ShortStackApi, 'on'>]: ShortStackApi[K] };
@@ -192,7 +195,7 @@ export function registerIpcHandlers(context: IpcContext): void {
 
   // The last answer to each Analytics question, kept while the app runs so that opening the page does
   // not ask YouTube again. Cleared whenever the channel is disconnected or another one connected.
-  const analyticsPulls = new PulledCache();
+  const analyticsPulls = context.analytics;
 
   const handlers: Handlers = {
     appInfo: async (): Promise<AppInfo> => ({
@@ -505,19 +508,12 @@ export function registerIpcHandlers(context: IpcContext): void {
     },
     authDisconnect: async () => {
       await auth.disconnect();
-      // Stored channel data goes when access is revoked, as the API policies require. The cached
-      // channel picture is part of that, so the icon goes back to the ShortStack mark here.
-      clearChannels(db);
-      await context.appIcon.clear();
-      // Poster frames are drawn from the user's own videos, so they go with the rest of it.
-      await clearThumbnails(context.thumbnailDir);
-      // The uploads list kept for drafting is this channel's data too, and goes when permission does.
-      clearPastUploadsCache();
-      // So do the analytics kept for the page.
-      analyticsPulls.clear();
-      for (const item of listQueueItems(db)) {
-        if (item.youtube_video_id !== null) applyQueueEvent(db, item.id, { type: 'disconnect' }, eventContext());
-      }
+      // Stored channel data goes when access is revoked, as the API policies require — the same sweep
+      // retention makes when access disappears without anyone pressing this.
+      await forgetChannelData(
+        { db, thumbnailDir: context.thumbnailDir, appIcon: context.appIcon, analytics: analyticsPulls, ...eventContext() },
+        'access_gone'
+      );
       broadcast(context.getWindow(), 'auth:changed');
       changed();
       return ok(await authStatus());

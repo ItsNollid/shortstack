@@ -7,6 +7,8 @@ import { runtimeProfile } from './bootstrap/profile';
 import { getDb, initDatabase } from './db/appDatabase';
 import { readSettings, writeSetting } from './db/settingsRepo';
 import { broadcast, registerIpcHandlers } from './ipc';
+import { PulledCache } from './youtube/pulledCache';
+import { checkChannelRetention } from './youtube/retention';
 import { createSchedulerEffects } from './scheduler/effects';
 import { DraftWorker } from './ai/draftWorker';
 import { UpdateService } from './updates/updateService';
@@ -31,6 +33,7 @@ let engine: SchedulerEngine | null = null;
 let draftWorker: DraftWorker | null = null;
 let updates: UpdateService | null = null;
 let updateTimer: ReturnType<typeof setInterval> | null = null;
+let retentionTimer: ReturnType<typeof setInterval> | null = null;
 let appIcon: AppIcon | null = null;
 let isQuitting = false;
 
@@ -123,6 +126,8 @@ async function start(): Promise<void> {
   });
 
   const thumbnailDir = path.join(app.getPath('userData'), 'thumbs');
+  // Shared with the retention check, which clears it when the channel details go.
+  const analytics = new PulledCache();
   handleMediaRequests({ db, thumbnailDir });
 
   appIcon = new AppIcon({
@@ -209,7 +214,8 @@ async function start(): Promise<void> {
     draftWorker,
     updates,
     getWindow: () => mainWindow,
-    appIcon
+    appIcon,
+    analytics
   });
 
   mainWindow = createMainWindow({
@@ -264,6 +270,31 @@ async function start(): Promise<void> {
   void updates.check();
   updateTimer = setInterval(() => void updates?.check(), 6 * 60 * 60_000);
   if (typeof updateTimer.unref === 'function') updateTimer.unref();
+
+  // The privacy policy promises channel details are confirmed with YouTube while ShortStack is connected,
+  // and deleted when access goes or a month passes without confirming them. Nothing else would notice either.
+  const icon = appIcon;
+  const checkRetention = (): void => {
+    if (icon === null) return;
+    void checkChannelRetention({
+      db,
+      gateway,
+      authState: () => auth.state(),
+      appIcon: icon,
+      analytics,
+      thumbnailDir,
+      uploadMethod: () => readSettings(db).settings.upload_method,
+      onForgotten: () => {
+        broadcast(mainWindow, 'auth:changed');
+        broadcast(mainWindow, 'queue:changed');
+      }
+    }).catch((error: unknown) => {
+      console.warn('[ShortStack] the channel retention check failed:', error);
+    });
+  };
+  checkRetention();
+  retentionTimer = setInterval(checkRetention, 12 * 60 * 60_000);
+  if (typeof retentionTimer.unref === 'function') retentionTimer.unref();
   refreshStatusBadge();
   console.info(`[ShortStack] started (uploads ${runtimeProfile.uploads})`);
 }
@@ -292,6 +323,7 @@ app.on('before-quit', () => {
   engine?.stop();
   draftWorker?.stop();
   if (updateTimer !== null) clearInterval(updateTimer);
+  if (retentionTimer !== null) clearInterval(retentionTimer);
 });
 
 

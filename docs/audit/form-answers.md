@@ -97,8 +97,10 @@ set the publish time and visibility of videos the user approved.
   revokes the token immediately and deletes the stored tokens, channel details, cached channel
   picture and analytics. The same page links to the Google account permissions page. Uploaded
   videos keep a local marker so they can never be uploaded a second time.
-- **Retention** — Channel details and the channel picture are refreshed on every launch and are
-  deleted if they cannot be refreshed for 30 days.
+- **Retention** — Channel details and the channel picture are confirmed with YouTube at launch and
+  twice a day while ShortStack runs. If access is taken away they are deleted at the next check; if
+  they simply cannot be confirmed for 30 days they are deleted then. Videos already uploaded keep a
+  local marker either way, so none can ever be uploaded twice.
 - **Other platforms** — TikTok and Instagram are each their own switch, per video, off by default,
   and can be switched off again at any time before the user posts. Nothing reaches any platform
   without the user posting it themselves.

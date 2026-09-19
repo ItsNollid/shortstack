@@ -31,6 +31,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       'The Review page now holds everything the queue does — title, description, tags, visibility, publish time, platforms and every check — so a video can be finished there and never opened again.',
       'A suggested description or set of tags can be added to the start or the end of what you already wrote, instead of only replacing it.',
       'One button fills the calendar: every video without a time gets the next free one from your daily times, listed before anything changes and undone from the message afterwards. It never approves or uploads anything.',
+      'Your channel details are confirmed with YouTube while ShortStack is connected, and deleted if access is taken away or a month goes by without confirming them. The privacy policy always said so; now the app does it.',
       'An update arrives as one release rather than two half-finished ones.'
     ],
     legal: [
