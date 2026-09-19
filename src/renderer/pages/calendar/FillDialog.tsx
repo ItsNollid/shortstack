@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import type { FillPlan } from '../../../shared/fillSchedule';
 import type { Result } from '../../../shared/ipc';
 import { Banner, Button, Dialog } from '../../components/ui';
+import { useAppStatus } from '../../app/status';
 import { useApiMutation, useApiQuery } from '../../hooks/useApi';
 import styles from './Calendar.module.css';
 
@@ -27,6 +28,9 @@ const timeLabel = (iso: string): string =>
 /** Shows every time a fill would give before anything is written. Filling gives times; it never approves or uploads. */
 export function FillDialog({ open, onCancel, onFilled }: FillDialogProps): React.JSX.Element {
   // Unset until the first preview: then videos waiting for approval are included only when nothing else would be filled.
+  const { settings } = useAppStatus();
+  // Times come from the daily schedule, so with none set there is nothing to give, whatever the queue holds.
+  const noTimes = settings !== null && settings.upload_times.length === 0 && settings.rotation_upload_times.length === 0;
   const [include, setInclude] = useState<boolean | null>(null);
   useEffect(() => {
     if (!open) setInclude(null);
@@ -104,9 +108,11 @@ export function FillDialog({ open, onCancel, onFilled }: FillDialogProps): React
         <div className={styles.fillText}>Working out the times…</div>
       ) : count === 0 ? (
         <div className={styles.fillText}>
-          {plan.leftOver > 0
-            ? 'There is no free time left in the days ShortStack books ahead.'
-            : 'Every video that can have a time already has one.'}
+          {noTimes
+            ? 'No daily times are set, so there is nothing to give. Add one in Settings, under Daily schedule.'
+            : plan.leftOver > 0
+              ? 'There is no free time left in the days ShortStack books ahead.'
+              : 'Every video that can have a time already has one.'}
         </div>
       ) : (
         <>
@@ -134,7 +140,7 @@ export function FillDialog({ open, onCancel, onFilled }: FillDialogProps): React
         </>
       )}
 
-      {ready && plan.leftOver > 0 && (
+      {ready && plan.leftOver > 0 && !noTimes && (
         <div className={styles.fillHint}>
           {plural(plan.leftOver, 'more video')} {plan.leftOver === 1 ? 'does' : 'do'} not fit in the next {plural(plan.horizonDays, 'day')}.
           ShortStack books that far ahead; change it in Settings, under Daily schedule.

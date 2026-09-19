@@ -119,6 +119,30 @@ async function check(filePath: string, info: MediaInfo): Promise<Record<PostPlat
   return { tiktok: problemsFor(info, 'tiktok'), instagram: [...problemsFor(info, 'instagram'), ...layout] };
 }
 
+/**
+ * How long a copy made for TikTok and Instagram is kept. Each one is the whole video again, and nothing else
+ * ever deletes them: without this, every video posted anywhere leaves a second copy in the app's data folder
+ * for good. A month covers posting one and coming back to it; anything older is made again in a minute.
+ */
+export const RENDER_KEEP_MS = 30 * 24 * 60 * 60_000;
+
+/** Drops copies nothing has wanted for a month. Returns how many files went. */
+export async function pruneRenders(dir: string, now: Date = new Date(), keepMs: number = RENDER_KEEP_MS): Promise<number> {
+  const names = await fs.readdir(dir).catch(() => null);
+  if (names === null) return 0;
+  let removed = 0;
+  for (const name of names) {
+    // Only the pairs this module writes: a video's copy and the note saying which file it was made from.
+    if (!/^\d+\.(mp4|json)$/.test(name)) continue;
+    const each = path.join(dir, name);
+    const stat = await fs.stat(each).catch(() => null);
+    if (stat === null || now.getTime() - stat.mtimeMs <= keepMs) continue;
+    await fs.rm(each, { force: true }).catch(() => undefined);
+    removed += 1;
+  }
+  return removed;
+}
+
 const inFlight = new Map<number, Promise<RenderResult>>();
 
 /** One render per video at a time: a second request for the same video waits for the first. */
@@ -132,6 +156,7 @@ export function renderForPlatforms(deps: RenderDeps, source: RenderSource): Prom
 
 async function render(deps: RenderDeps, source: RenderSource): Promise<RenderResult> {
   const run = deps.run ?? runTool;
+  await pruneRenders(deps.dir);
   const stat = await fs.stat(source.filePath).catch(() => null);
   if (stat === null) return { ok: false, reason: 'The video file is not where it was' };
 
